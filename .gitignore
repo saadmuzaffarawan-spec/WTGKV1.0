@@ -1,0 +1,41 @@
+/build/
+# Build output directories
+build/
+bin/
+out/
+x64/
+x86/
+
+# Visual Studio temporary files & caches
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Compiler artifacts
+*.obj
+*.o
+*.lib
+*.a
+*.exp
+*.ilk
+*.pdb
+*.idb
+*.res
+
+# Clang / CMake compilation database
+compile_commands.json
+.cache/
+
+# OS specific files
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+.DS_Store
