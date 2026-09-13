@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: configure",
+      "type": "shell",
+      "command": "cmake --preset default",
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "CMake: build",
+      "type": "shell",
+      "command": "cmake --build --preset default --config RelWithDebInfo",
+      "problemMatcher": "$msCompile",
+      "dependsOn": "CMake: configure",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

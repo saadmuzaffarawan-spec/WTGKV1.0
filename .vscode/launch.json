@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run What The Ground Keeps",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/RelWithDebInfo/WhatTheGroundKeeps.exe",
+      "cwd": "${workspaceFolder}/build/RelWithDebInfo",
+      "preLaunchTask": "CMake: build",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}
