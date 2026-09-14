@@ -39,6 +39,7 @@ set(WTGK_SOURCES
     src/systems/atmospheric_particles.cpp
     src/systems/procedural_shop_assets.cpp
     src/systems/cctv_surveillance.cpp
+    src/systems/hud_manager.cpp
 )
 
 if(WIN32)

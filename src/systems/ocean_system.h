@@ -496,7 +496,7 @@ static float g_waterSmoothTiltRoll = 0.0f;
 // Audio generators for procedural water soundscapes
 static Sound g_sndWaterSplash;
 static Sound g_sndSurfacingGasp;
-static Sound g_sndFogBell;
+extern Sound g_sndFogBell;
 
 static Sound GenerateWaterSplashSound() {
     int sampleRate = 44100;
