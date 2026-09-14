@@ -37,6 +37,7 @@ set(WTGK_SOURCES
     src/systems/blackwood_college.cpp
     src/systems/shop_lighting.cpp
     src/systems/atmospheric_particles.cpp
+    src/systems/procedural_shop_assets.cpp
 )
 
 if(WIN32)

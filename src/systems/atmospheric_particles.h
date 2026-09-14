@@ -28,3 +28,4 @@ void DrawShopProductsAndParticles(const Camera3D &camera, float walkTime = 0.0f,
 int  GetCrosshairFocusedProduct(const Camera3D &camera, float maxReach = 2.8f, bool allowCart = false);
 
 void ToggleGameFullscreen();
+
