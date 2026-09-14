@@ -38,6 +38,7 @@ set(WTGK_SOURCES
     src/systems/shop_lighting.cpp
     src/systems/atmospheric_particles.cpp
     src/systems/procedural_shop_assets.cpp
+    src/systems/cctv_surveillance.cpp
 )
 
 if(WIN32)

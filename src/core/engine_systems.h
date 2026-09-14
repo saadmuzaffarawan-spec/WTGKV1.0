@@ -19,3 +19,4 @@
 #include "../systems/shop_lighting.h"
 #include "../systems/atmospheric_particles.h"
 #include "../systems/procedural_shop_assets.h"
+#include "../systems/cctv_surveillance.h"

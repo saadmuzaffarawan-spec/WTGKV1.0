@@ -184,15 +184,11 @@ static Sound g_sndPhoneTap;
 
 // --- DISTINCT STRONG HEADING & HIGH-LEGIBILITY MENU FONTS FROM ASSETS ---
 
-static Font g_fontTitle;    // assets/alagard.ttf @ 52px - Strong, gothic horror display font for main titles
-
-static Font g_fontHeadSub;  // assets/alagard.ttf @ 30px - Distinct horror display font for headers & banners
-
-Font g_fontMenu;            // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
-
-static Font g_fontBody;     // assets/IBMPlexMono-Medium.ttf @ 20px - Crisp monospace for lore transcripts & settings
-
-static Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, timestamps & status stamps
+Font g_fontTitle;    // assets/alagard.ttf @ 52px - Strong, gothic horror display font for main titles
+Font g_fontHeadSub;  // assets/alagard.ttf @ 30px - Distinct horror display font for headers & banners
+Font g_fontMenu;     // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
+Font g_fontBody;     // assets/IBMPlexMono-Medium.ttf @ 20px - Crisp monospace for lore transcripts & settings
+Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, timestamps & status stamps
 
 #include "systems/ui_helpers.h"
 
@@ -1292,18 +1288,7 @@ int main() {
 
 
 
-    // Gas Station, Shopkeeper & Front Roof Wall CCTV State
-
-    bool isRoofCamActive = false;
-
-    float roofCamSlideX  = 0.0f;   // Sliding along front roof wall rail (-3.2 to +3.2)
-
-    float roofCamPitch   = -14.0f; // Tilt angle (-65 to +28 deg)
-
-    float roofCamYaw     = 0.0f;   // Pan angle (-85 to +85 deg)
-
-    float roofCamFOV     = 65.0f;  // Optical zoom (15 to 80 deg)
-
+    // Gas Station, Shopkeeper & Front Roof Wall CCTV State (defined in cctv_surveillance.cpp)
     float doorSlideProgress  = 0.0f; // 0.0f = closed, 1.0f = fully open
 
     float doorSlideVel       = 0.0f; // critically damped spring velocity
@@ -4384,10 +4369,6 @@ auto RunIntroCinematic = [&]() {
 
     int  g_caseFileSelected = 0;
 
-    int  g_menuCCTVFeed = 0; // 0: Cold Storage Aisle, 1: Forecourt & Pumps, 2: Blackwood College Portico
-
-    float g_cctvSwitchGlitch = 0.0f;
-
     // --- Phase 1: Ultimate Interactive Horror Menu State ---
     static float   g_menuIdleTimer          = 0.0f;   // Seconds mouse has remained stationary
     static float   g_menuAwakeIntensity     = 1.0f;   // 1.0 = fully awake/bright, 0.12 = dark slumber
@@ -4818,67 +4799,7 @@ auto RunIntroCinematic = [&]() {
 
         if (IsKeyPressed(KEY_V) && !showQuitConfirm) isThirdPerson = !isThirdPerson;
 
-        if (IsKeyPressed(KEY_C) && !isShopOpen && !showQuitConfirm) isRoofCamActive = !isRoofCamActive;
-
-
-
-        // FRONT ROOF WALL CCTV CONTROLS: Sliders along the front roof edge wall
-
-        if (isRoofCamActive && !showQuitConfirm) {
-
-            // Slide along the front roof edge rail with A / D
-
-            if (IsKeyDown(KEY_A)) roofCamSlideX = Clamp(roofCamSlideX - dt * 4.5f, -3.2f, 3.2f);
-
-            if (IsKeyDown(KEY_D)) roofCamSlideX = Clamp(roofCamSlideX + dt * 4.5f, -3.2f, 3.2f);
-
-
-
-            // Strong Optical Zooming: Mouse Wheel or W / S
-
-            float wheel = GetMouseWheelMove();
-
-            if (wheel != 0.0f) roofCamFOV = Clamp(roofCamFOV - wheel * 4.5f, 15.0f, 80.0f);
-
-            if (IsKeyDown(KEY_W)) roofCamFOV = Clamp(roofCamFOV - dt * 28.0f, 15.0f, 80.0f);
-
-            if (IsKeyDown(KEY_S)) roofCamFOV = Clamp(roofCamFOV + dt * 28.0f, 15.0f, 80.0f);
-
-
-
-            // Mouse Look: Pan & Tilt (Only when cursor is captured)
-
-            if (isCursorCaptured) {
-
-                Vector2 mDelta = GetMouseDelta();
-
-                roofCamYaw   = Clamp(roofCamYaw - mDelta.x * 0.22f, -85.0f, 85.0f);
-
-                roofCamPitch = Clamp(roofCamPitch - mDelta.y * 0.22f, -65.0f, 28.0f);
-
-            }
-
-
-
-            if (IsKeyDown(KEY_LEFT))  roofCamYaw   = Clamp(roofCamYaw + dt * 45.0f, -85.0f, 85.0f);
-
-            if (IsKeyDown(KEY_RIGHT)) roofCamYaw   = Clamp(roofCamYaw - dt * 45.0f, -85.0f, 85.0f);
-
-            if (IsKeyDown(KEY_UP))    roofCamPitch = Clamp(roofCamPitch + dt * 35.0f, -65.0f, 28.0f);
-
-            if (IsKeyDown(KEY_DOWN))  roofCamPitch = Clamp(roofCamPitch - dt * 35.0f, -65.0f, 28.0f);
-
-        } else {
-
-            // Strange Autonomous Horror Behavior: Robotic CCTV box slowly creeps along the front roof wall!
-
-            roofCamSlideX = sinf(timeVal * 0.8f) * 2.8f;
-
-            roofCamPitch  = -15.0f + sinf(timeVal * 0.5f) * 4.0f;
-
-            roofCamYaw    = sinf(timeVal * 0.9f) * 24.0f;
-
-        }
+        UpdateRoofCCTV(dt, timeVal, isCursorCaptured, showQuitConfirm, isShopOpen);
 
 
 
@@ -8598,69 +8519,7 @@ auto RunIntroCinematic = [&]() {
         
 
         if (isRoofCamActive) {
-
-            // CCTV SURVEILLANCE CAMERA VIEW: Clean viewpoint placed forward of roof edge so you see the pure world (no camera parts clip into screen!)
-
-            Vector3 camPos = { 128.0f + roofCamSlideX, 15.35f, 133.05f };
-
-            renderCam.position = camPos;
-
-
-
-            // Compute look target facing South toward oncoming road + user pan/tilt
-
-            float radPitch = roofCamPitch * DEG2RAD;
-
-            float radYaw   = (180.0f + roofCamYaw) * DEG2RAD;
-
-            Vector3 forwardDir = { sinf(radYaw) * cosf(radPitch), sinf(radPitch), cosf(radYaw) * cosf(radPitch) };
-
-            renderCam.target = Vector3Add(camPos, forwardDir);
-
-            renderCam.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-
-            renderCam.fovy = roofCamFOV;
-
-
-
-            // Draw player '@' model visible from roof CCTV perspective (Bigger & 3D)
-
-            Matrix mp = MatrixIdentity();
-
-            mp.m0 = 0.2f; mp.m1 = 0.88f; mp.m2 = 0.35f; mp.m3 = 1.0f; // Terminal green
-
-            mp.m4 = 1.45f; mp.m5 = 1.45f;
-
-            mp.m8 = 0.0f; mp.m9 = 0.0f; mp.m10 = 0.0f; mp.m11 = 1.0f; // Billboard
-
-            mp.m12 = camera.position.x;
-
-            mp.m13 = camera.position.y - 0.7f;
-
-            mp.m14 = camera.position.z;
-
-
-
-            Vector3 camToCctvP = Vector3Normalize(Vector3Subtract(camera.position, renderCam.position));
-
-            for (int slice = -2; slice <= 2; slice++) {
-
-                Matrix sm = mp;
-
-                sm.m12 += camToCctvP.x * (slice * 0.035f);
-
-                sm.m13 += camToCctvP.y * (slice * 0.035f);
-
-                sm.m14 += camToCctvP.z * (slice * 0.035f);
-
-                float shade = (slice == 0) ? 1.0f : (1.0f - abs(slice) * 0.20f);
-
-                sm.m0 *= shade; sm.m1 *= shade; sm.m2 *= shade;
-
-                playerInstances['@'].push_back(sm);
-
-            }
-
+            SetupRoofCCTVCamera(renderCam, camera, playerInstances);
         } else if (isThirdPerson) {
 
             // ELASTIC THIRD PERSON CAMERA (INDOOR AWARE & WALL-COLLISION PROTECTED)
@@ -8933,24 +8792,8 @@ auto RunIntroCinematic = [&]() {
                 g_skullEyeSmoothX += (mNormX - g_skullEyeSmoothX) * Clamp(dt * 7.5f, 0.0f, 1.0f);
                 g_skullEyeSmoothY += (mNormY - g_skullEyeSmoothY) * Clamp(dt * 7.5f, 0.0f, 1.0f);
 
-                float breatheY = sinf(timeVal * 0.75f) * 0.035f;
-                float breatheX = cosf(timeVal * 0.45f) * 0.045f;
-
                 Vector3 basePos, baseTgt;
-
-                if (g_menuCCTVFeed == 0) {
-                    // CAM 01: Elevated perspective showcasing college facade & grand steps
-                    basePos = (Vector3){ 141.6f - g_menuCamSmoothX * 0.35f + breatheX * 0.4f, 13.85f + breatheY * 0.5f - g_menuCamSmoothY * 0.20f, 136.2f };
-                    baseTgt = (Vector3){ 152.0f + g_menuCamSmoothX * 1.0f, 14.50f - g_menuCamSmoothY * 0.60f, 140.0f };
-                } else if (g_menuCCTVFeed == 1) {
-                    // CAM 02: Courtyard & South Facade - high crane perspective across rain-swept grounds towards entrance
-                    basePos = (Vector3){ 136.5f - g_menuCamSmoothX * 0.55f + breatheX * 0.5f, 14.20f + breatheY * 0.4f - g_menuCamSmoothY * 0.30f, 122.0f };
-                    baseTgt = (Vector3){ 155.0f + g_menuCamSmoothX * 1.2f, 12.00f - g_menuCamSmoothY * 0.70f, 138.0f };
-                } else {
-                    // CAM 03: Portico Vestibule Looking Out - under the grand portico looking out between columns into stormy night
-                    basePos = (Vector3){ 152.2f - g_menuCamSmoothX * 0.25f + breatheX * 0.3f, 11.80f + breatheY * 0.5f - g_menuCamSmoothY * 0.15f, 140.0f };
-                    baseTgt = (Vector3){ 136.0f + g_menuCamSmoothX * 1.1f, 11.20f - g_menuCamSmoothY * 0.50f, 137.0f };
-                }
+                GetMenuCCTVCamera(g_menuCCTVFeed, timeVal, g_menuCamSmoothX, g_menuCamSmoothY, basePos, baseTgt);
 
                 // Cinematic camera dolly surge forward down the corridor when PLAY is activated
                 float targetFov = g_userFov;
@@ -9963,110 +9806,11 @@ auto RunIntroCinematic = [&]() {
 
 
             // =====================================================================
-
             // 7. FRONT ROOF WALL GUIDE RAIL & CREEPING CCTV BOX CAMERA
-
             // Mounted on the front roof edge wall. Appears fully when viewed from outside,
-
             // but hidden while looking through it so you see the pure world!
-
             // =====================================================================
-
-            {
-
-                // 1. Standoff Brackets anchoring the rail forward from the front canopy fascia (Y = 15.22, Z = 133.25)
-
-                float bracketXs[4] = { 124.6f, 126.8f, 129.2f, 131.4f };
-
-                for (int b = 0; b < 4; b++) {
-
-                    DrawCube({ bracketXs[b], 15.22f, 133.25f }, 0.10f, 0.16f, 0.26f, { 25, 25, 28, 255 });
-
-                }
-
-
-
-                // 2. Continuous Front Roof Wall Steel Rail Tube (X: 124.5..131.5, length 7.0m, Y = 15.35, Z = 133.20)
-
-                DrawCube({ 128.0f, 15.35f, 133.20f }, 7.0f, 0.08f, 0.08f, { 35, 36, 40, 255 });
-
-                // End Stopper Caps
-
-                DrawCube({ 124.45f, 15.35f, 133.20f }, 0.14f, 0.22f, 0.14f, { 20, 20, 24, 255 });
-
-                DrawCube({ 131.55f, 15.35f, 133.20f }, 0.14f, 0.22f, 0.14f, { 20, 20, 24, 255 });
-
-
-
-                // 3. PHYSICAL CCTV CAMERA ASSEMBLY (Appears fully when viewed from ground; hidden during CCTV mode so view is unobstructed!)
-
-                if (!isRoofCamActive) {
-
-                    float curCamX = 128.0f + roofCamSlideX;
-
-
-
-                    // Sliding Motorized Carriage gripping the rail
-
-                    DrawCube({ curCamX, 15.35f, 133.20f }, 0.34f, 0.12f, 0.22f, { 26, 26, 30, 255 });
-
-
-
-                    // Articulated Swivel Gimbal Drop Bracket
-
-                    DrawCube({ curCamX, 15.42f, 133.16f }, 0.14f, 0.16f, 0.14f, { 42, 42, 46, 255 });
-
-
-
-                    // Dynamic rotation for camera body based on yaw/pitch
-
-                    float radYaw   = (180.0f + roofCamYaw) * DEG2RAD;
-
-                    float radPitch = roofCamPitch * DEG2RAD;
-
-                    Vector3 fwd = { sinf(radYaw) * cosf(radPitch), sinf(radPitch), cosf(radYaw) * cosf(radPitch) };
-
-                    Vector3 rgt = { fwd.z, 0.0f, -fwd.x };
-
-
-
-                    // Weatherproof Rectangular CCTV Box Housing (Crisp security off-white/beige)
-
-                    Vector3 boxPos = { curCamX + fwd.x * 0.08f, 15.48f + fwd.y * 0.08f, 133.10f + fwd.z * 0.08f };
-
-                    DrawCube(boxPos, 0.36f, 0.24f, 0.46f, { 226, 226, 230, 255 });
-
-                    DrawCubeWires(boxPos, 0.365f, 0.245f, 0.465f, { 90, 90, 95, 255 });
-
-
-
-                    // Matte Black Protective Sunshield / Rain Visor extending over top and front
-
-                    Vector3 visorPos = { boxPos.x + fwd.x * 0.05f, boxPos.y + 0.13f, boxPos.z + fwd.z * 0.05f };
-
-                    DrawCube(visorPos, 0.40f, 0.04f, 0.52f, { 35, 36, 40, 255 });
-
-
-
-                    // Protruding Dark Cylindrical Lens Barrel
-
-                    Vector3 lensPos = { boxPos.x + fwd.x * 0.24f, boxPos.y - 0.02f + fwd.y * 0.24f, boxPos.z + fwd.z * 0.24f };
-
-                    DrawSphere(lensPos, 0.085f, { 12, 14, 18, 255 });
-
-
-
-                    // Active Blinking Red Recording LED beside lens (● REC)
-
-                    bool recBlink = (fmodf(timeVal, 0.8f) < 0.4f);
-
-                    Vector3 ledPos = { lensPos.x + rgt.x * 0.12f, lensPos.y + 0.07f, lensPos.z + rgt.z * 0.12f };
-
-                    DrawSphere(ledPos, 0.035f, recBlink ? (Color){ 255, 12, 12, 255 } : (Color){ 70, 0, 0, 255 });
-
-                }
-
-            }
+            DrawPhysicalCCTVCameraAssembly(timeVal);
 
         }
 
@@ -12387,20 +12131,8 @@ auto RunIntroCinematic = [&]() {
 
 
                 // Mini CRT Surveillance Monitor with phosphor scanlines (Facing Right +Z)
-
                 Vector3 crtPos = { 104.2f, 11.78f, 133.5f };
-
-                DrawCube(crtPos, 0.38f, 0.34f, 0.36f, ApplyShopLighting(crtPos, { 30, 32, 34, 255 }));
-
-                DrawCube({ 104.2f, 11.78f, 133.69f }, 0.28f, 0.25f, 0.03f, { 22, 190, 65, 240 });
-
-                float scanY = 11.78f - 0.10f + fmodf(timeVal * 0.35f, 0.20f);
-
-                DrawLine3D({ 104.07f, scanY, 133.71f }, { 104.33f, scanY, 133.71f }, { 140, 255, 170, 220 });
-
-                bool crtBlink = (fmodf(timeVal, 0.8f) < 0.4f);
-
-                DrawSphere({ 104.33f, 11.91f, 133.70f }, 0.022f, crtBlink ? (Color){ 255, 20, 20, 255 } : (Color){ 80, 0, 0, 255 });
+                DrawMiniCRTSurveillanceMonitor(crtPos, timeVal, [](Vector3 p, Color c) { return ApplyShopLighting(p, c); });
 
 
 
@@ -13829,44 +13561,7 @@ auto RunIntroCinematic = [&]() {
         // =========================================================================
         // AAA ROOF CCTV SURVEILLANCE OVERLAY (ZERO DUPLICATE TEXT & CLEAN CRT TELEMETRY)
         // =========================================================================
-        if (isRoofCamActive) {
-            for (int sl = 0; sl < LOGICAL_H; sl += 4) {
-                DrawLine(0, sl, LOGICAL_W, sl, { 0, 0, 0, 45 });
-            }
-            DrawRectangle(0, 0, LOGICAL_W, LOGICAL_H, { 10, 25, 15, 25 });
-
-            bool recBlink = (fmodf(timeVal, 0.8f) < 0.4f);
-            if (recBlink) {
-                DrawCircle(24, 24, 6, { 240, 20, 20, 255 });
-            }
-            DrawTextSharp(g_fontMenu, "REC", 36, 16, 15.0f, { 240, 20, 20, 255 });
-            DrawTextSharp(g_fontMenu, "CAM 01 - FRONT ROOF WALL // SURVEILLANCE FEED [LIVE]", 85, 16, 15.0f, { 190, 240, 190, 245 });
-
-            float zoomMag = 65.0f / roofCamFOV;
-            char telemBuf[160];
-            snprintf(telemBuf, sizeof(telemBuf), "RAIL POS: %+.1fm  |  ZOOM: %.1fx  |  PAN: %+.0f*  |  PITCH: %+.0f*",
-                     roofCamSlideX, zoomMag, roofCamYaw, roofCamPitch);
-            DrawTextSharp(g_fontSmall, telemBuf, 85, 37, 12.0f, { 140, 220, 140, 230 });
-            DrawTextSharp(g_fontSmall, "SURVEILLANCE ACTIVE", LOGICAL_W - 200, 17, 12.0f, { 120, 240, 120, 220 });
-
-            int cw = 28, ch = 28, thick = 2;
-            DrawRectangle(14, 14, cw, thick, { 100, 180, 100, 200 });
-            DrawRectangle(14, 14, thick, ch, { 100, 180, 100, 200 });
-            DrawRectangle(LOGICAL_W - 14 - cw, 14, cw, thick, { 100, 180, 100, 200 });
-            DrawRectangle(LOGICAL_W - 14, 14, thick, ch, { 100, 180, 100, 200 });
-            DrawRectangle(14, LOGICAL_H - 14 - thick, cw, thick, { 100, 180, 100, 200 });
-            DrawRectangle(14, LOGICAL_H - 14 - ch, thick, ch, { 100, 180, 100, 200 });
-            DrawRectangle(LOGICAL_W - 14 - cw, LOGICAL_H - 14 - thick, cw, thick, { 100, 180, 100, 200 });
-            DrawRectangle(LOGICAL_W - 14, LOGICAL_H - 14 - ch, thick, ch, { 100, 180, 100, 200 });
-
-            DrawLine(LOGICAL_W/2 - 14, LOGICAL_H/2, LOGICAL_W/2 + 14, LOGICAL_H/2, { 100, 180, 100, 160 });
-            DrawLine(LOGICAL_W/2, LOGICAL_H/2 - 14, LOGICAL_W/2, LOGICAL_H/2 + 14, { 100, 180, 100, 160 });
-
-            const char* cctvControls = "[A/D] SLIDE ROOF WALL   |   [MOUSE] PAN/TILT   |   [W/S/WHEEL] ZOOM   |   [C / ESC] EXIT";
-            float cmw = MeasureTextSharp(g_fontSmall, cctvControls, 13.0f);
-            DrawAAAPanel((Rectangle){ ((float)LOGICAL_W - cmw) * 0.5f - 16.0f, (float)LOGICAL_H - 42.0f, cmw + 32.0f, 28.0f }, (Color){ 10, 16, 12, 235 }, (Color){ 70, 165, 75, 220 }, 4.0f, true);
-            DrawTextSharpCentered(g_fontSmall, cctvControls, (float)LOGICAL_W * 0.5f, (float)LOGICAL_H - 34.5f, 13.0f, { 185, 245, 185, 255 });
-        }
+        DrawCCTVSurveillanceOverlay(timeVal);
 
         // =========================================================================
         // AAA SURREAL SHOPKEEPER STORE UI OVERLAY
@@ -14773,57 +14468,8 @@ auto RunIntroCinematic = [&]() {
                 }
             }
 
-            // Feather-light CRT scanlines for analog texture
-            for (int y = 0; y < screenH; y += 4) {
-                DrawLine(0, y, screenW, y, (Color){ 0, 0, 0, 16 });
-            }
-
-            // CCTV Camera Switch Glitch Overlay (video scanline flutter)
-            if (g_cctvSwitchGlitch > 0.0f) {
-                g_cctvSwitchGlitch -= dt;
-                for (int n = 0; n < 8; n++) {
-                    int ly = GetRandomValue(10, screenH - 10);
-                    DrawLine(0, ly, screenW, ly, (Color){ 200, 215, 235, (unsigned char)GetRandomValue(35, 80) });
-                }
-            }
-
-            // Keyboard and Mouse Wheel cycling for CCTV Cameras
-            if (!g_showSettingsModal && !g_showCaseFilesModal && !g_showSurvivalModal && !g_isMenuStartingGame) {
-                int camDelta = 0;
-                if (IsKeyPressed(KEY_Q) || wheelMove < -0.2f) camDelta = 2; // (current + 2) % 3 is previous
-                if (IsKeyPressed(KEY_E) || wheelMove > 0.2f)  camDelta = 1; // (current + 1) % 3 is next
-                if (camDelta != 0) {
-                    g_menuCCTVFeed = (g_menuCCTVFeed + camDelta) % 3;
-                    PlaySound(g_sndRadioStatic);
-                    g_cctvSwitchGlitch = 0.16f;
-                }
-            }
-
-            // Minimalist Floating Camera Switch Tabs at Screen Bottom
-            DrawTextSharp(g_fontSmall, "[ Q / E ]  Vistas:", 45, screenH - 32, 13.0f, (Color){ 150, 155, 165, 190 }, 1.2f);
-            const char* camTabs[3] = { "Portico Arch", "Courtyard", "Vestibule" };
-            int tabSpacing = 145;
-            int tabStartX  = screenW - 470;
-            for (int c = 0; c < 3; c++) {
-                int tx = tabStartX + c * tabSpacing;
-                int ty = screenH - 32;
-                Rectangle tabHit = { (float)(tx - 10), (float)(screenH - 42), 130.0f, 32.0f };
-                bool tHover = CheckCollisionPointRec(mPos, tabHit);
-                bool tActive = (g_menuCCTVFeed == c);
-
-                Color tabCol = tActive ? WHITE : (tHover ? (Color){ 245, 130, 120, 255 } : (Color){ 150, 145, 140, 190 });
-                DrawTextSharp(g_fontSmall, camTabs[c], tx, ty, 13.0f, tabCol, 1.2f);
-                if (tActive) {
-                    int tLen = (int)MeasureTextSharp(g_fontSmall, camTabs[c], 13.0f, 1.2f);
-                    DrawLine(tx, ty + 18, tx + tLen, ty + 18, (Color){ 235, 45, 35, 255 });
-                }
-
-                if (tHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && g_menuCCTVFeed != c) {
-                    g_menuCCTVFeed = c;
-                    PlaySound(g_sndRadioStatic);
-                    g_cctvSwitchGlitch = 0.16f;
-                }
-            }
+            UpdateMenuCCTV(dt, wheelMove, g_showSettingsModal || g_showCaseFilesModal || g_showSurvivalModal || g_isMenuStartingGame, g_sndRadioStatic);
+            DrawMenuCCTVOverlay(screenW, screenH, mPos, dt, g_sndRadioStatic);
 
 
 
