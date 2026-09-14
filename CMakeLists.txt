@@ -33,6 +33,8 @@ set(WTGK_SOURCES
     src/systems/crashed_sedan_site.cpp
     src/systems/hound_npc.cpp
     src/systems/skeleton_cow_npc.cpp
+    src/systems/shovel_system.cpp
+    src/systems/blackwood_college.cpp
 )
 
 if(WIN32)
