@@ -18,6 +18,9 @@
 
 #include <cstring>
 
+#include "core/game_types.h"
+#include "core/engine_systems.h"
+
 
 
 // ============================================================
@@ -30,115 +33,44 @@
 
 
 
-#define LOGICAL_W 1280
 
-#define LOGICAL_H 720
 
-#define CYAN (Color){0, 255, 255, 255}
 
 
 
-#define CHUNK_W 256
 
-#define CHUNK_H 32
 
-#define CHUNK_D 256
 
 
 
-struct Voxel {
 
-    uint8_t glyphIndex;
 
-    Color fgColor;
 
-    bool isSolid;
 
-};
 
 
 
-struct PhysicsParticle {
 
-    Vector3 pos;
 
-    Vector3 vel;
 
-    uint8_t glyphIndex;
 
-    Color color;
 
-    float life;
 
-};
 
 
 
-struct Star {
 
-    Vector3 basePos;
 
-    float phase;
 
-    bool isBig;
 
-};
 
 
 
 
 
-#include "systems/procedural_math.inl"
 
 
 
-// ============================================================
-
-#include "audio/audio_synthesis.h"
-
-
-
-#include "systems/plasma_lightning.inl"
-
-
-
-#include "systems/cloud_system.inl"
-
-
-
-
-
-#include "systems/voxel_mesh_system.inl"
-
-
-
-
-#include "systems/world_structures.inl"
-
-
-
-
-#include "systems/instanced_shader.inl"
-
-
-
-
-#include "systems/hand_item_ui.inl"
-
-
-
-
-
-
-
-
-
-#include "systems/car_cockpit_cinematic.inl"
-
-
-
-
-#include "systems/shop_item_types.inl"
 
 // --- KINEMATIC HORROR CAMERA & VIEWMODEL INERTIA CONTROLLER ---
 
@@ -196,61 +128,13 @@ static bool  g_autoDispenseMode    = false; // Store counter console toggle
 static float g_stationBellBannerTimer = 0.0f;
 static char  g_stationBellBanner[128] = { 0 };
 
-enum CustomerCarState {
-    CAR_INACTIVE,
-    CAR_APPROACHING,
-    CAR_PARKED,
-    CAR_REFUELING,
-    CAR_PAID,
-    CAR_DEPARTING
-};
-
-struct CustomerCar {
-    CustomerCarState state;
-    Vector3 pos;
-    float speed;
-    int targetPump;          // 0 = Pump 1 (Z=137.5), 1 = Pump 2 (Z=142.5)
-    float targetZ;
-    float requestedGallons;
-    float dispensedGallons;
-    float totalSale;
-    float tipAmount;
-    Color bodyColor;
-    float waitTimer;
-    char driverDialogue[128];
-};
+#include "systems/gas_station_system.h"
 
 static CustomerCar g_customerCar = { CAR_INACTIVE };
 static float g_customerCarCooldown = 35.0f; // Seconds until next car arrives
 
-static void SpawnCustomerCar() {
-    g_customerCar.state = CAR_APPROACHING;
-    g_customerCar.targetPump = (GetRandomValue(0, 1) == 0) ? 0 : 1;
-    g_customerCar.targetZ = (g_customerCar.targetPump == 0) ? 137.5f : 142.5f;
-    g_customerCar.pos = (Vector3){ 123.5f, 10.02f, 65.0f }; // Approaching from Route 9 North
-    g_customerCar.speed = 14.0f;
-    g_customerCar.requestedGallons = 8.0f + (float)GetRandomValue(0, 120) / 10.0f; // 8.0 to 20.0 Gal
-    g_customerCar.dispensedGallons = 0.0f;
-    g_customerCar.totalSale = g_customerCar.requestedGallons * g_fuelPricePerGallon;
-    g_customerCar.tipAmount = 4.0f + (float)GetRandomValue(0, 80) / 10.0f;
-    g_customerCar.waitTimer = 0.0f;
-
-    Color palette[4] = {
-        (Color){ 62, 54, 48, 255 },  // Rusted brown station wagon
-        (Color){ 35, 42, 52, 255 },  // Dark midnight blue sedan
-        (Color){ 72, 68, 62, 255 },  // Weathered gray pickup
-        (Color){ 55, 24, 26, 255 }   // Muddy dark maroon coupe
-    };
-    g_customerCar.bodyColor = palette[GetRandomValue(0, 3)];
-
-    const char* quotes[] = {
-        "\"Thanks... whatever you do out here, keep your eyes on the tree line.\"",
-        "\"Did you feel that tremor under the asphalt? Something is shifting below.\"",
-        "\"I wouldn't stay out on this road past 3 AM if I were you, kid.\"",
-        "\"My radio was picking up strange Morse code all through the mountain corridor.\"",
-        "\"The air smells like sulfur and rot tonight. Don't go wandering into the mire.\""
-    };
-    snprintf(g_customerCar.driverDialogue, sizeof(g_customerCar.driverDialogue), "%s", quotes[GetRandomValue(0, 4)]);
+static inline void SpawnCustomerCar() {
+    SpawnCustomerCar(g_customerCar, g_fuelPricePerGallon);
 }
 
 
@@ -304,107 +188,18 @@ static Font g_fontTitle;    // assets/alagard.ttf @ 52px - Strong, gothic horror
 
 static Font g_fontHeadSub;  // assets/alagard.ttf @ 30px - Distinct horror display font for headers & banners
 
-static Font g_fontMenu;     // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
+Font g_fontMenu;            // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
 
 static Font g_fontBody;     // assets/IBMPlexMono-Medium.ttf @ 20px - Crisp monospace for lore transcripts & settings
 
 static Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, timestamps & status stamps
 
-
-
-static inline void DrawTextSharp(Font font, const char* text, float x, float y, float fontSize, Color tint, float spacing = 1.0f) {
-
-    DrawTextEx(font, text, (Vector2){ x, y }, fontSize, spacing, tint);
-
-}
-
-
-
-static inline void DrawTextSharpCentered(Font font, const char* text, float centerX, float y, float fontSize, Color tint, float spacing = 1.0f) {
-
-    Vector2 sz = MeasureTextEx(font, text, fontSize, spacing);
-
-    DrawTextEx(font, text, (Vector2){ centerX - sz.x * 0.5f, y }, fontSize, spacing, tint);
-
-}
-
-
-
-static inline float MeasureTextSharp(Font font, const char* text, float fontSize, float spacing = 1.0f) {
-
-    return MeasureTextEx(font, text, fontSize, spacing).x;
-
-}
+#include "systems/ui_helpers.h"
 
 // =========================================================================
 // AAA POLISHED UI PRIMITIVES & DESIGN SYSTEM
 // =========================================================================
 
-static inline void DrawAAAPanel(Rectangle rec, Color bgColor, Color borderColor, float radius = 6.0f, bool shadow = true) {
-    float roundness = (rec.height > 0.0f) ? (radius / rec.height) : 0.1f;
-    if (roundness > 0.5f) roundness = 0.5f;
-
-    if (shadow) {
-        DrawRectangleRounded((Rectangle){ rec.x + 3.0f, rec.y + 5.0f, rec.width, rec.height }, roundness, 10, (Color){ 0, 0, 0, 105 });
-        DrawRectangleRounded((Rectangle){ rec.x + 1.0f, rec.y + 2.0f, rec.width, rec.height }, roundness, 10, (Color){ 0, 0, 0, 155 });
-    }
-
-    DrawRectangleRounded(rec, roundness, 10, bgColor);
-    DrawLine((int)(rec.x + radius), (int)(rec.y + 1.0f), (int)(rec.x + rec.width - radius), (int)(rec.y + 1.0f), (Color){ 255, 255, 255, 45 });
-    DrawRectangleRoundedLinesEx(rec, roundness, 10, 1.2f, borderColor);
-}
-
-static inline float DrawAAAKeycap(const char* key, float x, float y, Color accentCol) {
-    if (!key || !key[0]) return 0.0f;
-    float kw = MeasureTextSharp(g_fontMenu, key, 13.0f) + 12.0f;
-    if (kw < 24.0f) kw = 24.0f;
-    float kh = 22.0f;
-
-    // Soft drop shadow
-    DrawRectangleRounded((Rectangle){ x + 1.0f, y + 2.0f, kw, kh }, 0.28f, 6, (Color){ 0, 0, 0, 160 });
-
-    // Tactile keycap frame
-    DrawRectangleRounded((Rectangle){ x, y, kw, kh }, 0.28f, 6, (Color){ 22, 26, 32, 245 });
-    DrawRectangleRoundedLinesEx((Rectangle){ x, y, kw, kh }, 0.28f, 6, 1.0f, (Color){ 65, 75, 88, 230 });
-
-    // Subtle top rim light
-    DrawLine((int)(x + 3.0f), (int)(y + 1.0f), (int)(x + kw - 3.0f), (int)(y + 1.0f), (Color){ 255, 255, 255, 55 });
-
-    // Key glyph
-    DrawTextSharpCentered(g_fontMenu, key, x + kw * 0.5f, y + 4.5f, 13.0f, accentCol, 1.0f);
-
-    return kw;
-}
-
-static inline void DrawAAAInteractionBadge(const char* text, Color accentCol, float centerY) {
-    if (!text || !text[0]) return;
-    float fs = 16.0f;
-    float tw = MeasureTextSharp(g_fontMenu, text, fs);
-    float pw = tw + 38.0f;
-    if (pw < 220.0f) pw = 220.0f;
-    float ph = 36.0f;
-    float px = ((float)LOGICAL_W - pw) * 0.5f;
-    float py = centerY - ph * 0.5f;
-
-    // Dual-layer ambient drop shadow
-    DrawRectangleRounded((Rectangle){ px + 3.0f, py + 5.0f, pw, ph }, 0.25f, 10, (Color){ 0, 0, 0, 115 });
-    DrawRectangleRounded((Rectangle){ px + 1.0f, py + 2.0f, pw, ph }, 0.25f, 10, (Color){ 0, 0, 0, 165 });
-
-    // Glass acrylic dark slate body
-    DrawRectangleRounded((Rectangle){ px, py, pw, ph }, 0.25f, 10, (Color){ 14, 18, 22, 242 });
-
-    // Top specular highlight line
-    DrawLine((int)(px + 10.0f), (int)(py + 1.0f), (int)(px + pw - 10.0f), (int)(py + 1.0f), (Color){ 255, 255, 255, 45 });
-
-    // Glowing accent border
-    DrawRectangleRoundedLinesEx((Rectangle){ px, py, pw, ph }, 0.25f, 10, 1.2f, (Color){ accentCol.r, accentCol.g, accentCol.b, 225 });
-
-    // Subtle side indicator bar
-    DrawRectangleRounded((Rectangle){ px + 4.0f, py + 7.0f, 4.0f, ph - 14.0f }, 0.5f, 4, accentCol);
-
-    // Centered crisp text
-    DrawTextSharpCentered(g_fontMenu, text, (float)LOGICAL_W * 0.5f, py + 9.5f, fs, (Color){ 245, 248, 252, 255 }, 1.0f);
-}
 
 
 static int g_heldProductIndex = -1;
@@ -507,129 +302,7 @@ static float Frand(float lo, float hi) {
 
 
 
-static RenderTexture2D GenerateGlyphTexture(const char *glyph, Color bg, Color fg,
-
-                                           int texSize, int fontSize, int jitter)
-
-{
-
-    RenderTexture2D rt = LoadRenderTexture(texSize, texSize);
-
-    BeginTextureMode(rt);
-
-        ClearBackground(bg);
-
-        int step = fontSize - fontSize / 3;
-
-        if (step < 4) step = 4;
-
-        for (int y = -fontSize; y < texSize + fontSize; y += step) {
-
-            for (int x = -fontSize; x < texSize + fontSize; x += step) {
-
-                int jx = GetRandomValue(-jitter, jitter);
-
-                int jy = GetRandomValue(-jitter, jitter);
-
-                Color shade = fg;
-
-                int variance = GetRandomValue(-18, 18);
-
-                shade.r = (unsigned char)Clamp((float)fg.r + variance, 0.0f, 255.0f);
-
-                shade.g = (unsigned char)Clamp((float)fg.g + variance, 0.0f, 255.0f);
-
-                shade.b = (unsigned char)Clamp((float)fg.b + variance, 0.0f, 255.0f);
-
-                DrawText(glyph, x + jx, y + jy, fontSize, shade);
-
-            }
-
-        }
-
-    EndTextureMode();
-
-    return rt;
-
-}
-
-
-
-static RenderTexture2D GenerateCrustTexture(int texSize)
-
-{
-
-    RenderTexture2D rt = LoadRenderTexture(texSize, texSize);
-
-    BeginTextureMode(rt);
-
-        ClearBackground((Color){ 196, 148, 84, 255 });
-
-        for (int i = 0; i < 900; i++) {
-
-            int x = GetRandomValue(0, texSize);
-
-            int y = GetRandomValue(0, texSize);
-
-            int r = GetRandomValue(2, 10);
-
-            int dark = GetRandomValue(0, 70);
-
-            Color c = (Color){ (unsigned char)Clamp(196 - dark, 90, 255),
-
-                               (unsigned char)Clamp(148 - dark, 60, 255),
-
-                               (unsigned char)Clamp(84  - dark, 20, 255), 255 };
-
-            DrawCircle(x, y, (float)r, c);
-
-        }
-
-        for (int i = 0; i < 6; i++) {
-
-            int x = GetRandomValue(20, texSize - 20);
-
-            DrawRectangle(x, 10, 6, texSize - 20, (Color){ 120, 78, 40, 180 });
-
-        }
-
-    EndTextureMode();
-
-    return rt;
-
-}
-
-
-
-static Model MakeTexturedCylinder(float radius, float height, int slices, Texture2D tex)
-
-{
-
-    Mesh mesh = GenMeshCylinder(radius, height, slices);
-
-    Model model = LoadModelFromMesh(mesh);
-
-    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = tex;
-
-    return model;
-
-}
-
-
-
-static Model MakeTexturedSphere(float radius, int rings, int slices, Texture2D tex)
-
-{
-
-    Mesh mesh = GenMeshSphere(radius, rings, slices);
-
-    Model model = LoadModelFromMesh(mesh);
-
-    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = tex;
-
-    return model;
-
-}
+#include "systems/texture_factories.h"
 
 
 
@@ -2226,521 +1899,7 @@ static void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, flo
 
 
 
-// =========================================================================
-
-// THERMAL RECEIPT PRINTER & HORROR RECEIPT SYSTEM
-
-// Procedural aged paper, itemized horror list, curling output chain
-
-// =========================================================================
-
-// Real-world Authentic Super Mart Thermal Receipt:
-
-// Pure bright thermal paper white, prominent heading main text, total price below,
-
-// NO grocery items mentioned, and terrifying arterial blood stains.
-
-static Texture2D BuildReceiptTexture(void)
-
-{
-
-    const int TEX_W = 380;
-
-    const int TEX_H = 760;
-
-    // Pure thermal paper white background
-
-    Image paper = GenImageColor(TEX_W, TEX_H, (Color){ 252, 252, 250, 255 });
-
-
-
-    // Realistic thermal paper edge margin shading
-
-    for (int y = 0; y < TEX_H; y++) {
-
-        ImageDrawPixel(&paper, 0, y, (Color){ 220, 220, 215, 255 });
-
-        ImageDrawPixel(&paper, 1, y, (Color){ 235, 235, 230, 255 });
-
-        ImageDrawPixel(&paper, TEX_W - 2, y, (Color){ 235, 235, 230, 255 });
-
-        ImageDrawPixel(&paper, TEX_W - 1, y, (Color){ 220, 220, 215, 255 });
-
-    }
-
-
-
-    // Top & Bottom Tear Bar Serrations (Notched zig-zag cut edges)
-
-    for (int x = 0; x < TEX_W; x += 6) {
-
-        for (int dy = 0; dy < 4; dy++) {
-
-            int tooth = (x / 3) % 2 ? dy : (3 - dy);
-
-            ImageDrawPixel(&paper, x + dy, tooth, (Color){ 0, 0, 0, 0 });
-
-            ImageDrawPixel(&paper, x + dy, TEX_H - 1 - tooth, (Color){ 0, 0, 0, 0 });
-
-        }
-
-    }
-
-
-
-    auto DrawCentered = [&](const char *text, int y, int fontSize, Color color) {
-
-        int w = MeasureText(text, fontSize);
-
-        int x = (TEX_W - w) / 2;
-
-        if (x < 4) x = 4;
-
-        ImageDrawText(&paper, text, x, y, fontSize, color);
-
-    };
-
-
-
-    auto DrawDashed = [&](int y, Color color) {
-
-        for (int x = 14; x < TEX_W - 14; x += 9)
-
-            ImageDrawLine(&paper, x, y, x + 5, y, color);
-
-    };
-
-
-
-    // Realistic horror arterial blood splatters, running gravity drips, and soaked coagulated pools
-
-    auto DrawBloodPool = [&](int cx, int cy, int radius) {
-
-        for (int r = radius; r >= 1; r--) {
-
-            float t = (float)r / (float)radius;
-
-            Color col = (t < 0.45f) ? (Color){ 70, 3, 3, 250 } : (Color){ 140, 10, 10, (unsigned char)(210 - t * 70) };
-
-            ImageDrawCircle(&paper, cx, cy, r, col);
-
-        }
-
-    };
-
-
-
-    auto DrawBloodSpatter = [&](int cx, int cy, int dropletCount) {
-
-        DrawBloodPool(cx, cy, GetRandomValue(8, 18));
-
-        for (int i = 0; i < dropletCount; i++) {
-
-            int dist = GetRandomValue(6, 45);
-
-            float ang = Frand(0.0f, 6.283f);
-
-            int dx = cx + (int)(cosf(ang) * dist);
-
-            int dy = cy + (int)(sinf(ang) * dist);
-
-            int sz = GetRandomValue(1, 4);
-
-            ImageDrawCircle(&paper, dx, dy, sz, (Color){ 175, 12, 12, (unsigned char)GetRandomValue(180, 255) });
-
-        }
-
-        // Dripping gravity trails running down the receipt
-
-        int dripLen = GetRandomValue(30, 90);
-
-        int px = cx + GetRandomValue(-4, 4), py = cy;
-
-        for (int d = 0; d < dripLen; d += 3) {
-
-            int nx = px + GetRandomValue(-1, 1);
-
-            int ny = py + 3;
-
-            unsigned char a = (unsigned char)(220 - (d * 180 / (dripLen > 0 ? dripLen : 1)));
-
-            Color dCol = (d < dripLen / 2) ? (Color){ 110, 6, 6, a } : (Color){ 165, 12, 12, a };
-
-            ImageDrawLine(&paper, px, py, nx, ny, dCol);
-
-            ImageDrawLine(&paper, px + 1, py, nx + 1, ny, dCol);
-
-            px = nx; py = ny;
-
-        }
-
-    };
-
-
-
-    // Bloody finger / thumb drag smear on the side margin
-
-    auto DrawThumbSmear = [&](int sx, int sy) {
-
-        for (int step = 0; step < 26; step++) {
-
-            int y = sy + step * 2;
-
-            int x = sx + (int)(sinf(step * 0.25f) * 4.0f);
-
-            ImageDrawRectangle(&paper, x, y, 16, 3, (Color){ 120, 10, 10, (unsigned char)(140 - step * 4) });
-
-            ImageDrawRectangle(&paper, x + 2, y, 12, 2, (Color){ 80, 5, 5, (unsigned char)(160 - step * 5) });
-
-        }
-
-    };
-
-
-
-    int iy = 26;
-
-
-
-    // Header: Super Mart Brand & Register details
-
-    Color fontInk = (Color){ 18, 18, 22, 255 };
-
-    Color fontSub = (Color){ 65, 65, 72, 255 };
-
-    Color fontRule = (Color){ 90, 90, 98, 200 };
-
-
-
-    DrawCentered("*** DEAD END MART ***", iy, 22, fontInk); iy += 28;
-
-    DrawCentered("SUPERSTORE & GROCERY", iy, 14, fontSub); iy += 20;
-
-    DrawCentered("STORE #0666   TERMINAL 01   REG 04", iy, 12, fontSub); iy += 18;
-
-    DrawCentered("DATE: 10/31/2026   TIME: 03:33:13 AM", iy, 12, fontSub); iy += 22;
-
-
-
-    DrawDashed(iy, fontRule); iy += 32;
-
-
-
-    // PROMINENT HEADING MAIN TEXT (Bold, prominent, saturated thermal ink)
-
-    DrawCentered("HATE YOU FOR SHOPPING.", iy,     22, fontInk);
-
-    DrawCentered("HATE YOU FOR SHOPPING.", iy + 1, 22, fontInk); iy += 32;
-
-    DrawCentered("NEVER COME BACK!",     iy,     24, fontInk);
-
-    DrawCentered("NEVER COME BACK!",     iy + 1, 24, fontInk); iy += 42;
-
-
-
-    DrawDashed(iy, fontRule); iy += 32;
-
-
-
-    // TOTAL BILL PRICE (Crisp, bold, large thermal numerals)
-
-    // STRICTLY ZERO ITEMS MENTIONED!
-
-    DrawCentered("TOTAL USD    $666.13", iy,     26, fontInk);
-
-    DrawCentered("TOTAL USD    $666.13", iy + 1, 26, fontInk); iy += 38;
-
-    DrawCentered("CASH TENDERED:    $666.13", iy, 13, fontSub); iy += 20;
-
-    DrawCentered("CHANGE DUE:          $0.00", iy, 13, fontSub); iy += 20;
-
-    DrawCentered("TOTAL ITEMS SOLD:        0", iy, 13, fontSub); iy += 26;
-
-
-
-    DrawDashed(iy, fontRule); iy += 26;
-
-    DrawCentered("THANK YOU FOR YOUR SOUL", iy, 14, fontSub); iy += 35;
-
-
-
-    // Authentic Thermal 1D Barcode with Numbers
-
-    int barX = 35;
-
-    int barY = iy;
-
-    int barH = 42;
-
-    while (barX < TEX_W - 35) {
-
-        int w = GetRandomValue(2, 5);
-
-        if (GetRandomValue(0, 4) != 0) {
-
-            ImageDrawRectangle(&paper, barX, barY, w, barH, fontInk);
-
-        }
-
-        barX += w + GetRandomValue(2, 4);
-
-    }
-
-    iy += barH + 8;
-
-    DrawCentered("4  901234  567890", iy, 12, fontInk);
-
-
-
-    // HORRIFYING BLOOD STAINS: High contrast against crisp thermal white
-
-    DrawBloodSpatter(75, 140, 14);
-
-    DrawBloodSpatter(290, 240, 18);
-
-    DrawBloodSpatter(185, 390, 12);
-
-    DrawBloodSpatter(80, 540, 16);
-
-    DrawThumbSmear(TEX_W - 36, 170);
-
-    DrawThumbSmear(12, 340);
-
-
-
-    Texture2D tex = LoadTextureFromImage(paper);
-
-    UnloadImage(paper);
-
-    return tex;
-
-}
-
-
-
-static void DrawPrinter(Vector3 pos, float ledGlow, float t)
-
-{
-
-    Color body     = ApplyShopLighting(pos, (Color){ 36, 36, 40, 255 });
-
-    Color bodyDark = ApplyShopLighting(pos, (Color){ 18, 18, 22, 255 });
-
-    Color rust     = ApplyShopLighting(pos, (Color){ 95, 14, 14, 210 });
-
-
-
-    // Main printer chassis
-
-    Vector3 chassisCenter = { pos.x, pos.y + 0.11f, pos.z };
-
-    DrawCube(chassisCenter, 0.44f, 0.22f, 0.36f, body);
-
-    DrawCubeWires(chassisCenter, 0.44f, 0.22f, 0.36f, bodyDark);
-
-
-
-    float frontZ = pos.z + 0.18f;
-
-
-
-    // Top paper slot groove
-
-    Vector3 slotGroove = { pos.x, pos.y + 0.21f, pos.z + 0.11f };
-
-    DrawCube(slotGroove, 0.28f, 0.02f, 0.08f, BLACK);
-
-
-
-    // Guide lip
-
-    Vector3 lip = { pos.x, pos.y + 0.225f, pos.z + 0.15f };
-
-    DrawCube(lip, 0.30f, 0.015f, 0.03f, bodyDark);
-
-
-
-    // Metal tear bar flush with front
-
-    Vector3 tearBar = { pos.x, pos.y + 0.195f, frontZ + 0.003f };
-
-    DrawCube(tearBar, 0.28f, 0.012f, 0.015f, ApplyShopLighting(pos, DARKGRAY));
-
-
-
-    // Screen bezel & glowing red display
-
-    Vector3 screenBezel = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.003f };
-
-    DrawCube(screenBezel, 0.20f, 0.08f, 0.01f, bodyDark);
-
-    Vector3 screenGlow = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.007f };
-
-    DrawCube(screenGlow, 0.16f, 0.05f, 0.005f, (Color){ (unsigned char)(75 * ledGlow), 8, 8, 255 });
-
-
-
-    // Buttons
-
-    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.11f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, ApplyShopLighting(pos, GRAY));
-
-    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.06f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, (Color){ 140, 20, 20, 255 });
-
-
-
-    // Pulsing status LED
-
-    Vector3 ledPos = { pos.x + 0.16f, pos.y + 0.21f, pos.z + 0.08f };
-
-    DrawSphere(ledPos, 0.016f, (Color){ 255, (unsigned char)(35 * ledGlow), (unsigned char)(35 * ledGlow), 255 });
-
-
-
-    // Rust & blood streaks
-
-    DrawCube((Vector3){ pos.x - 0.12f, pos.y + 0.08f, frontZ + 0.004f }, 0.025f, 0.14f, 0.005f, rust);
-
-    for (int i = 0; i < 4; i++) {
-
-        float dropY = pos.y + 0.18f - i * 0.045f - fmodf(t * 0.05f, 0.045f);
-
-        DrawSphere((Vector3){ pos.x + 0.02f, dropY, frontZ + 0.006f }, 0.008f - i * 0.001f, (Color){ 130, 10, 10, 190 });
-
-    }
-
-}
-
-
-
-static void DrawReceiptChain(Vector3 slotPos, Texture2D tex, float revealedSegments, float time)
-
-{
-
-    const int TOTAL_SEGMENTS = 16;
-
-    const float PAPER_WIDTH  = 0.28f;
-
-    const float PAPER_LENGTH = 0.65f;
-
-    const float CURL_DEG_PER_SEG = 3.2f;
-
-
-
-    float segUnit = PAPER_LENGTH / (float)TOTAL_SEGMENTS;
-
-    int fullCount = (int)revealedSegments;
-
-    if (fullCount > TOTAL_SEGMENTS) fullCount = TOTAL_SEGMENTS;
-
-    float frac = revealedSegments - (float)fullCount;
-
-
-
-    rlDisableBackfaceCulling();
-
-    rlPushMatrix();
-
-        rlTranslatef(slotPos.x, slotPos.y, slotPos.z);
-
-
-
-        for (int i = 0; i < fullCount; i++)
-
-        {
-
-            float vTop = (float)i / (float)TOTAL_SEGMENTS;
-
-            float vBot = (float)(i + 1) / (float)TOTAL_SEGMENTS;
-
-            float wobble = sinf(time * 1.2f + (float)i * 0.9f) * 0.5f;
-
-
-
-            rlPushMatrix();
-
-                rlRotatef(wobble, 0.0f, 0.0f, 1.0f);
-
-                rlSetTexture(tex.id);
-
-                rlBegin(RL_QUADS);
-
-                    rlColor4ub(255, 255, 255, 255);
-
-                    rlNormal3f(0.0f, 0.0f, 1.0f);
-
-                    rlTexCoord2f(0.0f, vTop); rlVertex3f(-PAPER_WIDTH * 0.5f, 0.0f,     0.0f);
-
-                    rlTexCoord2f(0.0f, vBot); rlVertex3f(-PAPER_WIDTH * 0.5f, -segUnit, 0.0f);
-
-                    rlTexCoord2f(1.0f, vBot); rlVertex3f( PAPER_WIDTH * 0.5f, -segUnit, 0.0f);
-
-                    rlTexCoord2f(1.0f, vTop); rlVertex3f( PAPER_WIDTH * 0.5f, 0.0f,     0.0f);
-
-                rlEnd();
-
-                rlSetTexture(0);
-
-            rlPopMatrix();
-
-
-
-            rlTranslatef(0.0f, -segUnit, 0.0f);
-
-            rlRotatef(-CURL_DEG_PER_SEG, 1.0f, 0.0f, 0.0f);
-
-        }
-
-
-
-        if (frac > 0.001f && fullCount < TOTAL_SEGMENTS)
-
-        {
-
-            float vTop = (float)fullCount / (float)TOTAL_SEGMENTS;
-
-            float vBot = vTop + (1.0f / (float)TOTAL_SEGMENTS) * frac;
-
-            float segH = segUnit * frac;
-
-            float wobble = sinf(time * 1.2f + (float)fullCount * 0.9f) * 0.5f;
-
-
-
-            rlPushMatrix();
-
-                rlRotatef(wobble, 0.0f, 0.0f, 1.0f);
-
-                rlSetTexture(tex.id);
-
-                rlBegin(RL_QUADS);
-
-                    rlColor4ub(255, 255, 255, 255);
-
-                    rlNormal3f(0.0f, 0.0f, 1.0f);
-
-                    rlTexCoord2f(0.0f, vTop); rlVertex3f(-PAPER_WIDTH * 0.5f, 0.0f,  0.0f);
-
-                    rlTexCoord2f(0.0f, vBot); rlVertex3f(-PAPER_WIDTH * 0.5f, -segH, 0.0f);
-
-                    rlTexCoord2f(1.0f, vBot); rlVertex3f( PAPER_WIDTH * 0.5f, -segH, 0.0f);
-
-                    rlTexCoord2f(1.0f, vTop); rlVertex3f( PAPER_WIDTH * 0.5f, 0.0f,  0.0f);
-
-                rlEnd();
-
-                rlSetTexture(0);
-
-            rlPopMatrix();
-
-        }
-
-
-
-    rlPopMatrix();
-
-    rlEnableBackfaceCulling();
-
-}
+#include "systems/receipt_printer.h"
 
 
 
@@ -8353,68 +7512,10 @@ static void DrawDirtClods()
 
 
 
-// =========================================================================
-// DYNAMIC FOOTPRINT DECAL SYSTEM
-// Alternating left/right boot imprints stamped into dust/grime or dark blood,
-// dissolving smoothly over 8 seconds.
-// =========================================================================
-struct FootprintDecal {
-    Vector3 pos;
-    float yaw;
-    float life;
-    float maxLife;
-    bool isLeft;
-    bool isBloody;
-};
-
-#define MAX_FOOTPRINTS 200
-static FootprintDecal g_footprints[MAX_FOOTPRINTS];
-static int g_footprintHead = 0;
-static Vector3 g_lastFootprintPos = { 0.0f, -999.0f, 0.0f };
-static bool g_nextFootLeft = false;
-static float g_playerBloodStainTimer = 0.0f;
+#include "systems/footprint_decals.h"
 static float g_collegeFlickerTimer = 0.0f;
 static float g_collegeCreakTimer = 12.0f;
 static bool g_collegeLightOn = true;
-
-static void DrawFootprints() {
-    for (int i = 0; i < MAX_FOOTPRINTS; i++) {
-        const FootprintDecal& fp = g_footprints[i];
-        if (fp.life <= 0.0f) continue;
-        float alphaRatio = Clamp(fp.life / fp.maxLife, 0.0f, 1.0f);
-        
-        rlPushMatrix();
-        rlTranslatef(fp.pos.x, fp.pos.y, fp.pos.z);
-        rlRotatef(fp.yaw, 0.0f, 1.0f, 0.0f);
-        
-        if (fp.isBloody) {
-            unsigned char a = (unsigned char)(alphaRatio * 220.0f);
-            Color bloodSole = { 135, 12, 18, a };
-            Color bloodHeel = { 95, 8, 12, a };
-            // Sole
-            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, bloodSole);
-            // Heel
-            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, bloodHeel);
-            // Splatter droplets
-            Color dripCol = { 110, 10, 14, (unsigned char)(a * 0.75f) };
-            DrawCube((Vector3){ fp.isLeft ? -0.065f : 0.065f, 0.001f, 0.02f }, 0.025f, 0.002f, 0.025f, dripCol);
-            DrawCube((Vector3){ fp.isLeft ? -0.08f : 0.08f, 0.001f, -0.02f }, 0.018f, 0.002f, 0.018f, dripCol);
-        } else {
-            unsigned char a = (unsigned char)(alphaRatio * 155.0f);
-            Color treadCol = { 26, 24, 22, a };
-            Color ridgeCol = { 14, 12, 11, (unsigned char)(a * 0.85f) };
-            // Sole
-            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, treadCol);
-            // Heel
-            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, treadCol);
-            // Tread grooves
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.025f }, 0.09f, 0.002f, 0.015f, ridgeCol);
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.065f }, 0.09f, 0.002f, 0.015f, ridgeCol);
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.105f }, 0.08f, 0.002f, 0.015f, ridgeCol);
-        }
-        rlPopMatrix();
-    }
-}
 
 // =========================================================================
 // ABANDONED BLACKWOOD COLLEGE: ADVANCED DYNAMIC LIGHTING & PROCEDURAL SHADER
@@ -9604,89 +8705,7 @@ static void DrawPumpCrtScreen3D(Vector3 center, float width, float height, Textu
     rlEnableBackfaceCulling();
 }
 
-static void DrawCatenaryHose(Vector3 start, Vector3 end, float maxSag, int segments, float radius, Color col) {
-    float dist = Vector3Distance(start, end);
-    float slack = 4.8f - dist;
-    if (slack < 0.1f) slack = 0.1f;
-    float sagDepth = Clamp(slack * 0.38f, 0.14f, maxSag);
-
-    Vector3 prevPt = start;
-    for (int i = 1; i <= segments; i++) {
-        float t = (float)i / (float)segments;
-        float hx = Lerp(start.x, end.x, t);
-        float hz = Lerp(start.z, end.z, t);
-        float sag = sagDepth * 4.0f * t * (1.0f - t);
-        float hy = Lerp(start.y, end.y, t) - sag;
-        if (hy < 10.035f) hy = 10.035f; // Rests on asphalt
-
-        Vector3 curPt = { hx, hy, hz };
-        DrawCylinderEx(prevPt, curPt, radius, radius, 6, col);
-        prevPt = curPt;
-    }
-
-    // Brass threaded coupling collars at both ends
-    Color brassCol = { 185, 150, 60, 255 };
-    DrawSphere(start, radius * 1.35f, brassCol);
-    DrawSphere(end, radius * 1.35f, brassCol);
-}
-
-static void DrawFirstPersonFuelNozzle(Camera3D cam, bool isFlowing, float walkTime, float timeVal) {
-    Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
-    Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
-    Vector3 camUp = Vector3Normalize(Vector3CrossProduct(camRight, fwd));
-
-    float stepBobY = (walkTime > 0.0f) ? sinf(walkTime * 2.0f) * 0.008f : 0.0f;
-    float breathe  = sinf(timeVal * 1.8f) * 0.004f;
-
-    // Anchor in lower right view
-    Vector3 handPos = Vector3Add(cam.position,
-        Vector3Add(Vector3Scale(camRight, 0.22f),
-                   Vector3Add(Vector3Scale(camUp, -0.20f + stepBobY + breathe),
-                              Vector3Scale(fwd, 0.40f))));
-
-    Color metalBody  = { 85, 90, 96, 255 };
-    Color rubberGrip = { 20, 20, 22, 255 };
-    Color chromePipe = { 150, 155, 165, 255 };
-    Color brassNut   = { 185, 150, 60, 255 };
-
-    // Handle (angled down/back)
-    Vector3 handleTop = handPos;
-    Vector3 handleBot = Vector3Add(handPos, Vector3Add(Vector3Scale(camUp, -0.12f), Vector3Scale(fwd, -0.06f)));
-    DrawCylinderEx(handleTop, handleBot, 0.024f, 0.022f, 8, rubberGrip);
-
-    // Swivel hose coupling at base
-    Vector3 hoseCoupling = Vector3Add(handleBot, Vector3Scale(camUp, -0.025f));
-    DrawCylinderEx(handleBot, hoseCoupling, 0.026f, 0.026f, 8, brassNut);
-
-    // Valve body (above handle)
-    Vector3 valveBody = Vector3Add(handPos, Vector3Scale(fwd, 0.05f));
-    DrawCube(valveBody, 0.045f, 0.055f, 0.075f, metalBody);
-
-    // Trigger guard loop
-    Vector3 guardMid = Vector3Add(handPos, Vector3Add(Vector3Scale(fwd, 0.04f), Vector3Scale(camUp, -0.06f)));
-    DrawCubeWires(guardMid, 0.025f, 0.065f, 0.055f, metalBody);
-
-    // Steel trigger lever (squeezed when isFlowing)
-    float trigOffset = isFlowing ? 0.015f : 0.035f;
-    Vector3 trigPos = Vector3Add(handPos, Vector3Add(Vector3Scale(fwd, trigOffset), Vector3Scale(camUp, -0.05f)));
-    DrawCube(trigPos, 0.014f, 0.045f, 0.014f, isFlowing ? (Color){ 220, 220, 220, 255 } : (Color){ 160, 165, 170, 255 });
-
-    // Angled fuel spout protruding forward & curving slightly down
-    Vector3 spoutStart = Vector3Add(valveBody, Vector3Scale(fwd, 0.04f));
-    Vector3 spoutMid   = Vector3Add(spoutStart, Vector3Add(Vector3Scale(fwd, 0.12f), Vector3Scale(camUp, 0.02f)));
-    Vector3 spoutTip   = Vector3Add(spoutMid, Vector3Add(Vector3Scale(fwd, 0.14f), Vector3Scale(camUp, -0.04f)));
-    DrawCylinderEx(spoutStart, spoutMid, 0.016f, 0.015f, 8, chromePipe);
-    DrawCylinderEx(spoutMid, spoutTip, 0.015f, 0.013f, 8, chromePipe);
-
-    // Fuel vapor shimmer particles when pumping
-    if (isFlowing) {
-        for (int v = 0; v < 3; v++) {
-            float vAge = fmodf(timeVal * 4.0f + (float)v * 1.3f, 0.6f);
-            Vector3 vPos = Vector3Add(spoutTip, Vector3Add(Vector3Scale(fwd, vAge * 0.15f), Vector3Scale(camUp, -vAge * 0.08f)));
-            DrawSphere(vPos, 0.008f + vAge * 0.012f, (Color){ 200, 235, 210, (unsigned char)(110 * (1.0f - vAge / 0.6f)) });
-        }
-    }
-}
+// (DrawCatenaryHose & DrawFirstPersonFuelNozzle extracted to systems/gas_station_system.h/.cpp)
 
 #include "systems/ocean_system.h"
 #include "systems/shop_atmosphere.h"
@@ -16381,59 +15400,7 @@ auto RunIntroCinematic = [&]() {
         // -------------------------------------------------------------
         // DYNAMIC DISSOLVING FOOTPRINT STAMPING & HORROR ATMOSPHERE
         // -------------------------------------------------------------
-        if (onGround && hitStopTimer <= 0.0f) {
-            Vector2 curXZ = { camera.position.x, camera.position.z };
-            Vector2 lastXZ = { g_lastFootprintPos.x, g_lastFootprintPos.z };
-            float distMoved = Vector2Distance(curXZ, lastXZ);
-            if (distMoved >= 0.65f) {
-                g_lastFootprintPos = camera.position;
-                Vector3 fwdH = Vector3Normalize((Vector3){ viewDir.x, 0.0f, viewDir.z });
-                if (Vector3Length(fwdH) < 0.05f) fwdH = (Vector3){ 0.0f, 0.0f, 1.0f };
-                Vector3 rightH = { -fwdH.z, 0.0f, fwdH.x };
-                
-                float sideSign = g_nextFootLeft ? -1.0f : 1.0f;
-                g_nextFootLeft = !g_nextFootLeft;
-                float sideDist = 0.13f;
-                
-                float fYaw = atan2f(fwdH.x, fwdH.z) * RAD2DEG;
-                float floorY = camera.position.y - PLAYER_EYE_HEIGHT;
-                if (floorY < 10.015f && camera.position.y >= 10.0f) floorY = 10.0f;
-                
-                // Detect if stepping in or near blood pools:
-                // Abandoned College blood pools:
-                bool inCollegeBlood = (camera.position.x >= 153.0f && camera.position.x <= 186.0f && camera.position.z >= 125.0f && camera.position.z <= 159.0f) &&
-                    ((camera.position.z >= 139.3f && camera.position.z <= 141.7f && camera.position.x >= 158.0f && camera.position.x <= 178.0f) || // corridor drag
-                     (camera.position.x >= 160.0f && camera.position.x <= 170.0f && camera.position.z >= 126.0f && camera.position.z <= 136.0f) || // lecture hall pool
-                     (camera.position.x >= 161.0f && camera.position.x <= 167.0f && camera.position.z >= 148.0f && camera.position.z <= 154.0f));  // anatomy dissection pool
-                // Supermarket meat locker blood pool:
-                bool inShopBlood = (camera.position.x >= 87.0f && camera.position.x <= 95.0f && camera.position.z >= 146.0f && camera.position.z <= 153.0f);
-                
-                if (inCollegeBlood || inShopBlood) {
-                    g_playerBloodStainTimer = 16.0f; // Stains boots for several subsequent strides!
-                }
-                
-                bool isBloody = (g_playerBloodStainTimer > 0.0f);
-                
-                FootprintDecal& fp = g_footprints[g_footprintHead];
-                fp.pos = (Vector3){ camera.position.x + rightH.x * sideDist * sideSign, floorY + 0.018f, camera.position.z + rightH.z * sideDist * sideSign };
-                fp.yaw = fYaw;
-                fp.life = 8.0f; // Dissolves smoothly over 8 seconds!
-                fp.maxLife = 8.0f;
-                fp.isLeft = !g_nextFootLeft;
-                fp.isBloody = isBloody;
-                
-                g_footprintHead = (g_footprintHead + 1) % MAX_FOOTPRINTS;
-            }
-        }
-        
-        // Dissolve active footprints over time
-        for (int i = 0; i < MAX_FOOTPRINTS; i++) {
-            if (g_footprints[i].life > 0.0f) {
-                g_footprints[i].life -= dt;
-                if (g_footprints[i].life < 0.0f) g_footprints[i].life = 0.0f;
-            }
-        }
-        if (g_playerBloodStainTimer > 0.0f) g_playerBloodStainTimer -= dt;
+        UpdateFootprints(camera.position, viewDir, onGround, hitStopTimer, dt);
         
         // Abandoned College Creepy Fluorescent Lighting Flicker & Audio Ambience
         g_collegeFlickerTimer -= dt;
@@ -19261,32 +18228,7 @@ auto RunIntroCinematic = [&]() {
                 DrawCylinder((Vector3){ bellPos.x, 11.38f, bellPos.z }, 0.08f, 0.08f, 0.02f, 12, (Color){ 45, 42, 38, 255 });
 
                 // 7. 3D CUSTOMER CAR ON ROUTE 9
-                if (g_customerCar.state != CAR_INACTIVE) {
-                    Vector3 cPos = g_customerCar.pos;
-                    DrawCube((Vector3){ cPos.x, cPos.y + 0.50f, cPos.z }, 1.95f, 0.70f, 4.2f, g_customerCar.bodyColor);
-                    DrawCubeWires((Vector3){ cPos.x, cPos.y + 0.50f, cPos.z }, 1.96f, 0.71f, 4.21f, (Color){ 25, 22, 20, 255 });
-                    DrawCube((Vector3){ cPos.x, cPos.y + 1.05f, cPos.z - 0.25f }, 1.70f, 0.58f, 2.3f, (Color){ 22, 24, 28, 255 });
-                    DrawCube((Vector3){ cPos.x, cPos.y + 1.02f, cPos.z + 0.92f }, 1.62f, 0.48f, 0.06f, (Color){ 65, 80, 95, 220 });
-                    DrawCube((Vector3){ cPos.x, cPos.y + 0.40f, cPos.z + 2.12f }, 1.85f, 0.28f, 0.12f, (Color){ 160, 162, 168, 255 });
-                    DrawCube((Vector3){ cPos.x - 0.65f, cPos.y + 0.48f, cPos.z + 2.14f }, 0.24f, 0.16f, 0.04f, (Color){ 255, 245, 170, 255 });
-                    DrawCube((Vector3){ cPos.x + 0.65f, cPos.y + 0.48f, cPos.z + 2.14f }, 0.24f, 0.16f, 0.04f, (Color){ 255, 245, 170, 255 });
-                    DrawCube((Vector3){ cPos.x - 0.70f, cPos.y + 0.52f, cPos.z - 2.12f }, 0.22f, 0.14f, 0.04f, (Color){ 225, 30, 25, 255 });
-                    DrawCube((Vector3){ cPos.x + 0.70f, cPos.y + 0.52f, cPos.z - 2.12f }, 0.22f, 0.14f, 0.04f, (Color){ 225, 30, 25, 255 });
-
-                    Vector3 flapPos = { cPos.x + 0.98f, cPos.y + 0.65f, cPos.z - 0.85f };
-                    DrawCube(flapPos, 0.03f, 0.18f, 0.18f, (Color){ 18, 18, 18, 255 });
-
-                    if (g_nozzleInCar) {
-                        float pz = (g_customerCar.targetPump == 0) ? 137.5f : 142.5f;
-                        Vector3 pumpOutlet = { 127.42f, 11.2f, pz - 0.25f };
-                        // Seated cast-aluminum nozzle body in fuel neck
-                        DrawCube(flapPos, 0.09f, 0.09f, 0.15f, (Color){ 65, 70, 76, 255 });
-                        Vector3 nozzleCoupling = { flapPos.x + 0.08f, flapPos.y - 0.05f, flapPos.z };
-                        DrawCylinderEx(flapPos, nozzleCoupling, 0.024f, 0.022f, 8, (Color){ 140, 145, 155, 255 });
-                        // Realistic catenary heavy rubber hose draped smoothly to vehicle
-                        DrawCatenaryHose(pumpOutlet, nozzleCoupling, 0.85f, 16, 0.028f, (Color){ 16, 16, 18, 255 });
-                    }
-                }
+                DrawCustomerCar(g_customerCar, g_nozzleInCar);
 
                 // 8. NOZZLE HELD IN PLAYER HANDS
                 if (g_holdingFuelNozzle && !g_nozzleInCar && g_activePumpIndex != -1) {
@@ -21872,7 +20814,7 @@ auto RunIntroCinematic = [&]() {
 
                 float ledGlow = 0.6f + 0.4f * sinf(timeVal * 3.0f);
 
-                DrawPrinter(printerPos, ledGlow, timeVal);
+                DrawPrinter(printerPos, ledGlow, timeVal, [](Vector3 p, Color c) { return ApplyShopLighting(p, c); });
 
 
 

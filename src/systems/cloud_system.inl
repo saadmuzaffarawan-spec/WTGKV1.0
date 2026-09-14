@@ -474,7 +474,7 @@ void InitCloudSystem() {
 
 
 void UpdateCloudPhysics(float dt, float timeVal, float lightningFlash) {
-
+    (void)timeVal;
     for (auto& cluster : g_cloudClusters) {
 
         cluster.pos.x += cluster.vel.x * dt;

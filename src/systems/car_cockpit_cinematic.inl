@@ -463,9 +463,8 @@ void DrawFirstPersonDashboard(float iCarSpd, float iShakeDec, int iJerkCount, fl
 
 
 void Draw3DCarInterior(float iCarX, float iCarY, float iCarZ, float ccy, float timeVal, float iCarSpd, float iShakeDec, int iJerkCount,
-
                        Mesh mSeat, Mesh mSeatBack, Mesh mSteerRim, Material matSeat, Material matCabin) {
-
+    (void)iCarY;
     // ---- SEATS ----
 
     // Driver Seat (Left side)

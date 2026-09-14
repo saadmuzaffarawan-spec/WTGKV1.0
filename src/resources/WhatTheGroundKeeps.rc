@@ -1,3 +1,4 @@
 // Windows Resource Script for What The Ground Keeps
 // Associates the primary application icon with the compiled executable.
 1 ICON "icon.ico"
+

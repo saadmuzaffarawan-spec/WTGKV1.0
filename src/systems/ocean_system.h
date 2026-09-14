@@ -656,6 +656,7 @@ static void UnloadOceanSystem() {
 // RENDER INFINITE PROCEDURAL OCEAN SURFACE & SEABED
 // =========================================================================
 static void DrawOceanSurface(Camera3D camera, float timeVal, float extDayFactor, float extNightFactor, Vector3 sunDir, float sunElev, float lightningFlash) {
+    (void)extNightFactor;
     if (!g_oceanLoaded) InitOceanSystem();
 
     // 1. Compute Camera-Centric Snapping Grid Coordinates (CDLOD)
@@ -756,6 +757,10 @@ static void DrawOceanSurface(Camera3D camera, float timeVal, float extDayFactor,
 // RENDER COASTAL ENVIRONMENT: PIER, SEA STACKS, CRASHING SURF & WRECK
 // =========================================================================
 static void DrawCoastalEnvironment(Camera3D camera, float timeVal, float extDayFactor, float extNightFactor, Vector3 sunDir) {
+    (void)timeVal;
+    (void)extDayFactor;
+    (void)extNightFactor;
+    (void)sunDir;
     float distToCoast = fabsf(camera.position.x - 30.0f);
     if (distToCoast > 180.0f && camera.position.x > 30.0f) return;
 

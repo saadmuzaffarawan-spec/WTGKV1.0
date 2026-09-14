@@ -25,6 +25,11 @@ set(WTGK_SOURCES
     src/main.cpp
     src/audio/audio_synthesis.cpp
     src/systems/shop_atmosphere.cpp
+    src/systems/ui_helpers.cpp
+    src/systems/texture_factories.cpp
+    src/systems/receipt_printer.cpp
+    src/systems/footprint_decals.cpp
+    src/systems/gas_station_system.cpp
 )
 
 if(WIN32)
