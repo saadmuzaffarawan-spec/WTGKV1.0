@@ -1115,6 +1115,7 @@ void UpdateDog(DogNPC &dog, float dt) {
 
 
 void UpdateDogAI(DogNPC &dog, Vector3 playerPos, float dt, float lightningTimer, bool isNight) {
+
     (void)isNight;
     dog.pos.y = 10.0f;
 

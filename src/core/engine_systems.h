@@ -12,3 +12,4 @@
 #include "../systems/shop_item_types.inl"
 #include "../systems/crashed_sedan_site.h"
 #include "../systems/hound_npc.h"
+#include "../systems/skeleton_cow_npc.h"
