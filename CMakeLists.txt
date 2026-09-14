@@ -31,6 +31,7 @@ set(WTGK_SOURCES
     src/systems/footprint_decals.cpp
     src/systems/gas_station_system.cpp
     src/systems/crashed_sedan_site.cpp
+    src/systems/hound_npc.cpp
 )
 
 if(WIN32)

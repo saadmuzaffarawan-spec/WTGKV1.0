@@ -231,3 +231,4 @@ void DrawCrashedSedan(Vector3 carPos, float timeVal, float extDayFactor, float e
         DrawCube((Vector3){ sx, sy, sz }, sSize, sSize, sSize, (Color){ 230, 235, 240, (unsigned char)(sAlpha * 95.0f) });
     }
 }
+

@@ -16,3 +16,4 @@ Color CrashCarTint(Color base, float dayF, float nightF, float vertBias = 1.0f);
 // Renders the full crashed vehicle impact scene, skid marks, sheared utility pole,
 // shattered safety glass, crushed engine cavity, and rising radiator steam particles.
 void DrawCrashedSedan(Vector3 carPos, float timeVal, float extDayFactor, float extNightFactor, const Camera3D& camera);
+
