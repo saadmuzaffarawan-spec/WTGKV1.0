@@ -162,25 +162,16 @@ struct ShopProduct {
 
 
 
-static std::vector<ShopProduct> g_shopProducts;
+extern std::vector<ShopProduct> g_shopProducts;
+extern std::vector<ShopParticle> g_shopParticles;
+extern std::vector<DustParticle> g_dustParticles;
+extern std::vector<FootstepTrail> g_footstepTrails;
+extern std::vector<GunSpark> g_gunSparks;
+extern std::vector<ShellCasing> g_shellCasings;
 
-static std::vector<ShopParticle> g_shopParticles;
-
-static std::vector<DustParticle> g_dustParticles;
-
-static std::vector<FootstepTrail> g_footstepTrails;
-
-static std::vector<GunSpark> g_gunSparks;
-
-static std::vector<ShellCasing> g_shellCasings;
-
-
-
-static float g_gunRecoilTimer = 0.0f;
-
-static float g_gunMuzzleFlashTimer = 0.0f;
-
-static bool  g_isLeftFootStep = false;
+extern float g_gunRecoilTimer;
+extern float g_gunMuzzleFlashTimer;
+extern bool  g_isLeftFootStep;
 
 
 

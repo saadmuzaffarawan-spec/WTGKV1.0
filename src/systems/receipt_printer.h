@@ -2,6 +2,10 @@
 #include <raylib.h>
 #include <functional>
 
+enum PrinterState { PRINTER_IDLE = 0, PRINTER_PRINTING, PRINTER_DONE };
+extern PrinterState g_printerState;
+extern float g_printerProgress;
+
 // Lighting callback for in-world printer chassis and parts
 typedef std::function<Color(Vector3 pos, Color baseAlbedo)> PrinterLightingFn;
 

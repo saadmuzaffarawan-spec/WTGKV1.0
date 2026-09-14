@@ -67,3 +67,4 @@ void SpawnDirtClod(Vector3 origin, Vector3 dir);
 float GetTerrainGroundHeight(float x, float z);
 void UpdateDirtClods(float dt);
 void DrawDirtClods();
+

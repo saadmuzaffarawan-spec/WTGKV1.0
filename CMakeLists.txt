@@ -35,6 +35,8 @@ set(WTGK_SOURCES
     src/systems/skeleton_cow_npc.cpp
     src/systems/shovel_system.cpp
     src/systems/blackwood_college.cpp
+    src/systems/shop_lighting.cpp
+    src/systems/atmospheric_particles.cpp
 )
 
 if(WIN32)

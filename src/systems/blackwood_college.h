@@ -19,3 +19,4 @@ extern bool g_collegeLightOn;
 void InitCollegeShaderAndTextures();
 void UnloadCollegeShaderAndTextures();
 void DrawAbandonedCollege(Camera3D camera, float timeVal, float dt, float extDayFactor, float extNightFactor, Vector3 sunDir);
+

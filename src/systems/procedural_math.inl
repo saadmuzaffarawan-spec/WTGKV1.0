@@ -31,3 +31,16 @@ inline float fbm(float x, float y) {
     }
     return v;
 }
+
+#include <raylib.h>
+
+inline float LerpAngleDeg(float a, float b, float t) {
+    float diff = fmodf(b - a + 180.0f, 360.0f);
+    if (diff < 0) diff += 360.0f;
+    diff -= 180.0f;
+    return a + diff * t;
+}
+
+inline float Frand(float lo, float hi) {
+    return lo + (float)GetRandomValue(0, 10000) / 10000.0f * (hi - lo);
+}
