@@ -30,6 +30,7 @@ set(WTGK_SOURCES
     src/systems/receipt_printer.cpp
     src/systems/footprint_decals.cpp
     src/systems/gas_station_system.cpp
+    src/systems/crashed_sedan_site.cpp
 )
 
 if(WIN32)

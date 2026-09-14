@@ -10,3 +10,4 @@
 #include "../systems/hand_item_ui.inl"
 #include "../systems/car_cockpit_cinematic.inl"
 #include "../systems/shop_item_types.inl"
+#include "../systems/crashed_sedan_site.h"

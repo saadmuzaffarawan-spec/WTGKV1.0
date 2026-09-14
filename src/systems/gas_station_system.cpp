@@ -147,3 +147,114 @@ void DrawCustomerCar(const CustomerCar& car, bool nozzleInCar) {
     }
 }
 
+#include "ui_helpers.h"
+
+void UpdatePumpCrtTextureEx(RenderTexture2D rt, bool rtLoaded, Font fontSmall, Font fontTitle, int pumpNum,
+                            float gallons, float salePrice, bool isFlowing, float fuelPricePerGallon,
+                            float stationFuelGallons, float flk) {
+    if (!rtLoaded) return;
+
+    static int lastPumpNum = -1;
+    static float lastGallons = -1.0f;
+    static bool lastIsFlowing = false;
+    static float lastFlk = -1.0f;
+    static double lastFlowTime = 0.0;
+
+    // Only update if state changes, or if flowing (for the bargraph animation) at 15 FPS
+    bool needsUpdate = (pumpNum != lastPumpNum || gallons != lastGallons || isFlowing != lastIsFlowing || fabsf(flk - lastFlk) > 0.01f);
+    if (isFlowing && (GetTime() - lastFlowTime > 0.06)) needsUpdate = true;
+    if (!needsUpdate) return;
+
+    lastPumpNum = pumpNum;
+    lastGallons = gallons;
+    lastIsFlowing = isFlowing;
+    lastFlk = flk;
+    if (isFlowing) lastFlowTime = GetTime();
+
+    BeginTextureMode(rt);
+    ClearBackground((Color){ 4, 18, 8, 255 }); // Dark retro emerald phosphorescent glass
+
+    // Horizontal phosphor scanline raster grid
+    for (int y = 0; y < 240; y += 4) {
+        DrawRectangle(0, y, 320, 2, (Color){ 2, 10, 4, 115 });
+    }
+
+    // Header Bar with border
+    DrawRectangle(10, 8, 300, 26, (Color){ 8, 36, 16, 235 });
+    DrawRectangleLines(10, 8, 300, 26, (Color){ 35, 175, 75, 255 });
+    DrawTextSharp(fontSmall, TextFormat("ROUTE 9 COOP // DISPENSER 0%d", pumpNum), 18, 14, 12.5f, (Color){ 80, 255, 120, 255 }, 1.2f);
+
+    // Fuel Grade & Octane Badge
+    DrawRectangle(10, 38, 140, 20, (Color){ 6, 26, 12, 225 });
+    DrawRectangleLines(10, 38, 140, 20, (Color){ 25, 120, 50, 255 });
+    DrawTextSharp(fontSmall, "OCTANE 87 REGULAR", 16, 42, 10.0f, (Color){ 100, 220, 130, 240 }, 1.0f);
+
+    // Status Indicator Badge
+    Color statusBg = isFlowing ? (Color){ 12, 65, 24, 255 } : (Color){ 45, 38, 12, 255 };
+    Color statusFg = isFlowing ? (Color){ 80, 255, 120, 255 } : (Color){ 245, 200, 60, 255 };
+    DrawRectangle(210, 38, 100, 20, statusBg);
+    DrawRectangleLines(210, 38, 100, 20, statusFg);
+    DrawTextSharp(fontSmall, isFlowing ? ">> FLOWING <<" : "[ STANDBY ]", 216, 42, 10.0f, statusFg, 1.0f);
+
+    // Large Phosphor Digital Meter Displays
+    // Box 1: THIS SALE ($)
+    DrawRectangle(10, 64, 300, 44, (Color){ 6, 24, 12, 240 });
+    DrawRectangleLines(10, 64, 300, 44, (Color){ 30, 150, 65, 255 });
+    DrawTextSharp(fontSmall, "THIS SALE", 18, 70, 9.5f, (Color){ 90, 190, 115, 220 }, 1.1f);
+    DrawTextSharp(fontTitle, TextFormat("$ %.2f", salePrice), 18, 83, 21.0f, (Color){ 50, (unsigned char)(255 * flk), 90, 255 }, 1.5f);
+
+    // Box 2: GALLONS
+    DrawRectangle(10, 114, 300, 44, (Color){ 6, 24, 12, 240 });
+    DrawRectangleLines(10, 114, 300, 44, (Color){ 30, 150, 65, 255 });
+    DrawTextSharp(fontSmall, "GALLONS", 18, 120, 9.5f, (Color){ 90, 190, 115, 220 }, 1.1f);
+    DrawTextSharp(fontTitle, TextFormat("%.2f GAL", gallons), 18, 133, 21.0f, (Color){ 50, (unsigned char)(255 * flk), 90, 255 }, 1.5f);
+
+    // Telemetry Footer
+    DrawTextSharp(fontSmall, TextFormat("UNIT PRICE: $%.3f/GAL", fuelPricePerGallon), 14, 166, 10.5f, (Color){ 60, 175, 90, 230 }, 1.0f);
+    DrawTextSharp(fontSmall, TextFormat("UNDERGROUND TANK: %.1f GAL", stationFuelGallons), 14, 184, 10.5f, (Color){ 60, 175, 90, 230 }, 1.0f);
+
+    // Dynamic 16-Segment Flow Bargraph
+    int barSegments = 16;
+    int litSegments = isFlowing ? ((int)(GetTime() * 14.0f) % (barSegments + 1)) : 0;
+    for (int b = 0; b < barSegments; b++) {
+        Color bCol = (b < litSegments) ? (Color){ 65, 255, 110, 255 } : (Color){ 16, 52, 26, 210 };
+        DrawRectangle(14 + b * 18, 206, 14, 14, bCol);
+    }
+
+    // CRT Edge Vignette & Corner Glass Glint
+    DrawRectangleLinesEx((Rectangle){ 0, 0, 320, 240 }, 4.0f, (Color){ 2, 8, 3, 255 });
+    DrawLine(10, 10, 65, 10, (Color){ 180, 255, 200, 75 });
+
+    EndTextureMode();
+}
+
+void DrawPumpCrtScreen3D(Vector3 center, float width, float height, Texture2D tex, bool faceWest, Color tint) {
+    float hw = width * 0.5f;
+    float hh = height * 0.5f;
+
+    rlDisableBackfaceCulling();
+    rlSetTexture(tex.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(tint.r, tint.g, tint.b, tint.a);
+
+    if (faceWest) {
+        // Quad facing -X (towards Left Lane)
+        rlNormal3f(-1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z + hw); // Bottom-left
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z - hw); // Bottom-right
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z - hw); // Top-right
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z + hw); // Top-left
+    } else {
+        // Quad facing +X (towards Right Lane)
+        rlNormal3f(1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z - hw); // Bottom-left
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z + hw); // Bottom-right
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z + hw); // Top-right
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z - hw); // Top-left
+    }
+
+    rlEnd();
+    rlSetTexture(0);
+    rlEnableBackfaceCulling();
+}
+

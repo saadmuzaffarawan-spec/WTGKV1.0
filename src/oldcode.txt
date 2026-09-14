@@ -18,9 +18,6 @@
 
 #include <cstring>
 
-#include "core/game_types.h"
-#include "core/engine_systems.h"
-
 
 
 // ============================================================
@@ -33,6 +30,4427 @@
 
 
 
+#define LOGICAL_W 1280
+
+#define LOGICAL_H 720
+
+#define CYAN (Color){0, 255, 255, 255}
+
+
+
+#define CHUNK_W 256
+
+#define CHUNK_H 32
+
+#define CHUNK_D 256
+
+
+
+struct Voxel {
+
+    uint8_t glyphIndex;
+
+    Color fgColor;
+
+    bool isSolid;
+
+};
+
+
+
+struct PhysicsParticle {
+
+    Vector3 pos;
+
+    Vector3 vel;
+
+    uint8_t glyphIndex;
+
+    Color color;
+
+    float life;
+
+};
+
+
+
+struct Star {
+
+    Vector3 basePos;
+
+    float phase;
+
+    bool isBig;
+
+};
+
+
+
+
+
+// --- PROCEDURAL NOISE FUNCTIONS ---
+
+float fract(float x) { return x - floorf(x); }
+
+float hash(float x, float y) {
+
+    return fract(sinf(x * 12.9898f + y * 78.233f) * 43758.5453123f);
+
+}
+
+float noise(float x, float y) {
+
+    float ix = floorf(x), iy = floorf(y);
+
+    float fx = fract(x), fy = fract(y);
+
+    float ux = fx * fx * (3.0f - 2.0f * fx);
+
+    float uy = fy * fy * (3.0f - 2.0f * fy);
+
+    float a = hash(ix, iy);
+
+    float b = hash(ix + 1.0f, iy);
+
+    float c = hash(ix, iy + 1.0f);
+
+    float d = hash(ix + 1.0f, iy + 1.0f);
+
+    return a + (b - a)*ux + (c - a)*uy + (a - b - c + d)*ux*uy;
+
+}
+
+float fbm(float x, float y) {
+
+    float v = 0.0f; float amp = 0.5f;
+
+    for(int i=0; i<4; i++) {
+
+        v += amp * noise(x, y);
+
+        x *= 2.0f; y *= 2.0f; amp *= 0.5f;
+
+    }
+
+    return v;
+
+}
+
+
+
+// ============================================================
+
+// PROCEDURAL AUDIO SYNTHESIS
+
+// ============================================================
+
+
+
+
+
+Sound GenerateFootstepSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.2f; 
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    
+
+    float filterOut1 = 0.0f; // Low mud crunch
+
+    float filterOut2 = 0.0f; // Grass rustle
+
+    
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        
+
+        // Mud/Sand displacement (Low-mid noise)
+
+        filterOut1 = filterOut1 + 0.15f * (n - filterOut1);
+
+        float env1 = (t < 0.03f) ? (t / 0.03f) : expf(-(t - 0.03f) * 15.0f);
+
+        float mud = filterOut1 * env1;
+
+        
+
+        // Grass rustle (Subtract low frequencies to get high freq rustle)
+
+        filterOut2 = filterOut2 + 0.4f * (n - filterOut2);
+
+        float env2 = (t < 0.02f) ? (t / 0.02f) : expf(-(t - 0.02f) * 20.0f);
+
+        float grass = (filterOut2 - filterOut1) * env2; 
+
+        
+
+        // Very soft subtle weight (NO pitch sweep, just a soft 40Hz bump)
+
+        float weight = sinf(2.0f * PI * 40.0f * t) * expf(-t * 25.0f);
+
+        
+
+        // Mix: Mostly grass and mud, tiny bit of weight
+
+        float mixed = (mud * 1.5f + grass * 1.2f + weight * 0.15f) * 0.8f;
+
+        
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+Sound GeneratePhoneSlideSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.22f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    float hp = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        hp = hp + 0.45f * (noise - hp);
+
+        float clothHiss = (noise - hp) * expf(-t * 16.0f);
+
+        // Subtle haptic vibration motor click / tap (110Hz bump)
+
+        float haptic = sinf(2.0f * PI * 110.0f * t) * expf(-t * 32.0f);
+
+        float mixed = (clothHiss * 0.70f + haptic * 0.45f) * 0.85f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+
+Sound GenerateCashRegisterSound() {
+    int sampleRate = 44100;
+    float duration = 0.42f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / sampleRate;
+        float bell1 = sinf(2.0f * PI * 1480.0f * t) * 0.35f;
+        float bell2 = sinf(2.0f * PI * 2240.0f * t) * 0.22f;
+        float bell3 = sinf(2.0f * PI * 3360.0f * t) * 0.12f;
+        float envBell = expf(-t * 8.5f);
+        float latch = 0.0f;
+        if (t > 0.04f && t < 0.12f) {
+            float tc = t - 0.04f;
+            float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+            latch = (sinf(2.0f * PI * 680.0f * tc) * 0.35f + noise * 0.25f) * expf(-tc * 45.0f);
+        }
+        float mixed = (bell1 + bell2 + bell3) * envBell + latch;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GenerateDrivewayBellSound() {
+    int sampleRate = 44100;
+    float duration = 0.55f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / sampleRate;
+        float s1 = sinf(2.0f * PI * 1280.0f * t) * 0.40f + sinf(2.0f * PI * 2560.0f * t) * 0.18f;
+        float env1 = expf(-t * 9.5f);
+        float s2 = 0.0f;
+        if (t > 0.14f) {
+            float t2 = t - 0.14f;
+            s2 = (sinf(2.0f * PI * 1720.0f * t2) * 0.45f + sinf(2.0f * PI * 3440.0f * t2) * 0.20f) * expf(-t2 * 9.5f);
+        }
+        float mixed = s1 * env1 + s2;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GeneratePumpFlowSound() {
+    int sampleRate = 44100;
+    float duration = 0.35f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / sampleRate;
+        float motor = sinf(2.0f * PI * 92.0f * t) * 0.22f + sinf(2.0f * PI * 184.0f * t) * 0.12f;
+        float hiss = ((float)(rand() % 2000 - 1000) / 1000.0f) * 0.15f;
+        float click = 0.0f;
+        if (t > 0.16f && t < 0.20f) {
+            float tc = t - 0.16f;
+            click = sinf(2.0f * PI * 1100.0f * tc) * expf(-tc * 80.0f) * 0.35f;
+        }
+        float mixed = (motor + hiss + click) * 0.65f;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GenerateNozzleLatchSound() {
+    int sampleRate = 44100;
+    float duration = 0.12f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / sampleRate;
+        // Sharp metallic latch strike
+        float latch = sinf(2.0f * PI * 1850.0f * t) * expf(-t * 95.0f) * 0.55f;
+        // Solid cast-iron lever clunk
+        float clunk = (t > 0.024f) ? (sinf(2.0f * PI * 420.0f * (t - 0.024f)) * expf(-(t - 0.024f) * 65.0f) * 0.45f) : 0.0f;
+        // Metal spring resonance
+        float ping = sinf(2.0f * PI * 3100.0f * t) * expf(-t * 140.0f) * 0.25f;
+        float mixed = (latch + clunk + ping) * 0.85f;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GenerateNozzleShutoffSound() {
+    int sampleRate = 44100;
+    float duration = 0.18f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / sampleRate;
+        // Heavy spring-loaded valve trip snap (loud mechanical CLACK!)
+        float snap = sinf(2.0f * PI * 2450.0f * t) * expf(-t * 85.0f) * 0.75f;
+        // High impulse metallic click
+        float click = sinf(2.0f * PI * 4200.0f * t) * expf(-t * 190.0f) * 0.45f;
+        // Low-end pipe hammer thud
+        float thud = sinf(2.0f * PI * 165.0f * t) * expf(-t * 40.0f) * 0.65f;
+        float mixed = (snap + click + thud) * 0.90f;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GenerateFlashlightToggleSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.085f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float click1 = sinf(2.0f * PI * 3200.0f * t) * expf(-t * 220.0f);
+
+        float click2 = (t > 0.026f) ? (sinf(2.0f * PI * 1650.0f * (t - 0.026f)) * expf(-(t - 0.026f) * 140.0f)) : 0.0f;
+
+        float thunk  = sinf(2.0f * PI * 220.0f * t) * expf(-t * 50.0f) * 0.35f;
+
+        float mixed = (click1 * 0.70f + click2 * 0.55f + thunk);
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateLightSwitchSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.08f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float click1 = sinf(2.0f * PI * 2800.0f * t) * expf(-t * 200.0f);
+
+        float click2 = (t > 0.020f) ? (sinf(2.0f * PI * 1500.0f * (t - 0.020f)) * expf(-(t - 0.020f) * 130.0f)) : 0.0f;
+
+        float thunk  = sinf(2.0f * PI * 180.0f * t) * expf(-t * 45.0f) * 0.40f;
+
+        float mixed = (click1 * 0.75f + click2 * 0.60f + thunk);
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GeneratePhoneTapSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.045f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float click = sinf(2.0f * PI * 3200.0f * t) * expf(-t * 190.0f);
+
+        float thud = sinf(2.0f * PI * 440.0f * t) * expf(-t * 110.0f) * 0.4f;
+
+        float mixed = (click * 0.75f + thud) * 0.75f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateRadioStaticSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.65f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    float hp = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        hp = hp + 0.35f * (noise - hp);
+
+        float hiss = noise - hp;
+
+        float whistle = sinf(2.0f * PI * 1750.0f * t) * 0.14f;
+
+        float crackle = ((rand() % 100) > 88) ? (noise * 0.85f) : 0.0f;
+
+        float env = 1.0f;
+
+        if (t < 0.05f) env = t / 0.05f;
+
+        else if (t > duration - 0.08f) env = (duration - t) / 0.08f;
+
+        float mixed = (hiss * 0.55f + whistle + crackle) * env * 0.70f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateWaterDripSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.22f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float fDrop = 1420.0f + 230.0f * expf(-t * 85.0f);
+
+        float ping = sinf(2.0f * PI * fDrop * t) * expf(-t * 22.0f);
+
+        float overtone = sinf(2.0f * PI * 3120.0f * t) * expf(-t * 45.0f) * 0.35f;
+
+        float cavity = sinf(2.0f * PI * 380.0f * t) * expf(-t * 16.0f) * 0.28f;
+
+        float mixed = (ping * 0.65f + overtone + cavity) * 0.85f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateChestOpenSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.55f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float snap = (t < 0.05f) ? (sinf(2.0f * PI * 2200.0f * t) * expf(-t * 80.0f) * 1.5f) : 0.0f;
+
+        float thud = (t < 0.12f) ? (sinf(2.0f * PI * 135.0f * t) * expf(-t * 35.0f) * 0.9f) : 0.0f;
+
+        float creakFreq = 260.0f + 160.0f * sinf(t * 18.0f);
+
+        float creak = (t >= 0.06f) ? (sinf(2.0f * PI * creakFreq * t) * expf(-(t - 0.06f) * 6.5f) * 0.45f) : 0.0f;
+
+        float mixed = snap * 0.55f + thud * 0.45f + creak;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateShovelDigSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.38f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float strike = sinf(2.0f * PI * 115.0f * t) * expf(-t * 22.0f);
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        float grit = noise * expf(-t * 9.0f);
+
+        float sample = strike * 0.58f + grit * 0.42f;
+
+        if (sample > 1.0f) sample = 1.0f;
+
+        if (sample < -1.0f) sample = -1.0f;
+
+        data[i] = (short)(sample * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+
+
+Sound GenerateCricketAmbience() {
+
+    int sampleRate = 44100;
+
+    float duration = 5.0f; 
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        
+
+        // Primary cricket group
+
+        float freq = 4200.0f + sinf(t * 3.0f) * 30.0f; 
+
+        float osc = sinf(2.0f * PI * freq * t);
+
+        float chirpPulse = sinf(2.0f * PI * 22.0f * t); 
+
+        chirpPulse = (chirpPulse > 0.0f) ? chirpPulse : 0.0f; 
+
+        float burstEnv = sinf(2.0f * PI * 0.6f * t + sinf(t * 1.1f));
+
+        burstEnv = (burstEnv > 0.4f) ? (burstEnv - 0.4f) * 1.6f : 0.0f;
+
+        
+
+        // Secondary distant crickets
+
+        float osc2 = sinf(2.0f * PI * 5100.0f * t);
+
+        float pulse2 = sinf(2.0f * PI * 26.0f * t);
+
+        pulse2 = (pulse2 > 0.0f) ? pulse2 : 0.0f;
+
+        float burst2 = sinf(2.0f * PI * 0.4f * t);
+
+        burst2 = (burst2 > 0.2f) ? (burst2 - 0.2f) * 1.2f : 0.0f;
+
+        
+
+        float mixed = (osc * chirpPulse * burstEnv) + (osc2 * pulse2 * burst2 * 0.3f);
+
+        mixed *= 0.035f; // Very quiet background ambience
+
+        
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateWindAmbience() {
+
+    int sampleRate = 44100;
+
+    float duration = 8.0f; 
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    
+
+    float filterOut = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        
+
+        float gustLFO = sinf(2.0f * PI * 0.08f * t) + sinf(2.0f * PI * 0.19f * t);
+
+        gustLFO = (gustLFO + 2.0f) * 0.25f; 
+
+        
+
+        float filterAlpha = 0.005f + 0.02f * gustLFO; 
+
+        filterOut = filterOut + filterAlpha * (n - filterOut);
+
+        
+
+        float vol = 0.15f + 0.2f * gustLFO;
+
+        float mixed = filterOut * vol;
+
+        
+
+        // Fade edges for seamless looping
+
+        float fade = 1.0f;
+
+        if (t < 0.5f) fade = t / 0.5f;
+
+        else if (duration - t < 0.5f) fade = (duration - t) / 0.5f;
+
+        
+
+        data[i] = (short)(mixed * fade * 32767.0f);
+
+    }
+
+    
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateThunderSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 4.0f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    
+
+    float filterOut1 = 0.0f;
+
+    float filterOut2 = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f; // white noise
+
+        
+
+        // Initial crack envelope
+
+        float envCrack = expf(-t * 15.0f);
+
+        // Rumble envelope
+
+        float envRumble = expf(-t * 1.5f) * (1.0f - expf(-t * 10.0f));
+
+        
+
+        // Lowpass filter for deep rumble
+
+        filterOut1 = filterOut1 + 0.015f * (n - filterOut1);
+
+        filterOut2 = filterOut2 + 0.005f * (filterOut1 - filterOut2);
+
+        
+
+        float crack = n * envCrack * 0.4f;
+
+        float rumble = filterOut2 * envRumble * 10.0f;
+
+        
+
+        float mixed = (crack + rumble) * 0.7f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateRainSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 2.0f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    
+
+    float filterOut = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        // Highpass filter for rain sizzle
+
+        filterOut = filterOut + 0.8f * (n - filterOut);
+
+        float mixed = (n - filterOut) * 0.2f; 
+
+        
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateMenuNavSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.055f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float env = expf(-t * 85.0f);
+
+        float tone = sinf(2.0f * PI * 140.0f * t) * 0.7f + sinf(2.0f * PI * 70.0f * t) * 0.3f;
+
+        float noise = ((float)(rand() % 1000) / 500.0f - 1.0f) * 0.15f;
+
+        float s = (tone + noise) * env;
+
+        if (s > 1.0f) s = 1.0f;
+
+        if (s < -1.0f) s = -1.0f;
+
+        data[i] = (short)(s * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateMenuBoomSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.50f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    float lp = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float freq = 85.0f * expf(-t * 4.5f) + 36.0f;
+
+        float env = expf(-t * 4.0f);
+
+        float tone = sinf(2.0f * PI * freq * t);
+
+        float noise = ((float)(rand() % 1000) / 500.0f - 1.0f);
+
+        lp = lp + 0.07f * (noise - lp);
+
+        float s = (tone * 0.75f + lp * 0.25f) * env;
+
+        if (s > 1.0f) s = 1.0f;
+
+        if (s < -1.0f) s = -1.0f;
+
+        data[i] = (short)(s * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateElectricSparkSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.16f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+
+
+    float hpFilter = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+
+
+        // High-pass filter for sharp electrical sizzle (cutoff ~3.5kHz)
+
+        hpFilter = hpFilter + 0.65f * (n - hpFilter);
+
+        float sizzle = n - hpFilter;
+
+
+
+        // Rapid initial Dirac snap impulse (first 1.5ms)
+
+        float snap = (t < 0.0015f) ? (sinf(2.0f * PI * 4200.0f * t) * (1.0f - t / 0.0015f)) : 0.0f;
+
+
+
+        // Multi-frequency electrical arc hiss
+
+        float arcBuzz = sinf(2.0f * PI * 120.0f * t) * 0.25f + sinf(2.0f * PI * 240.0f * t) * 0.15f;
+
+
+
+        // Intermittent micro-pops inside the crackle
+
+        float pop = 0.0f;
+
+        if (i % 380 < 12) pop = (float)(rand() % 2000 - 1000) / 1000.0f * 0.6f;
+
+
+
+        // Sharp exponential decay envelope
+
+        float env = expf(-t * 28.0f);
+
+
+
+        float mixed = (snap * 2.5f + sizzle * 1.8f + arcBuzz * 0.8f + pop) * env;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateJumpscareSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 1.35f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+
+
+    float hpScream = 0.0f;
+
+
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float n = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+
+
+        // 1. Violent visceral sub-bass punch (42Hz -> 28Hz kick slam)
+
+        float bassFreq = 42.0f * expf(-t * 8.0f) + 26.0f;
+
+        float subPunch = sinf(2.0f * PI * bassFreq * t) * expf(-t * 4.5f) * 1.8f;
+
+
+
+        // 2. Screaming discordant metallic frequencies (piercing horror dissonance)
+
+        float s1 = sinf(2.0f * PI * 680.0f * t);
+
+        float s2 = sinf(2.0f * PI * 920.0f * t);
+
+        float s3 = sinf(2.0f * PI * 1440.0f * t);
+
+        float s4 = sinf(2.0f * PI * 2180.0f * t);
+
+        float dissonantScream = (s1 * 0.4f + s2 * 0.35f + s3 * 0.3f + s4 * 0.25f) * expf(-t * 2.8f);
+
+
+
+        // 3. Distorted high-frequency tearing noise burst
+
+        hpScream = hpScream + 0.55f * (n - hpScream);
+
+        float tearNoise = (n - hpScream) * expf(-t * 5.0f);
+
+
+
+        // 4. Initial brutal clipping impulse (first 40ms)
+
+        float clipSnap = (t < 0.04f) ? ((float)(rand() % 2000 - 1000) / 1000.0f * 1.5f) : 0.0f;
+
+
+
+        float mixed = subPunch * 1.2f + dissonantScream * 1.4f + tearNoise * 1.2f + clipSnap;
+
+
+
+        // Soft saturation wave shaper
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateGunshotSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.42f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    float lp = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        // Explosive noise transient
+
+        float envNoise = expf(-t * 34.0f);
+
+        // Heavy concussive punch pitch sweep from 160Hz down to 42Hz
+
+        float fPunch = 42.0f + 118.0f * expf(-t * 26.0f);
+
+        float punch = sinf(2.0f * PI * fPunch * t) * expf(-t * 18.0f);
+
+        // Room resonance reverb tail
+
+        lp += 0.07f * (noise - lp);
+
+        float tail = lp * expf(-t * 6.5f);
+
+        float mixed = noise * envNoise * 0.78f + punch * 0.58f + tail * 0.22f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateStoreFootstepSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.075f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        // Crisp heel/sole tap on hard supermarket polished linoleum tile
+
+        float tap = sinf(2.0f * PI * 920.0f * t) * expf(-t * 95.0f);
+
+        float thud = sinf(2.0f * PI * 115.0f * t) * expf(-t * 48.0f);
+
+        float friction = noise * expf(-t * 120.0f) * 0.32f;
+
+        float mixed = (tap * 0.52f + thud * 0.44f + friction) * 0.82f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+Sound GenerateFoilSound() {
+
+    int sampleRate = 44100;
+
+    float duration = 0.16f;
+
+    int frameCount = (int)(sampleRate * duration);
+
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    float hp = 0.0f;
+
+    for (int i = 0; i < frameCount; i++) {
+
+        float t = (float)i / sampleRate;
+
+        float noise = (float)(rand() % 2000 - 1000) / 1000.0f;
+
+        hp = noise - (hp * 0.85f); // High-pass crinkle
+
+        float crackle = ((rand() % 100) > 82) ? (noise * 1.8f) : 0.0f;
+
+        float env = (t < 0.02f) ? (t / 0.02f) : expf(-(t - 0.02f) * 14.0f);
+
+        float mixed = (hp * 0.4f + crackle * 0.6f) * env * 0.65f;
+
+        if (mixed > 1.0f) mixed = 1.0f;
+
+        if (mixed < -1.0f) mixed = -1.0f;
+
+        data[i] = (short)(mixed * 32767.0f);
+
+    }
+
+    Wave wave = { 0 };
+
+    wave.frameCount = frameCount;
+
+    wave.sampleRate = sampleRate;
+
+    wave.sampleSize = 16;
+
+    wave.channels = 1;
+
+    wave.data = data;
+
+    Sound snd = LoadSoundFromWave(wave);
+
+    UnloadWave(wave);
+
+    return snd;
+
+}
+
+
+
+void GenerateLightningBolt(Vector3 start, Vector3 end, int generations, std::vector<std::pair<Vector3, Vector3>>& segments) {
+
+    if (generations == 0) {
+
+        segments.push_back({start, end});
+
+        return;
+
+    }
+
+    
+
+    Vector3 mid = { (start.x + end.x) / 2.0f, (start.y + end.y) / 2.0f, (start.z + end.z) / 2.0f };
+
+    
+
+    float displace = (generations * generations) * 0.8f; 
+
+    mid.x += (GetRandomValue(-100, 100) / 100.0f) * displace;
+
+    mid.y += (GetRandomValue(-100, 100) / 100.0f) * displace;
+
+    mid.z += (GetRandomValue(-100, 100) / 100.0f) * displace;
+
+    
+
+    GenerateLightningBolt(start, mid, generations - 1, segments);
+
+    GenerateLightningBolt(mid, end, generations - 1, segments);
+
+    
+
+    if (GetRandomValue(0, 100) < 40) { 
+
+        Vector3 branchEnd = mid;
+
+        branchEnd.x += (GetRandomValue(-100, 100) / 100.0f) * displace * 3.0f;
+
+        branchEnd.y -= GetRandomValue(10, 40); 
+
+        branchEnd.z += (GetRandomValue(-100, 100) / 100.0f) * displace * 3.0f;
+
+        GenerateLightningBolt(mid, branchEnd, generations - 1, segments);
+
+    }
+
+}
+
+
+
+// =========================================================================
+
+// HYPERREALISTIC PLASMA LIGHTNING SYSTEM
+
+// Multi-layer high-current discharge: White Core + Cyan Sheath + UV Bloom
+
+// =========================================================================
+
+void DrawPlasmaLightningBolt(const std::vector<std::pair<Vector3, Vector3>>& segments,
+
+                            float flashTimer, Vector3 impactPos, float impactTimer) {
+
+    if (flashTimer <= 0.0f || segments.empty()) return;
+
+    
+
+    float a = Clamp(flashTimer, 0.0f, 1.0f);
+
+    unsigned char alphaCore   = (unsigned char)(255.0f * a);
+
+    unsigned char alphaCyan   = (unsigned char)(215.0f * a);
+
+    unsigned char alphaViolet = (unsigned char)(95.0f  * a);
+
+    
+
+    Color colCore   = { 255, 255, 255, alphaCore };
+
+    Color colCyan   = { 170, 235, 255, alphaCyan };
+
+    Color colViolet = { 135,  90, 255, alphaViolet };
+
+    
+
+    // 1. Layer 1: Wide Ultraviolet / Violet Corona Glow
+
+    for (const auto& seg : segments) {
+
+        DrawLine3D((Vector3){ seg.first.x + 0.28f, seg.first.y, seg.first.z + 0.28f },
+
+                   (Vector3){ seg.second.x + 0.28f, seg.second.y, seg.second.z + 0.28f }, colViolet);
+
+        DrawLine3D((Vector3){ seg.first.x - 0.28f, seg.first.y, seg.first.z - 0.28f },
+
+                   (Vector3){ seg.second.x - 0.28f, seg.second.y, seg.second.z - 0.28f }, colViolet);
+
+        DrawLine3D((Vector3){ seg.first.x, seg.first.y + 0.28f, seg.first.z },
+
+                   (Vector3){ seg.second.x, seg.second.y + 0.28f, seg.second.z }, colViolet);
+
+    }
+
+    
+
+    // 2. Layer 2: Ionized Plasma Sheath (Electric Cyan)
+
+    for (const auto& seg : segments) {
+
+        DrawLine3D((Vector3){ seg.first.x + 0.09f, seg.first.y, seg.first.z - 0.09f },
+
+                   (Vector3){ seg.second.x + 0.09f, seg.second.y, seg.second.z - 0.09f }, colCyan);
+
+        DrawLine3D((Vector3){ seg.first.x - 0.09f, seg.first.y, seg.first.z + 0.09f },
+
+                   (Vector3){ seg.second.x - 0.09f, seg.second.y, seg.second.z + 0.09f }, colCyan);
+
+    }
+
+    
+
+    // 3. Layer 3: Blinding Stark White Core Channel
+
+    for (const auto& seg : segments) {
+
+        DrawLine3D(seg.first, seg.second, colCore);
+
+    }
+
+    
+
+    // 4. Plasma Node Beads at branch junctions
+
+    if (a > 0.20f) {
+
+        for (size_t s = 0; s < segments.size(); s += 2) {
+
+            DrawCube(segments[s].first, 0.38f, 0.38f, 0.38f, { 220, 245, 255, (unsigned char)(235.0f * a) });
+
+        }
+
+    }
+
+    
+
+    // 5. Ground Impact Plasma Burst & Shockwave Ring
+
+    if (impactTimer > 0.0f) {
+
+        float blastProg = Clamp(impactTimer / 0.5f, 0.0f, 1.0f);
+
+        float ringRadius = (1.0f - blastProg) * 8.5f + 0.6f;
+
+        unsigned char ringAlpha = (unsigned char)(blastProg * 255.0f);
+
+        
+
+        // Expanding ionized shockwave ring
+
+        DrawCircle3D(impactPos, ringRadius, (Vector3){ 1.0f, 0.0f, 0.0f }, 90.0f, { 150, 220, 255, ringAlpha });
+
+        // Secondary electric arc ring
+
+        DrawCircle3D(impactPos, ringRadius * 0.45f, (Vector3){ 1.0f, 0.0f, 0.0f }, 90.0f, { 255, 255, 255, ringAlpha });
+
+        // Radiant ground fireball
+
+        DrawSphere(impactPos, blastProg * 2.4f, { 240, 250, 255, (unsigned char)(blastProg * 225.0f) });
+
+    }
+
+}
+
+
+
+// =========================================================================
+
+// HYBRID RAYLIB SHAPE + DYNAMIC ASCII CLOUD SYSTEM
+
+// Formations: Cumulus Humilis, Cumulonimbus Shelf Storm, Cirrus Wisps
+
+// Physics: Wind Advection, Altitude Shear, Thermal Boiling Turbulence
+
+// Optics: Direct Solar/Lunar, Beer-Lambert Absorption, Mie Rim ("Silver Lining")
+
+// =========================================================================
+
+enum CloudType {
+
+    CLOUD_CUMULUS = 0,
+
+    CLOUD_STORM_SHELF,
+
+    CLOUD_CIRRUS
+
+};
+
+
+
+struct CloudPuff {
+
+    Vector3 localPos;
+
+    Vector3 size;
+
+    float density;       // 0.2 (evaporating wisp) to 1.0 (dense core)
+
+    float boilPhase;     // phase offset for thermal boiling
+
+    float boilFreq;      // frequency of turbulence
+
+    char glyph;          // '@', '#', '8', 'O', '0', '&', '~', '.'
+
+};
+
+
+
+struct CloudCluster {
+
+    CloudType type;
+
+    Vector3 pos;         // Center position
+
+    Vector3 vel;         // Drift velocity
+
+    float boundingRadius;
+
+    std::vector<CloudPuff> puffs;
+
+    float baseAltitude;
+
+    float internalFlash; // Intra-cloud lightning flash
+
+};
+
+
+
+std::vector<CloudCluster> g_cloudClusters;
+
+
+
+static inline Color BlendColors(Color c1, Color c2, float t) {
+
+    t = Clamp(t, 0.0f, 1.0f);
+
+    return (Color){
+
+        (unsigned char)(c1.r + (c2.r - c1.r) * t),
+
+        (unsigned char)(c1.g + (c2.g - c1.g) * t),
+
+        (unsigned char)(c1.b + (c2.b - c1.b) * t),
+
+        (unsigned char)(c1.a + (c2.a - c1.a) * t)
+
+    };
+
+}
+
+
+
+void InitCloudSystem() {
+
+    g_cloudClusters.clear();
+
+    g_cloudClusters.reserve(16);
+
+    
+
+    // 1. CUMULUS HUMILIS (7 Fair-Weather Clusters, Alt 78 - 105m)
+
+    struct CumulusSeed {
+
+        Vector3 pos;
+
+        float radius;
+
+        Vector3 vel;
+
+    } cumulusSeeds[7] = {
+
+        { {  50.0f,  84.0f,  80.0f }, 28.0f, { 3.4f, 0.0f, 1.2f } },
+
+        { { 165.0f,  92.0f,  40.0f }, 32.0f, { 3.2f, 0.0f, 1.1f } },
+
+        { { 235.0f,  88.0f, 175.0f }, 26.0f, { 3.5f, 0.0f, 1.3f } },
+
+        { { -30.0f,  80.0f, 215.0f }, 30.0f, { 3.3f, 0.0f, 1.2f } },
+
+        { { 105.0f,  96.0f, 285.0f }, 25.0f, { 3.6f, 0.0f, 1.4f } },
+
+        { { 295.0f,  90.0f, 315.0f }, 29.0f, { 3.1f, 0.0f, 1.1f } },
+
+        { {  35.0f,  82.0f, -45.0f }, 27.0f, { 3.4f, 0.0f, 1.2f } }
+
+    };
+
+    
+
+    for (int i = 0; i < 7; i++) {
+
+        CloudCluster cl;
+
+        cl.type = CLOUD_CUMULUS;
+
+        cl.pos = cumulusSeeds[i].pos;
+
+        cl.vel = cumulusSeeds[i].vel;
+
+        cl.boundingRadius = cumulusSeeds[i].radius;
+
+        cl.baseAltitude = cumulusSeeds[i].pos.y;
+
+        cl.internalFlash = 0.0f;
+
+        
+
+        // Base flat layer (lifting condensation level)
+
+        for (int b = 0; b < 6; b++) {
+
+            float ang = (float)b * (2.0f * PI / 6.0f);
+
+            float r = cumulusSeeds[i].radius * 0.45f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * r, -1.8f, sinf(ang) * r };
+
+            p.size = (Vector3){ 16.0f, 8.5f, 16.0f };
+
+            p.density = 0.85f;
+
+            p.boilPhase = (float)(b * 1.05f);
+
+            p.boilFreq = 0.8f + (b % 3) * 0.2f;
+
+            p.glyph = (b % 2 == 0) ? '@' : '#';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Center buoyant thermal core
+
+        {
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ 0.0f, 1.5f, 0.0f };
+
+            p.size = (Vector3){ 18.0f, 12.0f, 18.0f };
+
+            p.density = 0.95f;
+
+            p.boilPhase = 0.5f;
+
+            p.boilFreq = 1.0f;
+
+            p.glyph = '@';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Bubbling upper turrets (cauliflower head)
+
+        for (int t = 0; t < 5; t++) {
+
+            float ang = (float)t * (2.0f * PI / 5.0f) + 0.35f;
+
+            float r = cumulusSeeds[i].radius * 0.32f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * r, 4.2f, sinf(ang) * r };
+
+            p.size = (Vector3){ 13.5f, 10.0f, 13.5f };
+
+            p.density = 0.65f;
+
+            p.boilPhase = (float)(t * 1.35f + 1.2f);
+
+            p.boilFreq = 1.1f + (t % 2) * 0.3f;
+
+            p.glyph = (t % 2 == 0) ? 'O' : '0';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Evaporating outer wisps
+
+        for (int w = 0; w < 4; w++) {
+
+            float ang = (float)w * (2.0f * PI / 4.0f) + 0.75f;
+
+            float r = cumulusSeeds[i].radius * 0.78f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * r, 0.5f, sinf(ang) * r };
+
+            p.size = (Vector3){ 10.0f, 6.0f, 10.0f };
+
+            p.density = 0.35f;
+
+            p.boilPhase = (float)(w * 1.7f + 2.1f);
+
+            p.boilFreq = 1.4f;
+
+            p.glyph = (w % 2 == 0) ? '~' : '.';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        g_cloudClusters.push_back(cl);
+
+    }
+
+    
+
+    // 2. CUMULONIMBUS / STORM SHELF SUPERCELL (3 Ominous Clusters)
+
+    struct StormSeed {
+
+        Vector3 pos;
+
+        float radius;
+
+        Vector3 vel;
+
+    } stormSeeds[3] = {
+
+        { { 120.0f,  64.0f, 140.0f }, 58.0f, { 2.1f, 0.0f, 0.7f } },
+
+        { { 230.0f,  72.0f, 270.0f }, 64.0f, { 2.2f, 0.0f, 0.8f } },
+
+        { { -50.0f,  68.0f,  60.0f }, 52.0f, { 2.0f, 0.0f, 0.7f } }
+
+    };
+
+    
+
+    for (int i = 0; i < 3; i++) {
+
+        CloudCluster cl;
+
+        cl.type = CLOUD_STORM_SHELF;
+
+        cl.pos = stormSeeds[i].pos;
+
+        cl.vel = stormSeeds[i].vel;
+
+        cl.boundingRadius = stormSeeds[i].radius;
+
+        cl.baseAltitude = stormSeeds[i].pos.y;
+
+        cl.internalFlash = 0.0f;
+
+        
+
+        // Dark bruised underbelly
+
+        for (int b = 0; b < 8; b++) {
+
+            float ang = (float)b * (2.0f * PI / 8.0f);
+
+            float r = stormSeeds[i].radius * 0.55f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * r, -5.0f, sinf(ang) * r };
+
+            p.size = (Vector3){ 26.0f, 14.0f, 26.0f };
+
+            p.density = 0.98f;
+
+            p.boilPhase = (float)(b * 0.9f);
+
+            p.boilFreq = 0.7f;
+
+            p.glyph = '#';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Central column
+
+        for (int c = 0; c < 6; c++) {
+
+            float yOff = (float)c * 4.5f;
+
+            float rScale = 1.0f + (float)c * 0.12f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ ((c % 2 == 0) ? -2.0f : 2.0f), yOff, ((c % 2 == 0) ? 2.0f : -2.0f) };
+
+            p.size = (Vector3){ 28.0f * rScale, 16.0f, 28.0f * rScale };
+
+            p.density = 0.95f;
+
+            p.boilPhase = (float)(c * 1.1f + 0.4f);
+
+            p.boilFreq = 0.85f;
+
+            p.glyph = '%';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Spreading anvil head
+
+        for (int a = 0; a < 6; a++) {
+
+            float ang = (float)a * (2.0f * PI / 6.0f);
+
+            float r = stormSeeds[i].radius * 0.75f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * r, 24.0f, sinf(ang) * r * 1.3f };
+
+            p.size = (Vector3){ 25.0f, 8.0f, 32.0f };
+
+            p.density = 0.75f;
+
+            p.boilPhase = (float)(a * 1.25f + 2.0f);
+
+            p.boilFreq = 0.9f;
+
+            p.glyph = 'W';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        // Turbulent shelf rim
+
+        for (int r = 0; r < 4; r++) {
+
+            float ang = (float)r * (2.0f * PI / 4.0f) + 0.4f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ cosf(ang) * stormSeeds[i].radius * 0.85f, -2.0f, sinf(ang) * stormSeeds[i].radius * 0.85f };
+
+            p.size = (Vector3){ 18.0f, 10.0f, 18.0f };
+
+            p.density = 0.50f;
+
+            p.boilPhase = (float)(r * 1.5f + 3.0f);
+
+            p.boilFreq = 1.2f;
+
+            p.glyph = '&';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        g_cloudClusters.push_back(cl);
+
+    }
+
+    
+
+    // 3. CIRRUS / STRATUS WISPS (4 High-Altitude Wind-Sheared Veils)
+
+    struct CirrusSeed {
+
+        Vector3 pos;
+
+        float radius;
+
+        Vector3 vel;
+
+    } cirrusSeeds[4] = {
+
+        { {  45.0f, 160.0f, 110.0f }, 46.0f, { 9.6f, 0.0f, 3.5f } },
+
+        { { 175.0f, 168.0f, 215.0f }, 52.0f, { 9.4f, 0.0f, 3.3f } },
+
+        { { 255.0f, 156.0f,  35.0f }, 48.0f, { 9.8f, 0.0f, 3.6f } },
+
+        { { -15.0f, 165.0f, 335.0f }, 50.0f, { 9.5f, 0.0f, 3.4f } }
+
+    };
+
+    
+
+    for (int i = 0; i < 4; i++) {
+
+        CloudCluster cl;
+
+        cl.type = CLOUD_CIRRUS;
+
+        cl.pos = cirrusSeeds[i].pos;
+
+        cl.vel = cirrusSeeds[i].vel;
+
+        cl.boundingRadius = cirrusSeeds[i].radius;
+
+        cl.baseAltitude = cirrusSeeds[i].pos.y;
+
+        cl.internalFlash = 0.0f;
+
+        
+
+        for (int s = 0; s < 9; s++) {
+
+            float offsetT = ((float)s - 4.0f) * 11.0f;
+
+            CloudPuff p;
+
+            p.localPos = (Vector3){ offsetT * 0.95f, sinf(offsetT * 0.05f) * 2.5f, offsetT * 0.35f };
+
+            p.size = (Vector3){ 18.0f, 3.5f, 12.0f };
+
+            p.density = 0.28f;
+
+            p.boilPhase = (float)(s * 0.8f);
+
+            p.boilFreq = 0.6f;
+
+            p.glyph = (s % 2 == 0) ? '~' : '-';
+
+            cl.puffs.push_back(p);
+
+        }
+
+        g_cloudClusters.push_back(cl);
+
+    }
+
+}
+
+
+
+void UpdateCloudPhysics(float dt, float timeVal, float lightningFlash) {
+
+    for (auto& cluster : g_cloudClusters) {
+
+        cluster.pos.x += cluster.vel.x * dt;
+
+        cluster.pos.z += cluster.vel.z * dt;
+
+        
+
+        // Seamless toroidal boundary wrapping across sky
+
+        if (cluster.pos.x > 380.0f) cluster.pos.x = -120.0f;
+
+        if (cluster.pos.x < -120.0f) cluster.pos.x = 380.0f;
+
+        if (cluster.pos.z > 440.0f) cluster.pos.z = -120.0f;
+
+        if (cluster.pos.z < -120.0f) cluster.pos.z = 440.0f;
+
+        
+
+        // Intra-cloud lightning flash response
+
+        if (lightningFlash > 0.0f && cluster.type == CLOUD_STORM_SHELF) {
+
+            cluster.internalFlash = lightningFlash * 1.5f;
+
+        } else if (cluster.internalFlash > 0.0f) {
+
+            cluster.internalFlash = fmaxf(0.0f, cluster.internalFlash - dt * 2.8f);
+
+        }
+
+    }
+
+}
+
+
+
+Color GetCloudPuffColor(const CloudCluster& cluster, const CloudPuff& puff, Vector3 puffWorldPos,
+
+                        Vector3 camPos, Vector3 sunDir, float sunElev, float lightningFlash) {
+
+    float h = sunElev;
+
+    float wDay   = Clamp((h + 0.10f) / 0.35f, 0.0f, 1.0f);
+
+    float wTwi   = Clamp(1.0f - fabsf(h - 0.04f) / 0.16f, 0.0f, 1.0f);
+
+    float wNight = Clamp((-h - 0.04f) / 0.22f, 0.0f, 1.0f);
+
+    float sumW = wDay + wTwi + wNight;
+
+    if (sumW > 0.001f) { wDay /= sumW; wTwi /= sumW; wNight /= sumW; }
+
+    
+
+    // Normal estimation (tops face zenith, flanks face outward)
+
+    Vector3 norm = Vector3Normalize((Vector3){ puff.localPos.x * 0.35f, puff.localPos.y + 4.5f, puff.localPos.z * 0.35f });
+
+    
+
+    // 1. Direct Solar & Lunar illumination
+
+    float nDotL = Vector3DotProduct(norm, sunDir);
+
+    float sunDiff = fmaxf(0.0f, nDotL) * fmaxf(0.0f, h);
+
+    float moonDiff = fmaxf(0.0f, Vector3DotProduct(norm, Vector3Negate(sunDir))) * fmaxf(0.0f, -h) * 0.35f;
+
+    
+
+    // 2. Beer-Lambert internal optical depth absorption
+
+    float yRatio = Clamp((puff.localPos.y + 6.0f) / 14.0f, 0.0f, 1.0f);
+
+    float beer = 0.32f + 0.68f * yRatio;
+
+    if (cluster.type == CLOUD_STORM_SHELF) {
+
+        beer = 0.18f + 0.52f * yRatio;
+
+    }
+
+    
+
+    // 3. Forward Mie Rim Lighting ("Silver Lining")
+
+    Vector3 toPuff = Vector3Normalize(Vector3Subtract(puffWorldPos, camPos));
+
+    float cosPsi = Vector3DotProduct(toPuff, sunDir);
+
+    float rim = 0.0f;
+
+    if (cosPsi > 0.05f && h > -0.05f) {
+
+        rim = powf(cosPsi, 5.0f) * (1.1f - puff.density) * 1.8f * (wDay * 0.9f + wTwi * 1.6f);
+
+    }
+
+    
+
+    // 4. Color Palette Synthesis
+
+    Vector3 colSun = Vector3Add(Vector3Scale((Vector3){ 255, 252, 245 }, wDay),
+
+                                Vector3Scale((Vector3){ 255, 165,  55 }, wTwi));
+
+    Vector3 colAmb = Vector3Add(Vector3Scale((Vector3){ 130, 160, 205 }, wDay),
+
+                     Vector3Add(Vector3Scale((Vector3){  85,  60, 110 }, wTwi),
+
+                                Vector3Scale((Vector3){  18,  24,  44 }, wNight)));
+
+    if (cluster.type == CLOUD_STORM_SHELF) {
+
+        colAmb = Vector3Multiply(colAmb, (Vector3){ 0.45f, 0.48f, 0.55f });
+
+        colSun = Vector3Multiply(colSun, (Vector3){ 0.60f, 0.58f, 0.55f });
+
+    } else if (cluster.type == CLOUD_CIRRUS) {
+
+        colSun = Vector3Scale(colSun, 1.15f);
+
+    }
+
+    
+
+    float lightFactor = (sunDiff + moonDiff) * 0.75f;
+
+    Vector3 finalRgb = Vector3Add(Vector3Scale(colAmb, beer), Vector3Scale(colSun, lightFactor * beer));
+
+    
+
+    if (rim > 0.01f) {
+
+        Vector3 rimCol = (wTwi > 0.25f) ? (Vector3){ 255, 190, 80 } : (Vector3){ 255, 255, 240 };
+
+        finalRgb = Vector3Add(finalRgb, Vector3Scale(rimCol, rim));
+
+    }
+
+    
+
+    // 5. Intra-cloud lightning flash & global lightning flash
+
+    float totalFlash = cluster.internalFlash + lightningFlash * 0.75f;
+
+    if (totalFlash > 0.01f) {
+
+        float fIntensity = Clamp(totalFlash * 220.0f, 0.0f, 255.0f);
+
+        finalRgb.x = fminf(255.0f, finalRgb.x + fIntensity * 0.90f);
+
+        finalRgb.y = fminf(255.0f, finalRgb.y + fIntensity * 0.98f);
+
+        finalRgb.z = fminf(255.0f, finalRgb.z + fIntensity * 1.10f);
+
+    }
+
+    
+
+    unsigned char alpha = (unsigned char)(Clamp(puff.density * (cluster.type == CLOUD_CIRRUS ? 160.0f : 240.0f), 40.0f, 255.0f));
+
+    return (Color){ (unsigned char)Clamp(finalRgb.x, 0.0f, 255.0f),
+
+                    (unsigned char)Clamp(finalRgb.y, 0.0f, 255.0f),
+
+                    (unsigned char)Clamp(finalRgb.z, 0.0f, 255.0f), alpha };
+
+}
+
+
+
+// CURATED FRUSTUM-CULLED ASCII CLOUD PARTICLES
+
+// Renders subtle, artistic ASCII cloud contour wisps strictly when the player is looking at them
+
+void PopulateCloudInstances(Camera3D camera, Vector3 sunDir, float sunElev, float lightningFlash,
+
+                            std::vector<Matrix> cloudInstances[256], float timeVal) {
+
+    for (int i = 0; i < 256; i++) cloudInstances[i].clear();
+
+    
+
+    Vector3 camForward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+
+    
+
+    for (const auto& cluster : g_cloudClusters) {
+
+        float dx = cluster.pos.x - camera.position.x;
+
+        float dy = cluster.pos.y - camera.position.y;
+
+        float dz = cluster.pos.z - camera.position.z;
+
+        float distSq = dx*dx + dz*dz;
+
+        if (distSq > 280.0f * 280.0f) continue;
+
+        
+
+        // 3D Frustum culling: Skip clusters outside player's viewing cone
+
+        float fullDist = sqrtf(dx*dx + dy*dy + dz*dz);
+
+        if (fullDist > 0.1f) {
+
+            float dot = (camForward.x * dx + camForward.y * dy + camForward.z * dz) / fullDist;
+
+            if (dot < 0.15f) continue; // Outside camera FOV
+
+        }
+
+        
+
+        // Populate a curated, tasteful subset of ASCII letters (core + prominent wisps)
+
+        for (size_t p = 0; p < cluster.puffs.size(); p++) {
+
+            // Keep selective artistic puffs (every 2nd puff and core) to prevent visual clutter
+
+            if (p % 2 != 0 && p != 0) continue;
+
+            
+
+            const auto& puff = cluster.puffs[p];
+
+            float dyPuff = sinf(timeVal * puff.boilFreq + puff.boilPhase) * 0.55f;
+
+            float px = cosf(timeVal * puff.boilFreq * 0.75f + puff.boilPhase) * 0.45f;
+
+            float pz = sinf(timeVal * puff.boilFreq * 1.25f + puff.boilPhase) * 0.45f;
+
+            
+
+            Vector3 worldPos = { cluster.pos.x + puff.localPos.x + px,
+
+                                 cluster.pos.y + puff.localPos.y + dyPuff,
+
+                                 cluster.pos.z + puff.localPos.z + pz };
+
+            
+
+            // Individual puff frustum culling: ONLY exist when player is directly seeing them
+
+            Vector3 toPuff = Vector3Subtract(worldPos, camera.position);
+
+            float pDist = Vector3Length(toPuff);
+
+            if (pDist > 0.1f) {
+
+                float pDot = (camForward.x * toPuff.x + camForward.y * toPuff.y + camForward.z * toPuff.z) / pDist;
+
+                if (pDot < 0.20f) continue; // Not in view
+
+            }
+
+            
+
+            Color col = GetCloudPuffColor(cluster, puff, worldPos, camera.position, sunDir, sunElev, lightningFlash);
+
+            
+
+            Matrix m = MatrixIdentity();
+
+            m.m0 = col.r / 255.0f;
+
+            m.m1 = col.g / 255.0f;
+
+            m.m2 = col.b / 255.0f;
+
+            m.m3 = (col.a / 255.0f) * 0.50f; // Delicate translucent blend with 3D puff volume
+
+            m.m4 = puff.size.x * 0.95f;
+
+            m.m5 = puff.size.y * 0.95f;
+
+            m.m9 = 1.0f;  // Disable Fog
+
+            m.m10 = 0.0f; // Billboard quad
+
+            m.m11 = 1.0f;
+
+            m.m12 = worldPos.x;
+
+            m.m13 = worldPos.y;
+
+            m.m14 = worldPos.z;
+
+            cloudInstances[(uint8_t)puff.glyph].push_back(m);
+
+        }
+
+    }
+
+}
+
+
+
+// 3D Volumetric Puffy Clouds: Realistic atmospheric Mie/Beer-Lambert illumination,
+
+// thermodynamic boiling, 3D spheres & cubes, with 3D frustum culling and optimized 8x8 tessellation.
+
+void DrawHybridCloudVolumes(Camera3D camera, Vector3 sunDir, float sunElev, float lightningFlash, float timeVal) {
+
+    Vector3 camForward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+
+    
+
+    for (const auto& cluster : g_cloudClusters) {
+
+        float dx = cluster.pos.x - camera.position.x;
+
+        float dy = cluster.pos.y - camera.position.y;
+
+        float dz = cluster.pos.z - camera.position.z;
+
+        float distSq = dx*dx + dz*dz;
+
+        if (distSq > 300.0f * 300.0f) continue;
+
+        
+
+        // 3D Frustum culling: Skip cloud clusters completely outside camera field of view
+
+        float fullDist = sqrtf(dx*dx + dy*dy + dz*dz);
+
+        if (fullDist > 0.1f) {
+
+            float dot = (camForward.x * dx + camForward.y * dy + camForward.z * dz) / fullDist;
+
+            if (dot < 0.15f) continue;
+
+        }
+
+        
+
+        for (size_t p = 0; p < cluster.puffs.size(); p++) {
+
+            const auto& puff = cluster.puffs[p];
+
+            float dyPuff = sinf(timeVal * puff.boilFreq + puff.boilPhase) * 0.55f;
+
+            float px = cosf(timeVal * puff.boilFreq * 0.75f + puff.boilPhase) * 0.45f;
+
+            float pz = sinf(timeVal * puff.boilFreq * 1.25f + puff.boilPhase) * 0.45f;
+
+            
+
+            Vector3 worldPos = { cluster.pos.x + puff.localPos.x + px,
+
+                                 cluster.pos.y + puff.localPos.y + dyPuff,
+
+                                 cluster.pos.z + puff.localPos.z + pz };
+
+            
+
+            // Individual puff frustum check
+
+            Vector3 toPuff = Vector3Subtract(worldPos, camera.position);
+
+            float pDist = Vector3Length(toPuff);
+
+            if (pDist > 0.1f) {
+
+                float pDot = (camForward.x * toPuff.x + camForward.y * toPuff.y + camForward.z * toPuff.z) / pDist;
+
+                if (pDot < 0.20f) continue;
+
+            }
+
+            
+
+            Color col = GetCloudPuffColor(cluster, puff, worldPos, camera.position, sunDir, sunElev, lightningFlash);
+
+            
+
+            if (cluster.type == CLOUD_CIRRUS) {
+
+                DrawCube(worldPos, puff.size.x * 1.4f, puff.size.y * 0.45f, puff.size.z * 1.4f, col);
+
+            } else {
+
+                DrawSphereEx(worldPos, puff.size.x * 0.62f, 8, 8, col);
+
+            }
+
+        }
+
+    }
+
+}
+
+
+
+// -------------------------------------------------------------------------
+
+// REAL-WORLD ATMOSPHERIC PHYSICS: CELESTIAL CLOUD OCCLUSION & EXTINCTION
+
+// Ray-sphere intersection against volumetric cloud clusters to determine
+
+// real-time extinction of direct solar and lunar beams.
+
+// -------------------------------------------------------------------------
+
+static float GetCelestialCloudOcclusion(Camera3D camera, Vector3 celestialDir) {
+
+    if (celestialDir.y < -0.08f) return 0.0f;
+
+    float maxCover = 0.0f;
+
+
+
+    for (const auto& cluster : g_cloudClusters) {
+
+        Vector3 toCluster = Vector3Subtract(cluster.pos, camera.position);
+
+        float projDist = Vector3DotProduct(toCluster, celestialDir);
+
+        if (projDist <= 5.0f) continue; // Behind camera
+
+
+
+        Vector3 closestPt = Vector3Add(camera.position, Vector3Scale(celestialDir, projDist));
+
+        float perpDist = Vector3Distance(cluster.pos, closestPt);
+
+        float effRadius = cluster.boundingRadius * 1.35f;
+
+
+
+        if (perpDist < effRadius) {
+
+            float cover = 1.0f - (perpDist / effRadius);
+
+            cover = cover * cover; // Smooth quadratic falloff toward edges
+
+            float weight = (cluster.type == CLOUD_CIRRUS) ? 0.75f : ((cluster.type == CLOUD_STORM_SHELF) ? 1.4f : 1.0f);
+
+            float effCover = Clamp(cover * weight, 0.0f, 1.0f);
+
+            if (effCover > maxCover) maxCover = effCover;
+
+        }
+
+    }
+
+    return maxCover;
+
+}
+
+
+
+void DrawCloudGroundShadows(Camera3D camera, Vector3 sunDir, float sunElev) {
+
+    // Determine active celestial light source: Sun during day, Moon at night
+
+    Vector3 lightDir = sunDir;
+
+    float lightElev = sunElev;
+
+    bool isMoonShadow = false;
+
+    if (sunElev < -0.04f) {
+
+        // Nighttime: Moon is directly opposite the Sun
+
+        lightDir = Vector3Negate(sunDir);
+
+        lightElev = lightDir.y;
+
+        isMoonShadow = true;
+
+    }
+
+    if (lightElev < 0.035f) return; // Sun/Moon below horizon casts no ground shadows
+
+
+
+    float invLy = 1.0f / fmaxf(0.10f, lightElev);
+
+
+
+    rlEnableColorBlend();
+
+    rlSetTexture(0);
+
+
+
+    for (const auto& cluster : g_cloudClusters) {
+
+        if (cluster.type == CLOUD_CIRRUS) continue;
+
+
+
+        float groundH = cluster.pos.y - 10.025f;
+
+        float shadowX = cluster.pos.x - lightDir.x * groundH * invLy;
+
+        float shadowZ = cluster.pos.z - lightDir.z * groundH * invLy;
+
+
+
+        float dx = shadowX - camera.position.x;
+
+        float dz = shadowZ - camera.position.z;
+
+        if (dx*dx + dz*dz > 250.0f * 250.0f) continue;
+
+
+
+        // Physical Umbra / Penumbra synthesis:
+
+        // Render organic, soft-feathered shadow volumes matching the cloud's constituent puffs
+
+        float maxAlpha = isMoonShadow ? 42.0f : ((cluster.type == CLOUD_STORM_SHELF) ? 140.0f : 90.0f);
+
+        maxAlpha *= Clamp(lightElev * 2.5f, 0.0f, 1.0f);
+
+        if (maxAlpha < 2.0f) continue;
+
+
+
+        Color shadowCol = isMoonShadow ? (Color){ 4, 6, 12, 0 } : (Color){ 10, 14, 20, 0 };
+
+
+
+        const int fanSegs = 14;
+
+        for (const auto& puff : cluster.puffs) {
+
+            float pGroundH = (cluster.pos.y + puff.localPos.y) - 10.025f;
+
+            float px = (cluster.pos.x + puff.localPos.x) - lightDir.x * pGroundH * invLy;
+
+            float pz = (cluster.pos.z + puff.localPos.z) - lightDir.z * pGroundH * invLy;
+
+
+
+            float pDistSq = (px - camera.position.x)*(px - camera.position.x) + (pz - camera.position.z)*(pz - camera.position.z);
+
+            if (pDistSq > 220.0f * 220.0f) continue;
+
+
+
+            float pRad = fmaxf(puff.size.x, puff.size.z) * 1.45f;
+
+            float puffAlpha = maxAlpha * puff.density * 0.72f;
+
+            unsigned char cAlpha = (unsigned char)Clamp(puffAlpha, 0.0f, 255.0f);
+
+
+
+            // Continuous radial fan: Center is Umbra (cAlpha), Outer rim smoothly feathers to 0 ALPHA.
+
+            // Completely eliminates geometric rings!
+
+            rlBegin(RL_TRIANGLES);
+
+            for (int i = 0; i < fanSegs; i++) {
+
+                float a0 = (float)i * (2.0f * PI / (float)fanSegs);
+
+                float a1 = (float)(i + 1) * (2.0f * PI / (float)fanSegs);
+
+                float x0 = px + cosf(a0) * pRad;
+
+                float z0 = pz + sinf(a0) * pRad;
+
+                float x1 = px + cosf(a1) * pRad;
+
+                float z1 = pz + sinf(a1) * pRad;
+
+
+
+                // Center vertex: core umbra/penumbra
+
+                rlColor4ub(shadowCol.r, shadowCol.g, shadowCol.b, cAlpha);
+
+                rlVertex3f(px, 10.025f, pz);
+
+
+
+                // Outer vertices: 0 alpha (feathered penumbra boundary, zero rings!)
+
+                rlColor4ub(shadowCol.r, shadowCol.g, shadowCol.b, 0);
+
+                rlVertex3f(x0, 10.025f, z0);
+
+
+
+                rlColor4ub(shadowCol.r, shadowCol.g, shadowCol.b, 0);
+
+                rlVertex3f(x1, 10.025f, z1);
+
+            }
+
+            rlEnd();
+
+        }
+
+    }
+
+}
+
+
+
+void DrawAtmosphericSkyDome(Camera3D camera, float sunTheta, float lightningFlash) {
+
+    rlDisableDepthTest();
+
+    rlDisableDepthMask();
+
+    rlDisableBackfaceCulling();
+
+    
+
+    float sunElev = sinf(sunTheta);
+
+    Vector3 sunDir = Vector3Normalize((Vector3){ cosf(sunTheta), sunElev, cosf(sunTheta) * 0.28f });
+
+    
+
+    float wDay = Clamp((sunElev + 0.10f) / 0.35f, 0.0f, 1.0f);
+
+    float wTwi = Clamp(1.0f - fabsf(sunElev - 0.04f) / 0.16f, 0.0f, 1.0f);
+
+    float wNight = Clamp((-sunElev - 0.04f) / 0.22f, 0.0f, 1.0f);
+
+    float sumW = wDay + wTwi + wNight;
+
+    if (sumW > 0.001f) {
+
+        wDay /= sumW;
+
+        wTwi /= sumW;
+
+        wNight /= sumW;
+
+    }
+
+    
+
+    auto Blend3Col = [&](Color cDay, Color cTwi, Color cNight) -> Color {
+
+        float r = cDay.r * wDay + cTwi.r * wTwi + cNight.r * wNight;
+
+        float g = cDay.g * wDay + cTwi.g * wTwi + cNight.g * wNight;
+
+        float b = cDay.b * wDay + cTwi.b * wTwi + cNight.b * wNight;
+
+        if (lightningFlash > 0.0f) {
+
+            float lf = lightningFlash * 190.0f;
+
+            r = fminf(255.0f, r + lf);
+
+            g = fminf(255.0f, g + lf * 1.05f);
+
+            b = fminf(255.0f, b + lf * 1.15f);
+
+        }
+
+        return (Color){ (unsigned char)Clamp(r, 0.0f, 255.0f),
+
+                        (unsigned char)Clamp(g, 0.0f, 255.0f),
+
+                        (unsigned char)Clamp(b, 0.0f, 255.0f), 255 };
+
+    };
+
+    
+
+    bool isUnderwater = (camera.position.y < 9.75f && camera.position.x <= 36.0f);
+
+    // Dynamic Atmospheric Sky Dome Colors: switch to deep abyssal oceanic dome when submerged!
+    Color colZenith = isUnderwater ? Blend3Col((Color){ 14, 75, 95, 255 }, (Color){ 8, 42, 58, 255 }, (Color){ 2, 8, 14, 255 })
+                                   : Blend3Col((Color){ 42, 115, 225, 255 }, (Color){ 25, 35, 85, 255 }, (Color){ 3, 5, 10, 255 });
+
+    Color colUpper  = isUnderwater ? Blend3Col((Color){ 9, 52, 70, 255 }, (Color){ 5, 28, 40, 255 }, (Color){ 2, 6, 11, 255 })
+                                   : Blend3Col((Color){ 95, 168, 242, 255 }, (Color){ 118, 62, 125, 255 }, (Color){ 6, 9, 18, 255 });
+
+    Color colHaze   = isUnderwater ? Blend3Col((Color){ 5, 28, 42, 255 }, (Color){ 3, 16, 26, 255 }, (Color){ 1, 4, 8, 255 })
+                                   : Blend3Col((Color){ 188, 222, 252, 255 }, (Color){ 255, 115, 35, 255 }, (Color){ 10, 15, 28, 255 });
+
+    Color colAntiSunHaze = colHaze;
+
+    Color colNadir  = isUnderwater ? (Color){ 1, 5, 10, 255 }
+                                   : Blend3Col((Color){ 45, 60, 75, 255 }, (Color){ 22, 18, 26, 255 }, (Color){ 4, 5, 8, 255 });
+
+    
+
+    const int sectors = 32;
+
+    const int rings = 12;
+
+    const float radius = 280.0f;
+
+    
+
+    // Explicitly bind the default 1x1 white texture to guarantee untextured shapes are NEVER multiplied by leftover textures
+
+    rlSetTexture(0);
+
+    rlBegin(RL_TRIANGLES);
+
+    for (int r = 0; r < rings; r++) {
+
+        float phi0 = -0.35f + (PI * 0.5f + 0.35f) * ((float)r / (float)rings);
+
+        float phi1 = -0.35f + (PI * 0.5f + 0.35f) * ((float)(r + 1) / (float)rings);
+
+        
+
+        float cosPhi0 = cosf(phi0); float sinPhi0 = sinf(phi0);
+
+        float cosPhi1 = cosf(phi1); float sinPhi1 = sinf(phi1);
+
+        
+
+        for (int s = 0; s < sectors; s++) {
+
+            float psi0 = (float)s * (2.0f * PI / (float)sectors);
+
+            float psi1 = (float)(s + 1) * (2.0f * PI / (float)sectors);
+
+            
+
+            float cosPsi0 = cosf(psi0); float sinPsi0 = sinf(psi0);
+
+            float cosPsi1 = cosf(psi1); float sinPsi1 = sinf(psi1);
+
+            
+
+            Vector3 v00 = { camera.position.x + radius * cosPhi0 * cosPsi0, camera.position.y + radius * sinPhi0, camera.position.z + radius * cosPhi0 * sinPsi0 };
+
+            Vector3 v10 = { camera.position.x + radius * cosPhi1 * cosPsi0, camera.position.y + radius * sinPhi1, camera.position.z + radius * cosPhi1 * sinPsi0 };
+
+            Vector3 v01 = { camera.position.x + radius * cosPhi0 * cosPsi1, camera.position.y + radius * sinPhi0, camera.position.z + radius * cosPhi0 * sinPsi1 };
+
+            Vector3 v11 = { camera.position.x + radius * cosPhi1 * cosPsi1, camera.position.y + radius * sinPhi1, camera.position.z + radius * cosPhi1 * sinPsi1 };
+
+            
+
+            auto VertexColor = [&](float sinPhi, float cosPsi) -> Color {
+
+                float elevNorm = Clamp(sinPhi, 0.0f, 1.0f);
+
+                float sunAlign = cosPsi * sunDir.x + (sinPhi * sunDir.y) + (sinf(psi0) * sunDir.z);
+
+                Color hColor = (sunAlign > 0.0f) ? colHaze : colAntiSunHaze;
+
+                
+
+                // Twilight forward scattering
+
+                if (sunAlign > 0.0f && wTwi > 0.05f) {
+
+                    float glow = powf(Clamp(sunAlign, 0.0f, 1.0f), 3.0f) * wTwi;
+
+                    hColor.r = (unsigned char)fminf(255.0f, hColor.r + glow * 60.0f);
+
+                    hColor.g = (unsigned char)fminf(255.0f, hColor.g + glow * 30.0f);
+
+                }
+
+                // Daytime solar forward-scattering bloom
+
+                if (sunAlign > 0.0f && wDay > 0.05f) {
+
+                    float bloom = powf(Clamp(sunAlign, 0.0f, 1.0f), 4.0f) * wDay;
+
+                    hColor.r = (unsigned char)fminf(255.0f, hColor.r + bloom * 65.0f);
+
+                    hColor.g = (unsigned char)fminf(255.0f, hColor.g + bloom * 45.0f);
+
+                    hColor.b = (unsigned char)fminf(255.0f, hColor.b + bloom * 20.0f);
+
+                }
+
+                
+
+                if (elevNorm > 0.55f) {
+
+                    float t = (elevNorm - 0.55f) / 0.45f;
+
+                    return BlendColors(colUpper, colZenith, t);
+
+                } else if (elevNorm > 0.05f) {
+
+                    float t = (elevNorm - 0.05f) / 0.50f;
+
+                    return BlendColors(hColor, colUpper, t);
+
+                } else {
+
+                    float t = Clamp((elevNorm + 0.35f) / 0.40f, 0.0f, 1.0f);
+
+                    return BlendColors(colNadir, hColor, t);
+
+                }
+
+            };
+
+            
+
+            Color c00 = VertexColor(sinPhi0, cosPsi0);
+
+            Color c10 = VertexColor(sinPhi1, cosPsi0);
+
+            Color c01 = VertexColor(sinPhi0, cosPsi1);
+
+            Color c11 = VertexColor(sinPhi1, cosPsi1);
+
+            
+
+            // Render inward-facing triangles with default white texcoords
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c00.r, c00.g, c00.b, c00.a); rlVertex3f(v00.x, v00.y, v00.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c01.r, c01.g, c01.b, c01.a); rlVertex3f(v01.x, v01.y, v01.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c10.r, c10.g, c10.b, c10.a); rlVertex3f(v10.x, v10.y, v10.z);
+
+            
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c01.r, c01.g, c01.b, c01.a); rlVertex3f(v01.x, v01.y, v01.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c11.r, c11.g, c11.b, c11.a); rlVertex3f(v11.x, v11.y, v11.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(c10.r, c10.g, c10.b, c10.a); rlVertex3f(v10.x, v10.y, v10.z);
+
+        }
+
+    }
+
+    rlEnd();
+
+    
+
+    // Compact, Realistic-Proportioned 3D Radiant Sun & Multi-Ring Corona (ZERO square edges)
+
+    if (sunElev > -0.12f && !isUnderwater) {
+
+        Vector3 sunPos = Vector3Add(camera.position, Vector3Scale(sunDir, 260.0f));
+
+        Vector3 toCam = Vector3Normalize(Vector3Subtract(camera.position, sunPos));
+
+        Vector3 upRef = (fabsf(toCam.y) > 0.88f) ? (Vector3){ 0.0f, 0.0f, 1.0f } : (Vector3){ 0.0f, 1.0f, 0.0f };
+
+        Vector3 right = Vector3Normalize(Vector3CrossProduct(upRef, toCam));
+
+        Vector3 up    = Vector3Normalize(Vector3CrossProduct(toCam, right));
+
+
+
+        const int sunSegs = 32;
+
+
+
+        // 1. Central Solar Core Disc (32-segment circular fan, compact 3.5m radius)
+
+        float rCore = 3.5f;
+
+        Color centerCol = { 255, 255, 250, 255 };
+
+        Color coreRimCol = (wTwi > 0.25f) ? (Color){ 255, 215, 140, 255 } : (Color){ 255, 252, 225, 255 };
+
+        
+
+        rlSetTexture(0);
+
+        rlBegin(RL_TRIANGLES);
+
+        for (int i = 0; i < sunSegs; i++) {
+
+            float a0 = (float)i * (2.0f * PI / (float)sunSegs);
+
+            float a1 = (float)(i + 1) * (2.0f * PI / (float)sunSegs);
+
+            Vector3 p0 = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, cosf(a0) * rCore), Vector3Scale(up, sinf(a0) * rCore)));
+
+            Vector3 p1 = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, cosf(a1) * rCore), Vector3Scale(up, sinf(a1) * rCore)));
+
+            
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(centerCol.r, centerCol.g, centerCol.b, centerCol.a);     rlVertex3f(sunPos.x, sunPos.y, sunPos.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(coreRimCol.r, coreRimCol.g, coreRimCol.b, coreRimCol.a); rlVertex3f(p0.x, p0.y, p0.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(coreRimCol.r, coreRimCol.g, coreRimCol.b, coreRimCol.a); rlVertex3f(p1.x, p1.y, p1.z);
+
+        }
+
+        rlEnd();
+
+
+
+        // Smooth gradient sun corona fan (zero stepped rings)
+
+        auto DrawContinuousSunGlow = [&](float rInner, float rOuter, Color colInner, Color colOuter) {
+
+            rlBegin(RL_TRIANGLES);
+
+            for (int i = 0; i < sunSegs; i++) {
+
+                float a0 = (float)i * (2.0f * PI / (float)sunSegs);
+
+                float a1 = (float)(i + 1) * (2.0f * PI / (float)sunSegs);
+
+                float c0 = cosf(a0), s0 = sinf(a0);
+
+                float c1 = cosf(a1), s1 = sinf(a1);
+
+                
+
+                Vector3 in0  = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, c0 * rInner), Vector3Scale(up, s0 * rInner)));
+
+                Vector3 in1  = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, c1 * rInner), Vector3Scale(up, s1 * rInner)));
+
+                Vector3 out0 = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, c0 * rOuter), Vector3Scale(up, s0 * rOuter)));
+
+                Vector3 out1 = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, c1 * rOuter), Vector3Scale(up, s1 * rOuter)));
+
+                
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colInner.r, colInner.g, colInner.b, colInner.a); rlVertex3f(in0.x, in0.y, in0.z);
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colOuter.r, colOuter.g, colOuter.b, colOuter.a); rlVertex3f(out0.x, out0.y, out0.z);
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colInner.r, colInner.g, colInner.b, colInner.a); rlVertex3f(in1.x, in1.y, in1.z);
+
+                
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colInner.r, colInner.g, colInner.b, colInner.a); rlVertex3f(in1.x, in1.y, in1.z);
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colOuter.r, colOuter.g, colOuter.b, colOuter.a); rlVertex3f(out0.x, out0.y, out0.z);
+
+                rlTexCoord2f(0.5f, 0.5f); rlColor4ub(colOuter.r, colOuter.g, colOuter.b, colOuter.a); rlVertex3f(out1.x, out1.y, out1.z);
+
+            }
+
+            rlEnd();
+
+        };
+
+
+
+        // Forward Mie Scattering Solar Glow (smooth gradient fading seamlessly to 0 alpha)
+
+        Color auraInner = (wTwi > 0.25f) ? (Color){ 255, 185, 75, 180 } : (Color){ 255, 248, 205, 170 };
+
+        Color auraOuter = (wTwi > 0.25f) ? (Color){ 255, 110, 30, 0 }   : (Color){ 255, 220, 110, 0 };
+
+        DrawContinuousSunGlow(3.5f, 24.0f, auraInner, auraOuter);
+
+
+
+        // =========================================================================
+
+        // REAL-WORLD ATMOSPHERIC OPTICS: 22-DEGREE ICE CRYSTAL HALO & CORONA
+
+        // Triggers when high clouds / ice crystals pass in front of the Sun!
+
+        // Red on inside, blue on outside (opposite of atmospheric corona)
+
+        // =========================================================================
+
+        float sunCloudCover = GetCelestialCloudOcclusion(camera, sunDir);
+
+        if (sunCloudCover > 0.03f) {
+
+            // A. Forward Mie scattering optical corona through cloud veil
+
+            float coronaAlpha = sunCloudCover * (wDay * 140.0f + wTwi * 190.0f);
+
+            Color coronaCol = (wTwi > 0.25f) ? (Color){ 255, 200, 120, (unsigned char)coronaAlpha } : (Color){ 255, 252, 240, (unsigned char)coronaAlpha };
+
+            Color coronaFade = (Color){ coronaCol.r, coronaCol.g, coronaCol.b, 0 };
+
+            DrawContinuousSunGlow(3.5f, 38.0f * (1.0f + sunCloudCover * 0.5f), coronaCol, coronaFade);
+
+
+
+            // B. 22-Degree Hexagonal Ice-Crystal Refraction Halo Ring
+
+            // Radius: 260m * tan(22 deg) ~= 105 meters!
+
+            float haloRadius = 105.0f;
+
+            float haloThick  = 6.5f;
+
+            float haloAlpha  = sunCloudCover * (wDay * 95.0f + wTwi * 120.0f);
+
+
+
+            // Refraction physics: Red on inside (rIn), Pale Blue/Violet on outside (rOut)
+
+            Color haloRedInside = { 245, 95, 65, (unsigned char)haloAlpha };
+
+            Color haloBlueOut   = { 110, 165, 255, (unsigned char)(haloAlpha * 0.85f) };
+
+            Color haloFade      = { 120, 180, 255, 0 };
+
+
+
+            DrawContinuousSunGlow(haloRadius - haloThick, haloRadius, haloFade, haloRedInside);
+
+            DrawContinuousSunGlow(haloRadius, haloRadius + haloThick, haloRedInside, haloBlueOut);
+
+            DrawContinuousSunGlow(haloRadius + haloThick, haloRadius + haloThick * 2.0f, haloBlueOut, haloFade);
+
+        }
+
+
+
+        // 5. Subtle Delicate Sunbeams (12 delicate rays)
+
+        const int rayCount = 12;
+
+        rlBegin(RL_TRIANGLES);
+
+        for (int r = 0; r < rayCount; r++) {
+
+            float baseAngle = (float)r * (2.0f * PI / (float)rayCount);
+
+            float rayLen = (r % 2 == 0) ? 25.0f : 18.0f;
+
+            float rayHalfWidth = 0.045f;
+
+            
+
+            float aL = baseAngle - rayHalfWidth;
+
+            float aR = baseAngle + rayHalfWidth;
+
+            
+
+            Vector3 pL = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, cosf(aL) * 3.8f), Vector3Scale(up, sinf(aL) * 3.8f)));
+
+            Vector3 pR = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, cosf(aR) * 3.8f), Vector3Scale(up, sinf(aR) * 3.8f)));
+
+            Vector3 pT = Vector3Add(sunPos, Vector3Add(Vector3Scale(right, cosf(baseAngle) * rayLen), Vector3Scale(up, sinf(baseAngle) * rayLen)));
+
+            
+
+            Color rayBaseCol = (wTwi > 0.25f) ? (Color){ 255, 155, 50, 75 } : (Color){ 255, 245, 195, 65 };
+
+            Color rayTipCol  = (wTwi > 0.25f) ? (Color){ 255, 95, 20, 0 }   : (Color){ 255, 215, 130, 0 };
+
+            
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(rayBaseCol.r, rayBaseCol.g, rayBaseCol.b, rayBaseCol.a); rlVertex3f(pL.x, pL.y, pL.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(rayTipCol.r, rayTipCol.g, rayTipCol.b, rayTipCol.a);     rlVertex3f(pT.x, pT.y, pT.z);
+
+            rlTexCoord2f(0.5f, 0.5f); rlColor4ub(rayBaseCol.r, rayBaseCol.g, rayBaseCol.b, rayBaseCol.a); rlVertex3f(pR.x, pR.y, pR.z);
+
+        }
+
+        rlEnd();
+
+    }
+
+    
+
+    rlEnableBackfaceCulling();
+
+    rlEnableDepthMask();
+
+    rlEnableDepthTest();
+
+}
+
+
+
+
+
+#define BUCKET_SIZE 32
+
+#define BUCKETS_X (CHUNK_W / BUCKET_SIZE)
+
+#define BUCKETS_Z (CHUNK_D / BUCKET_SIZE)
+
+
+
+struct RenderBucket {
+
+    std::vector<Matrix> instances[256];
+
+    std::vector<uint8_t> activeGlyphs;
+
+};
+
+
+
+struct Chunk {
+
+    Voxel voxels[CHUNK_W][CHUNK_H][CHUNK_D];
+
+    RenderBucket buckets[BUCKETS_X][BUCKETS_Z];
+
+
+
+    // High-performance local spatial bucket mesh builder (runs in <0.5ms!)
+
+    void BuildBucket(int bx, int bz) {
+
+        if (bx < 0 || bx >= BUCKETS_X || bz < 0 || bz >= BUCKETS_Z) return;
+
+        RenderBucket& bucket = buckets[bx][bz];
+
+        bucket.activeGlyphs.clear();
+
+        for (int i = 0; i < 256; i++) bucket.instances[i].clear();
+
+
+
+        auto isOpaque = [&](int vx, int vy, int vz) {
+
+            if (vx < 0 || vx >= CHUNK_W || vy < 0 || vy >= CHUNK_H || vz < 0 || vz >= CHUNK_D) return true;
+
+            Voxel& vv = voxels[vx][vy][vz];
+
+            if (!vv.isSolid) return false;
+
+            char g = vv.glyphIndex;
+
+            if (g == '|' || g == '/' || g == '&' || g == '\'' || g == ',' || g == '.' || g == '"' || g == ';' || g == '`') return false;
+
+            return true;
+
+        };
+
+
+
+        struct Face { int dx, dy, dz; };
+
+        Face faces[6] = {
+
+            { 0,  1,  0 }, // 1: Top
+
+            { 0, -1,  0 }, // 2: Bottom
+
+            {-1,  0,  0 }, // 3: Left
+
+            { 1,  0,  0 }, // 4: Right
+
+            { 0,  0, -1 }, // 5: Front
+
+            { 0,  0,  1 }  // 6: Back
+
+        };
+
+
+
+        int startX = bx * BUCKET_SIZE;
+
+        int endX   = startX + BUCKET_SIZE;
+
+        int startZ = bz * BUCKET_SIZE;
+
+        int endZ   = startZ + BUCKET_SIZE;
+
+
+
+        for (int x = startX; x < endX; x++) {
+
+            for (int y = 0; y < CHUNK_H; y++) {
+
+                for (int z = startZ; z < endZ; z++) {
+
+                    Voxel& v = voxels[x][y][z];
+
+                    if (v.glyphIndex != 0 && v.glyphIndex != ' ') {
+
+                        if (!v.isSolid || v.glyphIndex == '&' || v.glyphIndex == '|' || v.glyphIndex == '/') {
+
+                            Matrix m = MatrixIdentity();
+
+                            bool isGlow = (v.fgColor.a == 254);
+
+                            float glowMultiplier = isGlow ? 1.5f : 1.0f;
+
+                            
+
+                            m.m0 = (v.fgColor.r / 255.0f) * glowMultiplier;
+
+                            m.m1 = (v.fgColor.g / 255.0f) * glowMultiplier;
+
+                            m.m2 = (v.fgColor.b / 255.0f) * glowMultiplier;
+
+                            m.m3 = 1.0f;
+
+                            m.m4 = 1.0f; m.m5 = 1.0f;
+
+                            
+
+                            m.m8 = 0.0f; // isFoliage flag
+
+                            if (v.glyphIndex == '&') m.m8 = 2.0f;
+
+                            else if (!v.isSolid || v.glyphIndex == '|' || v.glyphIndex == '/') m.m8 = 1.0f; // Swaying grass
+
+                            
+
+                            m.m9 = 0.0f;
+
+                            m.m10 = 0.0f; // 0 = Billboard
+
+                            m.m11 = 1.0f; // Full sunlight
+
+                            m.m12 = (float)x; m.m13 = (float)y; m.m14 = (float)z;
+
+                            bucket.instances[(uint8_t)v.glyphIndex].push_back(m);
+
+                            
+
+                            if (isGlow) {
+
+                                Matrix glowM = m;
+
+                                glowM.m0 *= 0.6f; glowM.m1 *= 0.6f; glowM.m2 *= 0.6f;
+
+                                float offsets[4][2] = { {-0.08f, 0.0f}, {0.08f, 0.0f}, {0.0f, -0.08f}, {0.0f, 0.08f} };
+
+                                for(int g = 0; g < 4; g++) {
+
+                                    glowM.m12 = (float)x + offsets[g][0];
+
+                                    glowM.m13 = (float)y + offsets[g][1];
+
+                                    bucket.instances[(uint8_t)v.glyphIndex].push_back(glowM);
+
+                                }
+
+                            }
+
+                        } else {
+
+                            bool isExposed = false;
+
+                            for (int f = 0; f < 6; f++) {
+
+                                if (!isOpaque(x + faces[f].dx, y + faces[f].dy, z + faces[f].dz) ||
+
+                                    !isOpaque(x + faces[f].dx * 2, y + faces[f].dy * 2, z + faces[f].dz * 2) ||
+
+                                    !isOpaque(x + faces[f].dx * 3, y + faces[f].dy * 3, z + faces[f].dz * 3)) {
+
+                                    isExposed = true;
+
+                                    break;
+
+                                }
+
+                            }
+
+                            
+
+                            if (isExposed) {
+
+                                if (fabs((float)x - (CHUNK_W / 2.0f)) < 7.5f) continue;
+
+                                if (x >= 75 && x <= 116 && z >= 118 && z <= 162) continue; // Zero ASCII floating on shop floor
+
+
+
+                                int surfaceY = 0;
+
+                                for(int dy = CHUNK_H - 1; dy >= 0; dy--) {
+
+                                    if (voxels[x][dy][z].isSolid && voxels[x][dy][z].glyphIndex == '#') {
+
+                                        surfaceY = dy + 1;
+
+                                        break;
+
+                                    }
+
+                                }
+
+                                
+
+                                int depthFromSurface = surfaceY - y;
+
+                                
+
+                                if (depthFromSurface >= 1 && depthFromSurface <= 5) {
+
+                                    int numInstances = (depthFromSurface == 1) ? GetRandomValue(8, 12) : GetRandomValue(2, 4);
+
+                                    static const char denseGlyphs[] = {'#', '.', '*', '+', '/', '\\', '%', '&', ':', ';'};
+
+                                    
+
+                                    float t = (depthFromSurface - 1) / 4.0f;
+
+                                    float baseR, baseG, baseB;
+
+                                    if (t < 0.5f) {
+
+                                         float localT = t * 2.0f;
+
+                                         baseR = 85.0f + localT * (55.0f - 85.0f);
+
+                                         baseG = 55.0f + localT * (45.0f - 55.0f);
+
+                                         baseB = 35.0f + localT * (40.0f - 35.0f);
+
+                                    } else {
+
+                                         float localT = (t - 0.5f) * 2.0f;
+
+                                         baseR = 55.0f + localT * (25.0f - 55.0f);
+
+                                         baseG = 45.0f + localT * (25.0f - 45.0f);
+
+                                         baseB = 40.0f + localT * (28.0f - 40.0f);
+
+                                    }
+
+                                    
+
+                                    Matrix baseM = MatrixIdentity();
+
+                                    baseM.m3 = 1.0f;
+
+                                    baseM.m8 = 0.0f; baseM.m9 = 0.0f; baseM.m10 = 0.0f; baseM.m11 = 1.0f; 
+
+                                    
+
+                                    for (int i = 0; i < numInstances; i++) {
+
+                                        Matrix m = baseM;
+
+                                        float r = Clamp(baseR + GetRandomValue(-8, 8), 0.0f, 255.0f);
+
+                                        float g = Clamp(baseG + GetRandomValue(-8, 8), 0.0f, 255.0f);
+
+                                        float b = Clamp(baseB + GetRandomValue(-8, 8), 0.0f, 255.0f);
+
+                                        
+
+                                        m.m0 = r / 255.0f; 
+
+                                        m.m1 = g / 255.0f;  
+
+                                        m.m2 = b / 255.0f;                           
+
+                                        
+
+                                        m.m4 = 0.50f + (GetRandomValue(-4, 4) / 100.0f);
+
+                                        m.m5 = 0.50f + (GetRandomValue(-4, 4) / 100.0f);
+
+                                        
+
+                                        float ox = (GetRandomValue(-50, 50) / 100.0f);
+
+                                        float oy = (GetRandomValue(-50, 50) / 100.0f);
+
+                                        float oz = (GetRandomValue(-50, 50) / 100.0f);
+
+                                        
+
+                                        m.m12 = (float)x + ox; 
+
+                                        m.m13 = (float)y + oy; 
+
+                                        m.m14 = (float)z + oz;
+
+                                        
+
+                                        char glyph = denseGlyphs[GetRandomValue(0, 9)];
+
+                                        bucket.instances[(uint8_t)glyph].push_back(m);
+
+                                    }
+
+                                } else {
+
+                                    int numInstances = GetRandomValue(2, 3);
+
+                                    static const char heavyGlyphs[] = {'#', '@', '%', '&', '$', 'W', 'M', '8'};
+
+                                    
+
+                                    Matrix baseM = MatrixIdentity();
+
+                                    baseM.m3 = 1.0f;
+
+                                    baseM.m4 = 1.0f; baseM.m5 = 1.0f;
+
+                                    baseM.m8 = 0.0f; baseM.m9 = 0.0f; baseM.m10 = 0.0f; baseM.m11 = 1.0f; 
+
+                                    
+
+                                    for (int i = 0; i < numInstances; i++) {
+
+                                        Matrix m = baseM;
+
+                                        int baseVal = GetRandomValue(15, 30);
+
+                                        m.m0 = (baseVal + GetRandomValue(5, 15)) / 255.0f; 
+
+                                        m.m1 = (baseVal + GetRandomValue(2, 8)) / 255.0f;  
+
+                                        m.m2 = baseVal / 255.0f;                           
+
+                                        
+
+                                        float ox = (GetRandomValue(-30, 30) / 100.0f);
+
+                                        float oy = (GetRandomValue(-30, 30) / 100.0f);
+
+                                        float oz = (GetRandomValue(-30, 30) / 100.0f);
+
+                                        
+
+                                        m.m12 = (float)x + ox; 
+
+                                        m.m13 = (float)y + oy; 
+
+                                        m.m14 = (float)z + oz;
+
+                                        
+
+                                        char glyph = heavyGlyphs[GetRandomValue(0, 7)];
+
+                                        bucket.instances[(uint8_t)glyph].push_back(m);
+
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        for (int i = 0; i < 256; i++) {
+
+            if (!bucket.instances[i].empty()) {
+
+                bucket.activeGlyphs.push_back((uint8_t)i);
+
+            }
+
+        }
+
+    }
+
+
+
+    void BuildMesh(std::function<void(float)> onProgress = nullptr) {
+
+        for (int bx = 0; bx < BUCKETS_X; bx++) {
+
+            if (onProgress) onProgress((float)bx / (float)BUCKETS_X);
+
+            for (int bz = 0; bz < BUCKETS_Z; bz++) {
+
+                BuildBucket(bx, bz);
+
+            }
+
+        }
+
+    }
+
+};
+
+
+
+// =========================================================================
+
+// STRUCTURE 1: THE GAS STATION (CENTER OF ROAD: X = 126..130, Z = 134..146)
+
+// Sits neatly in the exact center of the highway, splitting the road into
+
+// two equal lanes (Left Lane: 117..125, Right Lane: 131..139).
+
+// Features central pump island, dual-sided fuel pumps, overhead canopy & roof camera.
+
+// =========================================================================
+
+void BuildGasStation(Chunk* chunk) {
+
+    // 1. Concrete Pump Island curb in the center of the road at Y = 10..11
+
+    for (int x = 126; x <= 130; x++) {
+
+        for (int z = 134; z <= 146; z++) {
+
+            Voxel& v = chunk->voxels[x][10][z];
+
+            v.isSolid = true;
+
+            v.glyphIndex = '#';
+
+            v.fgColor = { 26, 24, 22, 255 }; // Stained concrete island base
+
+        }
+
+    }
+
+}
+
+
+
+// =========================================================================
+
+// STRUCTURE 2: THE SHOP (ON THE WEST BANK OF THE ROAD: X = 106..116, Z = 134..146)
+
+// =========================================================================
+
+// STRUCTURE 2: THE STANDALONE HORROR SUPERSTORE & SURROUNDING LOT
+
+// Lot footprint: X in [78, 115], Z in [120, 160] on the west bank of the highway.
+
+// Hollows out terrain voxels (Y >= 11) to open air, zero ASCII wall stamping.
+
+// All walls, trims, fixtures, and blood stains are drawn as real 3D shapes!
+
+// =========================================================================
+
+void BuildShop(Chunk* chunk) {
+
+    // Clear all terrain voxels within the shop lot footprint (Y >= 10 up to CHUNK_H - 1)
+
+    // Ensures zero rogue ASCII blocks anywhere inside the shop or on its floor
+
+    for (int x = 75; x <= 116; x++) {
+
+        for (int z = 118; z <= 162; z++) {
+
+            for (int y = 10; y < CHUNK_H; y++) {
+
+                Voxel& v = chunk->voxels[x][y][z];
+
+                v.isSolid = false;
+
+                v.glyphIndex = 0;
+
+            }
+
+        }
+
+    }
+
+}
+
+// =========================================================================
+// STRUCTURE 3: THE ABANDONED BLACKWOOD COLLEGE BUILDING & GROUNDS
+// East bank of Route 9: X in [148, 194], Z in [118, 166]
+// Hollows out terrain voxels (Y >= 10 up to CHUNK_H - 1) to open air
+// All walls, partitions, classrooms, and fixtures are drawn in rich 3D!
+// =========================================================================
+void BuildCollege(Chunk* chunk) {
+    for (int x = 148; x <= 194; x++) {
+        for (int z = 118; z <= 166; z++) {
+            for (int y = 10; y < CHUNK_H; y++) {
+                Voxel& v = chunk->voxels[x][y][z];
+                v.isSolid = false;
+                v.glyphIndex = 0;
+            }
+        }
+    }
+}
+
+
+
+
+const char* instancedVS = R"(
+
+#version 330
+
+in vec3 vertexPosition;
+
+in vec2 vertexTexCoord;
+
+layout(location = 4) in mat4 instanceTransform;
+
+
+
+out vec2 fragTexCoord;
+
+out vec4 fragColor;
+
+out float fragIsDirt;
+
+
+
+uniform mat4 matView;
+
+uniform mat4 matProjection;
+
+uniform vec2 uvOffset;
+
+uniform vec2 uvScale;
+
+uniform float time;
+
+uniform vec3 playerPos;
+
+uniform vec3 trailPos[16];
+
+uniform float trailLife[16];
+
+uniform float lightningFlash;
+
+uniform vec3 sunDir;
+
+uniform float dayFactor;
+
+uniform vec3 sunColor;
+
+uniform vec3 moonDir;
+
+uniform float nightFactor;
+
+
+
+void main()
+
+{
+
+    vec3 position = vec3(instanceTransform[3][0], instanceTransform[3][1], instanceTransform[3][2]);
+
+    fragColor = vec4(instanceTransform[0][0], instanceTransform[0][1], instanceTransform[0][2], instanceTransform[0][3]);
+
+    
+
+    // Apply lightning flash additive blending
+
+    fragColor.rgb += vec3(lightningFlash);
+
+    
+
+    vec2 size = vec2(instanceTransform[1][0], instanceTransform[1][1]);
+
+    
+
+    float isFoliage = instanceTransform[2][0];
+
+    float disableFog = instanceTransform[2][1];
+
+    float faceId = instanceTransform[2][2]; 
+
+    float sunlight = instanceTransform[2][3];
+
+
+
+    // --- DYNAMIC DIRECTIONAL SUNLIGHT & MOONLIGHT ILLUMINATION ---
+
+    // No self-illumination: directly illuminated by Sun in day and Moon at night!
+
+    if (disableFog < 0.5) {
+
+        vec3 norm = vec3(0.0, 1.0, 0.0);
+
+        if (faceId > 0.5 && faceId < 1.5) norm = vec3(0.0, 1.0, 0.0);
+
+        else if (faceId < 2.5) norm = vec3(0.0, -1.0, 0.0);
+
+        else if (faceId < 3.5) norm = vec3(-1.0, 0.0, 0.0);
+
+        else if (faceId < 4.5) norm = vec3(1.0, 0.0, 0.0);
+
+        else if (faceId < 5.5) norm = vec3(0.0, 0.0, -1.0);
+
+        else if (faceId >= 5.5) norm = vec3(0.0, 0.0, 1.0);
+
+
+
+        float nDotL_Sun = max(0.0, dot(norm, sunDir));
+
+        float nDotL_Moon = max(0.0, dot(norm, moonDir));
+
+        float sunDiff = (isFoliage > 0.5) ? (0.35 + 0.65 * max(0.0, sunDir.y)) : (0.25 + 0.75 * nDotL_Sun);
+
+        float moonDiff = (isFoliage > 0.5) ? (0.35 + 0.65 * max(0.0, moonDir.y)) : (0.25 + 0.75 * nDotL_Moon);
+
+
+
+        vec3 directSun = sunColor * sunDiff * 1.35 * dayFactor;
+
+        // Directional cool silver moonlight illuminating surfaces facing the moon
+
+        vec3 directMoon = vec3(0.45, 0.58, 0.85) * moonDiff * 0.80 * nightFactor;
+
+        // Natural pitch-dark starlight ambient at night (0.04) vs daylight ambient (0.40)
+
+        vec3 ambient = mix(vec3(0.035, 0.045, 0.070), vec3(0.40, 0.42, 0.46), dayFactor);
+
+        fragColor.rgb *= (ambient + directSun + directMoon);
+
+    }
+
+
+
+    vec3 tRight, tUp;
+
+    if (faceId < 0.5) { 
+
+        tRight = vec3(matView[0][0], matView[1][0], matView[2][0]);
+
+        tUp = vec3(matView[0][1], matView[1][1], matView[2][1]);
+
+    } else if (faceId < 1.5) { // Top
+
+        tRight = vec3(1.0, 0.0, 0.0);
+
+        tUp    = vec3(0.0, 0.0, -1.0);
+
+    } else if (faceId < 2.5) { // Bottom
+
+        tRight = vec3(1.0, 0.0, 0.0);
+
+        tUp    = vec3(0.0, 0.0, 1.0);
+
+    } else if (faceId < 3.5) { // Left
+
+        tRight = vec3(0.0, 0.0, 1.0);
+
+        tUp    = vec3(0.0, 1.0, 0.0);
+
+    } else if (faceId < 4.5) { // Right
+
+        tRight = vec3(0.0, 0.0, -1.0);
+
+        tUp    = vec3(0.0, 1.0, 0.0);
+
+    } else if (faceId < 5.5) { // Front
+
+        tRight = vec3(-1.0, 0.0, 0.0);
+
+        tUp    = vec3(0.0, 1.0, 0.0);
+
+    } else { // Back
+
+        tRight = vec3(1.0, 0.0, 0.0);
+
+        tUp    = vec3(0.0, 1.0, 0.0);
+
+    }
+
+
+
+    if (isFoliage > 0.5 && isFoliage < 2.5) {
+
+        float swayOffset = position.x * 0.5 + position.z * 0.5;
+
+        float intensity = (isFoliage > 1.5) ? 0.35 : 0.20;
+
+        float swayX = sin(time * 1.5 + swayOffset) * intensity;
+
+        float swayZ = cos(time * 1.2 + swayOffset) * intensity;
+
+        
+
+        float bend = (vertexPosition.y + 0.5);
+
+        if (isFoliage > 1.5) bend = 1.0;
+
+        
+
+        position.x += swayX * bend;
+
+        position.z += swayZ * bend;
+
+        
+
+        // --- MEADOW WAKE TRAIL EFFECT ---
+
+        float maxTrample = 0.0;
+
+        for (int i = 0; i < 16; i++) {
+
+            if (trailLife[i] > 0.0) {
+
+                float d = distance(position, trailPos[i]);
+
+                if (d < 1.8) {
+
+                    float trample = (1.0 - (d / 1.8)) * trailLife[i];
+
+                    if (trample > maxTrample) maxTrample = trample;
+
+                }
+
+            }
+
+        }
+
+        
+
+        if (maxTrample > 0.0) {
+
+            size.y *= (1.0 - maxTrample * 0.8);
+
+            position.y -= maxTrample * 0.4 * bend;
+
+        }
+
+
+
+        // --- PLAYER PARTING EFFECT ---
+
+        float dist = distance(position, playerPos);
+
+        if (dist < 2.5) {
+
+            float pushStrength = (2.5 - dist) * 0.5; // Closer = stronger push
+
+            vec3 pushDir = normalize(vec3(position.x - playerPos.x, 0.0, position.z - playerPos.z));
+
+            position.x += pushDir.x * pushStrength * bend;
+
+            position.z += pushDir.z * pushStrength * bend;
+
+            position.y -= pushStrength * 0.4 * bend;
+
+        }
+
+    }
+
+
+
+    vec3 vertexPos = position 
+
+                     + tRight * vertexPosition.x * size.x 
+
+                     + tUp * vertexPosition.y * size.y;
+
+
+
+    fragTexCoord = vertexTexCoord * uvScale + uvOffset;
+
+    
+
+    vec4 viewPos = matView * vec4(vertexPos, 1.0);
+
+    gl_Position = matProjection * viewPos;
+
+}
+
+)";
+
+
+
+const char* instancedFS = R"(
+
+#version 330
+
+in vec2 fragTexCoord;
+
+in vec4 fragColor;
+
+in float fragIsDirt;
+
+
+
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+
+
+
+void main()
+
+{
+
+    vec4 texColor = texture(texture0, fragTexCoord);
+
+    
+
+    if (texColor.a < 0.1) {
+
+        discard;
+
+    } else {
+
+        finalColor = texColor * fragColor;
+
+    }
+
+}
+
+)";
+
+
+
+Mesh GenQuadMesh() {
+
+    Mesh mesh = {0};
+
+    mesh.vertexCount = 4;
+
+    mesh.triangleCount = 2;
+
+    mesh.vertices = (float*)MemAlloc(mesh.vertexCount * 3 * sizeof(float));
+
+    mesh.texcoords = (float*)MemAlloc(mesh.vertexCount * 2 * sizeof(float));
+
+    mesh.indices = (unsigned short*)MemAlloc(mesh.triangleCount * 3 * sizeof(unsigned short));
+
+    
+
+    mesh.vertices[0] = -0.5f; mesh.vertices[1] = -0.5f; mesh.vertices[2] = 0.0f;
+
+    mesh.texcoords[0] = 0.0f; mesh.texcoords[1] = 1.0f;
+
+    mesh.vertices[3] = -0.5f; mesh.vertices[4] = 0.5f; mesh.vertices[5] = 0.0f;
+
+    mesh.texcoords[2] = 0.0f; mesh.texcoords[3] = 0.0f;
+
+    mesh.vertices[6] = 0.5f; mesh.vertices[7] = 0.5f; mesh.vertices[8] = 0.0f;
+
+    mesh.texcoords[4] = 1.0f; mesh.texcoords[5] = 0.0f;
+
+    mesh.vertices[9] = 0.5f; mesh.vertices[10] = -0.5f; mesh.vertices[11] = 0.0f;
+
+    mesh.texcoords[6] = 1.0f; mesh.texcoords[7] = 1.0f;
+
+    
+
+    mesh.indices[0] = 0; mesh.indices[1] = 2; mesh.indices[2] = 1;
+
+    mesh.indices[3] = 0; mesh.indices[4] = 3; mesh.indices[5] = 2;
+
+    
+
+    UploadMesh(&mesh, false);
+
+    return mesh;
+
+}
+
+
+
+Texture2D CreateGlyphAtlas() {
+
+    const int cols = 16;
+
+    const int rows = 16;
+
+    const int glyphSize = 32;
+
+    
+
+    RenderTexture2D target = LoadRenderTexture(cols * glyphSize, rows * glyphSize);
+
+    
+
+    BeginTextureMode(target);
+
+    ClearBackground(BLANK);
+
+    
+
+    for (int i = 0; i < 256; i++) {
+
+        int x = (i % cols) * glyphSize;
+
+        int y = (i / cols) * glyphSize;
+
+        char text[2] = {(char)i, '\0'};
+
+        int w = MeasureText(text, 20);
+
+        DrawText(text, x + (glyphSize - w)/2, y + 6, 20, WHITE);
+
+    }
+
+    
+
+    EndTextureMode();
+
+    
+
+    Image img = LoadImageFromTexture(target.texture);
+
+    ImageFlipVertical(&img); 
+
+    Texture2D atlas = LoadTextureFromImage(img);
+
+    UnloadImage(img);
+
+    UnloadRenderTexture(target);
+
+    
+
+    return atlas;
+
+}
+
+
+
+void DrawShovelUI(int offsetX, int offsetY) {
+
+    int baseX = 900 + offsetX;
+
+    int baseY = 250 + offsetY;
+
+    
+
+    // Right Hand and Shovel ASCII Art
+
+    const char* shovelArt[] = {
+
+        "       _       ",
+
+        "      / \\      ",
+
+        "     /   \\     ",
+
+        "    |  .  |    ",
+
+        "     \\   /     ",
+
+        "      \\ /      ",
+
+        "       |       ",
+
+        "       |       ",
+
+        "     _[ ]_     ",
+
+        "    /     \\    ",
+
+        "   | /\\ /\\ |   ",
+
+        "   \\__ _ __/   ",
+
+        "     | |       ",
+
+        "     | |       "
+
+    };
+
+
+
+    // Draw Shovel (Cyan Glow)
+
+    for (int row = 0; row < 14; row++) {
+
+        for (int col = 0; col < 15; col++) {
+
+            char c = shovelArt[row][col];
+
+            if (c == ' ') continue;
+
+            
+
+            int px = baseX + col * 18;
+
+            int py = baseY + row * 26;
+
+            
+
+            // Glow effect
+
+            DrawText(TextFormat("%c", c), px - 1, py, 26, (Color){0, 200, 255, 100});
+
+            DrawText(TextFormat("%c", c), px + 1, py, 26, (Color){0, 200, 255, 100});
+
+            DrawText(TextFormat("%c", c), px, py - 1, 26, (Color){0, 200, 255, 100});
+
+            DrawText(TextFormat("%c", c), px, py + 1, 26, (Color){0, 200, 255, 100});
+
+            // Core
+
+            DrawText(TextFormat("%c", c), px, py, 26, (Color){150, 255, 255, 255});
+
+        }
+
+    }
+
+}
+
+
+
+void DrawLanternUI(int offsetX, int offsetY, float timeVal) {
+
+    int baseX = 150 + offsetX;
+
+    int baseY = 320 + offsetY;
+
+    
+
+    // Left Hand holding Lantern
+
+    const char* lanternArt[] = {
+
+        "      ===      ",
+
+        "     /   \\     ",
+
+        "    |  *  |    ",
+
+        "     \\___/     ",
+
+        "       |       ",
+
+        "     _[ ]_     ",
+
+        "    /     \\    ",
+
+        "   | /\\ /\\ |   ",
+
+        "   \\__ _ __/   ",
+
+        "     | |       ",
+
+        "     | |       "
+
+    };
+
+
+
+    float fireBob = sinf(timeVal * 4.0f) * 3.0f;
+
+
+
+    for (int row = 0; row < 11; row++) {
+
+        for (int col = 0; col < 15; col++) {
+
+            char c = lanternArt[row][col];
+
+            if (c == ' ') continue;
+
+
+
+            int px = baseX + col * 18;
+
+            int py = baseY + row * 26;
+
+            
+
+            if (c == '*') {
+
+                py += (int)fireBob; // Bob the light
+
+                // Bright Green Light Glow
+
+                DrawText(TextFormat("%c", c), px - 2, py, 32, (Color){50, 255, 50, 80});
+
+                DrawText(TextFormat("%c", c), px + 2, py, 32, (Color){50, 255, 50, 80});
+
+                DrawText(TextFormat("%c", c), px, py - 2, 32, (Color){50, 255, 50, 80});
+
+                DrawText(TextFormat("%c", c), px, py + 2, 32, (Color){50, 255, 50, 80});
+
+                DrawText(TextFormat("%c", c), px, py, 32, (Color){200, 255, 200, 255});
+
+            } else {
+
+                // Cyan Hand Glow
+
+                DrawText(TextFormat("%c", c), px - 1, py, 26, (Color){0, 200, 255, 100});
+
+                DrawText(TextFormat("%c", c), px + 1, py, 26, (Color){0, 200, 255, 100});
+
+                DrawText(TextFormat("%c", c), px, py, 26, (Color){150, 255, 255, 255});
+
+            }
+
+        }
+
+    }
+
+}
+
+
+
+const char* moonArt[] = {
+
+    "   _..._   ",
+
+    " .       . ",
+
+    " |       | ",
+
+    " .       . ",
+
+    "   `...`   "
+
+};
 
 
 
@@ -40,35 +4458,869 @@
 
 
 
+void DrawFirstPersonDashboard(float iCarSpd, float iShakeDec, int iJerkCount, float timeVal, float panX = 0.0f, bool isSisterPOV = false) {
+
+    // -------------------------------------------------------------
+
+    // COCKPIT WINDSHIELD FRAME (A-Pillars and Top Roof Visor)
+
+    // -------------------------------------------------------------
+
+    Color frameColor = { 12, 14, 18, 255 };
+
+    Color frameTrim  = { 30, 36, 46, 255 };
+
+
+
+    // Left A-Pillar (Slanted with subtle parallax)
+
+    int apOff = (int)(panX * 0.15f);
+
+    DrawTriangle({ (float)(-apOff), 0 }, { (float)(-apOff), (float)LOGICAL_H }, { (float)(65 - apOff), (float)LOGICAL_H }, frameColor);
+
+    DrawTriangle({ (float)(-apOff), 0 }, { (float)(65 - apOff), (float)LOGICAL_H }, { (float)(32 - apOff), 0 }, frameColor);
+
+    DrawLineEx({ (float)(32 - apOff), 0 }, { (float)(65 - apOff), (float)LOGICAL_H }, 2.0f, frameTrim);
+
+
+
+    // Right A-Pillar (Slanted with subtle parallax)
+
+    DrawTriangle({ (float)LOGICAL_W - apOff, 0 }, { (float)LOGICAL_W - 65 - apOff, (float)LOGICAL_H }, { (float)LOGICAL_W - apOff, (float)LOGICAL_H }, frameColor);
+
+    DrawTriangle({ (float)LOGICAL_W - apOff, 0 }, { (float)LOGICAL_W - 32 - apOff, 0 }, { (float)LOGICAL_W - 65 - apOff, (float)LOGICAL_H }, frameColor);
+
+    DrawLineEx({ (float)LOGICAL_W - 32 - apOff, 0 }, { (float)LOGICAL_W - 65 - apOff, (float)LOGICAL_H }, 2.0f, frameTrim);
+
+
+
+    // Top Roof Visor
+
+    DrawRectangle(0, 0, LOGICAL_W, 24, frameColor);
+
+    DrawLineEx({ 0, 24 }, { (float)LOGICAL_W, 24 }, 2.0f, frameTrim);
+
+
+
+    // -------------------------------------------------------------
+
+    // CURVED DASHBOARD MAIN PANEL (ALWAYS firmly anchored at bottom)
+
+    // -------------------------------------------------------------
+
+    int dashBaseY = 550;
+
+    DrawRectangle(0, dashBaseY, LOGICAL_W, LOGICAL_H - dashBaseY, { 15, 17, 21, 255 });
+
+
+
+    // The Curved Instrument Binnacle / Cowl (Pans with head rotation)
+
+    float cowlCenterX = 420.0f - panX;
+
+    DrawCircleSector({ cowlCenterX, 550 }, 240, 180, 360, 48, { 20, 23, 28, 255 });
+
+    DrawCircleSectorLines({ cowlCenterX, 550 }, 240, 180, 360, 48, { 42, 50, 62, 255 });
+
+
+
+    // Horizontal dash division accent lines
+
+    DrawLineEx({ 0, (float)dashBaseY }, { (float)LOGICAL_W, (float)dashBaseY }, 2.5f, { 38, 46, 58, 255 });
+
+
+
+    // Instrument Cluster Inset Housing
+
+    float clustX = 215.0f - panX;
+
+    DrawRectangleRounded({ clustX, 465, 430, 220 }, 0.18f, 8, { 9, 11, 14, 255 });
+
+    DrawRectangleRoundedLines({ clustX, 465, 430, 220 }, 0.18f, 8, { 46, 55, 68, 255 });
+
+
+
+    // Screw / Rivet glyphs on cluster corners
+
+    DrawText("+", (int)clustX + 11, 474, 13, { 70, 82, 98, 220 });
+
+    DrawText("+", (int)clustX + 417, 474, 13, { 70, 82, 98, 220 });
+
+    DrawText("+", (int)clustX + 11, 670, 13, { 70, 82, 98, 220 });
+
+    DrawText("+", (int)clustX + 417, 670, 13, { 70, 82, 98, 220 });
+
+
+
+    // -------------------------------------------------------------
+
+    // 1. SPEEDOMETER (Curved dial with glyphs and dynamic needle)
+
+    // -------------------------------------------------------------
+
+    Vector2 spdCenter = { 335.0f - panX, 575.0f };
+
+    float spdRadius = 78.0f;
+
+
+
+    DrawCircleV(spdCenter, spdRadius + 3.0f, { 28, 33, 42, 255 });
+
+    DrawCircleV(spdCenter, spdRadius, { 13, 15, 18, 255 });
+
+    DrawCircleLines((int)spdCenter.x, (int)spdCenter.y, spdRadius, { 52, 62, 78, 255 });
+
+
+
+    const char* spdMarks[] = { "0", "20", "40", "60", "80", "100" };
+
+    for (int i = 0; i <= 10; i++) {
+
+        float f = (float)i / 10.0f;
+
+        float angDeg = 135.0f + f * 270.0f;
+
+        float angRad = angDeg * DEG2RAD;
+
+
+
+        float rIn = (i % 2 == 0) ? (spdRadius - 13.0f) : (spdRadius - 7.0f);
+
+        float rOut = spdRadius - 2.0f;
+
+        Vector2 p1 = { spdCenter.x + cosf(angRad) * rIn, spdCenter.y + sinf(angRad) * rIn };
+
+        Vector2 p2 = { spdCenter.x + cosf(angRad) * rOut, spdCenter.y + sinf(angRad) * rOut };
+
+
+
+        Color tickCol = (i >= 8) ? (Color){ 235, 75, 75, 255 } : (Color){ 185, 200, 218, 220 };
+
+        DrawLineEx(p1, p2, (i % 2 == 0) ? 2.0f : 1.0f, tickCol);
+
+
+
+        if (i % 2 == 0) {
+
+            int idx = i / 2;
+
+            float rTxt = spdRadius - 22.0f;
+
+            int tx = (int)(spdCenter.x + cosf(angRad) * rTxt) - 5;
+
+            int ty = (int)(spdCenter.y + sinf(angRad) * rTxt) - 5;
+
+            DrawText(spdMarks[idx], tx, ty, 10, { 170, 185, 205, 240 });
+
+        }
+
+    }
+
+
+
+    DrawText("MPH", (int)spdCenter.x - 11, (int)spdCenter.y + 22, 10, { 120, 138, 160, 220 });
+
+
+
+    // Odometer box with glyphs
+
+    DrawRectangle((int)spdCenter.x - 28, (int)spdCenter.y + 38, 56, 14, { 6, 8, 10, 255 });
+
+    DrawRectangleLines((int)spdCenter.x - 28, (int)spdCenter.y + 38, 56, 14, { 40, 48, 62, 255 });
+
+    DrawText("[04821]", (int)spdCenter.x - 25, (int)spdCenter.y + 40, 10, { 175, 220, 175, 240 });
+
+
+
+    // Dynamic Speedometer Needle
+
+    float speedMph = (iCarSpd / 12.0f) * 65.0f;
+
+    if (iShakeDec > 0.05f) {
+
+        speedMph += sinf(timeVal * 45.0f) * iShakeDec * 4.0f;
+
+    }
+
+    if (speedMph < 0.0f) speedMph = 0.0f;
+
+    float needleFrac = speedMph / 100.0f;
+
+    if (needleFrac > 1.0f) needleFrac = 1.0f;
+
+    float needleRad = (135.0f + needleFrac * 270.0f) * DEG2RAD;
+
+
+
+    Vector2 needleTip = { spdCenter.x + cosf(needleRad) * (spdRadius - 8.0f),
+
+                          spdCenter.y + sinf(needleRad) * (spdRadius - 8.0f) };
+
+    DrawLineEx(spdCenter, needleTip, 2.5f, { 255, 72, 60, 255 });
+
+    DrawCircleV(spdCenter, 6.0f, { 42, 50, 64, 255 });
+
+    DrawCircleV(spdCenter, 3.0f, { 220, 230, 245, 255 });
+
+
+
+    // -------------------------------------------------------------
+
+    // 2. FUEL GAUGE (Curved dial with glyphs and warning indicator)
+
+    // -------------------------------------------------------------
+
+    Vector2 fuelCenter = { 525.0f - panX, 575.0f };
+
+    float fuelRadius = 55.0f;
+
+
+
+    DrawCircleV(fuelCenter, fuelRadius + 3.0f, { 28, 33, 42, 255 });
+
+    DrawCircleV(fuelCenter, fuelRadius, { 13, 15, 18, 255 });
+
+    DrawCircleLines((int)fuelCenter.x, (int)fuelCenter.y, fuelRadius, { 52, 62, 78, 255 });
+
+
+
+    for (int i = 0; i <= 6; i++) {
+
+        float f = (float)i / 6.0f;
+
+        float angRad = (150.0f + f * 180.0f) * DEG2RAD;
+
+        float rIn = fuelRadius - 9.0f;
+
+        float rOut = fuelRadius - 2.0f;
+
+        Vector2 p1 = { fuelCenter.x + cosf(angRad) * rIn, fuelCenter.y + sinf(angRad) * rIn };
+
+        Vector2 p2 = { fuelCenter.x + cosf(angRad) * rOut, fuelCenter.y + sinf(angRad) * rOut };
+
+        Color tc = (i <= 1) ? (Color){ 240, 75, 75, 255 } : (Color){ 180, 195, 212, 220 };
+
+        DrawLineEx(p1, p2, 1.5f, tc);
+
+    }
+
+
+
+    DrawText("E", (int)fuelCenter.x - 40, (int)fuelCenter.y + 10, 13, { 245, 80, 80, 255 });
+
+    DrawText("1/2", (int)fuelCenter.x - 9, (int)fuelCenter.y - 41, 10, { 170, 185, 205, 220 });
+
+    DrawText("F", (int)fuelCenter.x + 30, (int)fuelCenter.y + 10, 13, { 95, 215, 120, 255 });
+
+    DrawText("FUEL", (int)fuelCenter.x - 13, (int)fuelCenter.y + 18, 10, { 120, 138, 160, 220 });
+
+
+
+    float fuelVal = 0.22f + sinf(timeVal * 2.0f) * 0.02f;
+
+    if (iJerkCount >= 2) fuelVal = 0.07f;
+
+    float fNeedleRad = (150.0f + fuelVal * 180.0f) * DEG2RAD;
+
+    Vector2 fTip = { fuelCenter.x + cosf(fNeedleRad) * (fuelRadius - 7.0f),
+
+                     fuelCenter.y + sinf(fNeedleRad) * (fuelRadius - 7.0f) };
+
+    DrawLineEx(fuelCenter, fTip, 2.0f, { 255, 160, 50, 255 });
+
+    DrawCircleV(fuelCenter, 5.0f, { 42, 50, 64, 255 });
+
+
+
+    float fPulse = sinf(timeVal * 4.0f) * 0.5f + 0.5f;
+
+    Color warnCol = (fuelVal <= 0.15f) ? (Color){ 255, 60, 60, (unsigned char)(160 + fPulse * 95) } 
+
+                                       : (Color){ 240, 160, 40, (unsigned char)(140 + fPulse * 80) };
+
+    DrawText("[!]", (int)fuelCenter.x - 7, (int)fuelCenter.y - 18, 13, warnCol);
+
+
+
+    // -------------------------------------------------------------
+
+    // 3. AUXILIARY SWITCHES PANEL (Curved panel with ASCII glyphs)
+
+    // -------------------------------------------------------------
+
+    int swX = (int)(720.0f - panX), swY = 555, swW = 460, swH = 135;
+
+    DrawRectangleRounded({ (float)swX, (float)swY, (float)swW, (float)swH }, 0.16f, 6, { 11, 13, 17, 255 });
+
+    DrawRectangleRoundedLines({ (float)swX, (float)swY, (float)swW, (float)swH }, 0.16f, 6, { 42, 52, 66, 255 });
+
+
+
+    DrawText("- AUXILIARY CONTROLS -", swX + swW / 2 - 84, swY + 10, 11, { 130, 145, 170, 230 });
+
+    DrawLine(swX + 16, swY + 26, swX + swW - 16, swY + 26, { 32, 40, 52, 255 });
+
+
+
+    struct SwitchItem {
+
+        const char* label;
+
+        const char* glyph;
+
+        const char* state;
+
+        Color col;
+
+    };
+
+
+
+    bool isHazard = (iJerkCount > 0);
+
+    float blinkA = (sinf(timeVal * 7.0f) > 0.0f) ? 1.0f : 0.2f;
+
+
+
+    SwitchItem switches[4] = {
+
+        { "LIGHTS",  "[/]", "ON",   { 110, 235, 140, 255 } },
+
+        { "WIPERS",  "[~]", "HI",   { 100, 215, 255, 255 } },
+
+        { "HAZARD",  "[!]", isHazard ? "WARN" : "OFF", isHazard ? (Color){ 255, 60, 60, (unsigned char)(blinkA * 255) } : (Color){ 90, 102, 118, 200 } },
+
+        { "DEFROST", "[#]", "MAX",  { 255, 180, 65, 255 } }
+
+    };
+
+
+
+    int spacing = (swW - 32) / 4;
+
+    for (int s = 0; s < 4; s++) {
+
+        int sx = swX + 16 + s * spacing;
+
+        int sy = swY + 36;
+
+
+
+        DrawRectangle(sx, sy, 84, 76, { 7, 8, 11, 255 });
+
+        DrawRectangleLines(sx, sy, 84, 76, { 32, 40, 52, 255 });
+
+
+
+        int lw = MeasureText(switches[s].label, 10);
+
+        DrawText(switches[s].label, sx + 42 - lw / 2, sy + 6, 10, { 150, 165, 185, 230 });
+
+
+
+        int gw = MeasureText(switches[s].glyph, 18);
+
+        DrawText(switches[s].glyph, sx + 42 - gw / 2, sy + 25, 18, switches[s].col);
+
+
+
+        int stw = MeasureText(switches[s].state, 10);
+
+        DrawText(switches[s].state, sx + 42 - stw / 2, sy + 54, 10, switches[s].col);
+
+    }
+
+
+
+    // Passenger dash detail (Glovebox) visible when sitting on passenger side
+
+    if (panX > 80.0f) {
+
+        int gbX = swX + swW + 30;
+
+        DrawRectangleRounded({ (float)gbX, 560, 280, 120 }, 0.14f, 6, { 11, 13, 17, 255 });
+
+        DrawRectangleRoundedLines({ (float)gbX, 560, 280, 120 }, 0.14f, 6, { 35, 42, 54, 255 });
+
+        DrawText("[ GLOVE COMPARTMENT ]", gbX + 48, 600, 12, { 90, 105, 125, 220 });
+
+        DrawRectangle(gbX + 115, 625, 50, 6, { 45, 52, 65, 255 }); // Handle
+
+    }
+
+
+
+    // -------------------------------------------------------------
+
+    // 4. STEERING WHEEL RIM & SPOKES (Gentle rocking in front of driver)
+
+    // -------------------------------------------------------------
+
+    Vector2 strCenter = { 385.0f - panX, 710.0f };
+
+    float strTurn = sinf(timeVal * 1.8f) * 10.0f;
+
+    if (iShakeDec > 0.05f) strTurn += sinf(timeVal * 40.0f) * iShakeDec * 5.0f;
+
+
+
+    DrawRing(strCenter, 148.0f, 172.0f, 190.0f + strTurn, 350.0f + strTurn, 36, { 22, 24, 28, 255 });
+
+    DrawRingLines(strCenter, 148.0f, 172.0f, 190.0f + strTurn, 350.0f + strTurn, 36, { 48, 56, 70, 255 });
+
+
+
+    Vector2 spkL = { strCenter.x + cosf((225.0f + strTurn) * DEG2RAD) * 150.0f,
+
+                     strCenter.y + sinf((225.0f + strTurn) * DEG2RAD) * 150.0f };
+
+    Vector2 spkR = { strCenter.x + cosf((315.0f + strTurn) * DEG2RAD) * 150.0f,
+
+                     strCenter.y + sinf((315.0f + strTurn) * DEG2RAD) * 150.0f };
+
+    DrawLineEx(strCenter, spkL, 8.0f, { 30, 34, 42, 255 });
+
+    DrawLineEx(strCenter, spkR, 8.0f, { 30, 34, 42, 255 });
+
+    DrawCircleV(strCenter, 32.0f, { 26, 30, 36, 255 });
+
+    DrawCircleLines((int)strCenter.x, (int)strCenter.y, 32.0f, { 52, 60, 74, 255 });
+
+    DrawText("@", (int)strCenter.x - 6, (int)strCenter.y - 10, 18, { 160, 180, 205, 220 });
+
+
+
+    // In Sister's POV, render brother @ sitting in the driver's seat behind the steering wheel
+
+    if (isSisterPOV) {
+
+        int brX = (int)strCenter.x;
+
+        int brY = 475;
+
+        // Brother head '@'
+
+        DrawText("@", brX - 14, brY, 36, { 255, 220, 160, 255 });
+
+        // Subtle driving hands on the wheel
+
+        DrawText("o", (int)spkL.x - 6, (int)spkL.y - 6, 20, { 245, 205, 145, 230 });
+
+        DrawText("o", (int)spkR.x - 6, (int)spkR.y - 6, 20, { 245, 205, 145, 230 });
+
+    }
+
+}
 
 
 
 
 
+void Draw3DCarInterior(float iCarX, float iCarY, float iCarZ, float ccy, float timeVal, float iCarSpd, float iShakeDec, int iJerkCount,
+
+                       Mesh mSeat, Mesh mSeatBack, Mesh mSteerRim, Material matSeat, Material matCabin) {
+
+    // ---- SEATS ----
+
+    // Driver Seat (Left side)
+
+    DrawMesh(mSeat, matSeat, MatrixTranslate(iCarX - 0.48f, ccy - 0.12f, iCarZ + 0.08f));
+
+    DrawMesh(mSeatBack, matSeat, MatrixTranslate(iCarX - 0.48f, ccy + 0.22f, iCarZ - 0.30f));
 
 
 
+    // Passenger Seat (Sister side, Right side)
+
+    DrawMesh(mSeat, matSeat, MatrixTranslate(iCarX + 0.48f, ccy - 0.12f, iCarZ + 0.08f));
+
+    DrawMesh(mSeatBack, matSeat, MatrixTranslate(iCarX + 0.48f, ccy + 0.22f, iCarZ - 0.30f));
 
 
 
+    // ---- CENTER CONSOLE & TRANSMISSION TUNNEL ----
+
+    DrawCube({ iCarX, ccy - 0.12f, iCarZ + 0.38f }, 0.26f, 0.22f, 1.10f, { 22, 25, 30, 255 });
+
+    
+
+    // Shifter stick & knob
+
+    DrawLine3D({ iCarX, ccy - 0.01f, iCarZ + 0.52f }, { iCarX, ccy + 0.18f, iCarZ + 0.48f }, { 170, 175, 185, 255 });
+
+    DrawSphere({ iCarX, ccy + 0.18f, iCarZ + 0.48f }, 0.032f, { 28, 30, 35, 255 });
 
 
 
+    // ---- DASHBOARD BEAM & CURVED COWL ----
+
+    // Main dashboard base spanning cabin width
+
+    DrawCube({ iCarX, ccy + 0.20f, iCarZ + 1.05f }, 1.95f, 0.28f, 0.40f, { 16, 18, 22, 255 });
 
 
 
+    // Raised Curved Binnacle / Instrument Cowl over driver's seat
+
+    DrawCube({ iCarX - 0.48f, ccy + 0.38f, iCarZ + 0.98f }, 0.68f, 0.12f, 0.32f, { 22, 25, 32, 255 });
+
+    DrawLine3D({ iCarX - 0.82f, ccy + 0.44f, iCarZ + 0.82f }, { iCarX - 0.14f, ccy + 0.44f, iCarZ + 0.82f }, { 55, 68, 85, 255 });
 
 
 
+    // Passenger dash glovebox seam
+
+    DrawLine3D({ iCarX + 0.18f, ccy + 0.16f, iCarZ + 0.85f }, { iCarX + 0.85f, ccy + 0.16f, iCarZ + 0.85f }, { 35, 40, 48, 255 });
 
 
 
+    // ---- 3D INSTRUMENTS (Speedometer & Fuel Gauge on Driver Cowl) ----
+
+    // Speedometer dial background
+
+    Vector3 spd3D = { iCarX - 0.58f, ccy + 0.30f, iCarZ + 0.84f };
+
+    DrawCube(spd3D, 0.16f, 0.16f, 0.02f, { 8, 10, 14, 255 });
+
+    // Speedometer ticks
+
+    for (int t = 0; t < 8; t++) {
+
+        float ta = (135.0f + t * 34.0f) * DEG2RAD;
+
+        Vector3 tp1 = { spd3D.x + cosf(ta) * 0.050f, spd3D.y + sinf(ta) * 0.050f, spd3D.z - 0.012f };
+
+        Vector3 tp2 = { spd3D.x + cosf(ta) * 0.068f, spd3D.y + sinf(ta) * 0.068f, spd3D.z - 0.012f };
+
+        DrawLine3D(tp1, tp2, (t >= 6) ? (Color){ 230, 70, 70, 255 } : (Color){ 180, 195, 215, 240 });
+
+    }
+
+    // Speedometer dynamic needle
+
+    float spdFrac = (iCarSpd / 12.0f);
+
+    if (iShakeDec > 0.05f) spdFrac += sinf(timeVal * 40.0f) * iShakeDec * 0.05f;
+
+    if (spdFrac < 0.0f) spdFrac = 0.0f;
+
+    if (spdFrac > 1.0f) spdFrac = 1.0f;
+
+    float spdNeedleAng = (135.0f + spdFrac * 270.0f) * DEG2RAD;
+
+    DrawLine3D(spd3D, { spd3D.x + cosf(spdNeedleAng) * 0.058f, spd3D.y + sinf(spdNeedleAng) * 0.058f, spd3D.z - 0.015f }, { 255, 75, 65, 255 });
 
 
 
+    // Fuel Gauge dial background
+
+    Vector3 fuel3D = { iCarX - 0.38f, ccy + 0.30f, iCarZ + 0.84f };
+
+    DrawCube(fuel3D, 0.12f, 0.12f, 0.02f, { 8, 10, 14, 255 });
+
+    // Fuel gauge ticks
+
+    for (int t = 0; t <= 4; t++) {
+
+        float fa = (150.0f + t * 45.0f) * DEG2RAD;
+
+        DrawLine3D({ fuel3D.x + cosf(fa) * 0.035f, fuel3D.y + sinf(fa) * 0.035f, fuel3D.z - 0.012f },
+
+                   { fuel3D.x + cosf(fa) * 0.050f, fuel3D.y + sinf(fa) * 0.050f, fuel3D.z - 0.012f },
+
+                   (t == 0) ? (Color){ 240, 70, 70, 255 } : (Color){ 180, 195, 215, 240 });
+
+    }
+
+    // Fuel needle (low fuel)
+
+    float fVal = (iJerkCount >= 2) ? 0.08f : 0.22f;
+
+    float fAng = (150.0f + fVal * 180.0f) * DEG2RAD;
+
+    DrawLine3D(fuel3D, { fuel3D.x + cosf(fAng) * 0.042f, fuel3D.y + sinf(fAng) * 0.042f, fuel3D.z - 0.015f }, { 255, 160, 50, 255 });
 
 
 
+    // ---- 3D AUXILIARY SWITCHES (Center stack) ----
+
+    Vector3 swPanel = { iCarX, ccy + 0.20f, iCarZ + 0.84f };
+
+    DrawCube(swPanel, 0.28f, 0.14f, 0.02f, { 12, 14, 18, 255 });
+
+    DrawLine3D({ swPanel.x - 0.12f, swPanel.y + 0.05f, swPanel.z - 0.012f },
+
+               { swPanel.x + 0.12f, swPanel.y + 0.05f, swPanel.z - 0.012f }, { 45, 52, 65, 255 });
+
+
+
+    // 4 glowing indicator switches
+
+    bool isHaz = (iJerkCount > 0);
+
+    float hazBlink = (sinf(timeVal * 7.0f) > 0.0f) ? 1.0f : 0.2f;
+
+    Color swCols[4] = {
+
+        { 110, 235, 140, 255 }, // Lights (Green)
+
+        { 100, 215, 255, 255 }, // Wipers (Cyan)
+
+        isHaz ? (Color){ 255, 60, 60, (unsigned char)(hazBlink * 255) } : (Color){ 80, 90, 105, 200 }, // Hazard
+
+        { 255, 180, 65, 255 }  // Defrost (Amber)
+
+    };
+
+    for (int s = 0; s < 4; s++) {
+
+        float sx = swPanel.x - 0.09f + s * 0.06f;
+
+        DrawCube({ sx, swPanel.y - 0.01f, swPanel.z - 0.015f }, 0.038f, 0.045f, 0.01f, { 25, 28, 35, 255 });
+
+        DrawSphere({ sx, swPanel.y - 0.01f, swPanel.z - 0.022f }, 0.010f, swCols[s]);
+
+    }
+
+
+
+    // ---- STEERING COLUMN & STEERING WHEEL ----
+
+    Vector3 colStart = { iCarX - 0.48f, ccy + 0.22f, iCarZ + 0.85f };
+
+    Vector3 swCenter = { iCarX - 0.48f, ccy + 0.30f, iCarZ + 0.68f };
+
+    DrawLine3D(colStart, swCenter, { 35, 40, 50, 255 });
+
+    DrawCube({ colStart.x, (colStart.y + swCenter.y)*0.5f, (colStart.z + swCenter.z)*0.5f }, 0.08f, 0.08f, 0.16f, { 25, 28, 36, 255 });
+
+
+
+    float swTurn = sinf(timeVal * 1.8f) * 12.0f * DEG2RAD;
+
+    if (iShakeDec > 0.05f) swTurn += sinf(timeVal * 40.0f) * iShakeDec * 0.08f;
+
+
+
+    // Steering wheel rim (cylinder rotated toward driver)
+
+    Matrix sMat = MatrixRotateZ(90.0f * DEG2RAD);
+
+    sMat = MatrixMultiply(sMat, MatrixRotateY(swTurn));
+
+    sMat = MatrixMultiply(sMat, MatrixTranslate(swCenter.x, swCenter.y, swCenter.z));
+
+    DrawMesh(mSteerRim, matCabin, sMat);
+
+
+
+    // Spokes connecting hub to rim
+
+    for (int sp = 0; sp < 3; sp++) {
+
+        float sa = swTurn + (sp / 3.0f) * 2.0f * PI;
+
+        Vector3 rimPt = { swCenter.x + cosf(sa) * 0.24f, swCenter.y + sinf(sa) * 0.24f, swCenter.z };
+
+        DrawLine3D(swCenter, rimPt, { 48, 55, 68, 255 });
+
+    }
+
+    DrawSphere(swCenter, 0.042f, { 30, 35, 45, 255 });
+
+
+
+    // Windshield A-Pillars framing the cabin
+
+    DrawLine3D({ iCarX - 0.98f, ccy + 0.38f, iCarZ + 1.15f }, { iCarX - 0.82f, ccy + 0.88f, iCarZ + 0.85f }, { 40, 48, 60, 255 });
+
+    DrawLine3D({ iCarX + 0.98f, ccy + 0.38f, iCarZ + 1.15f }, { iCarX + 0.82f, ccy + 0.88f, iCarZ + 0.85f }, { 40, 48, 60, 255 });
+
+    DrawLine3D({ iCarX - 0.82f, ccy + 0.88f, iCarZ + 0.85f }, { iCarX + 0.82f, ccy + 0.88f, iCarZ + 0.85f }, { 40, 48, 60, 255 });
+
+}
+
+
+
+// =========================================================================
+
+// PROCEDURAL SUPERSTORE PRODUCTS & PARTICLE SYSTEM
+
+// Real interactive 3D products populated in filled supermarket racks:
+
+// - Popcorn Tin   -> procedural cylinder body + stripes + opening lid + kernel physics
+
+// - Sparrow's milk -> glass bottle + white '~' glyph procedural liquid + pouring physics
+
+// - B+ Blood       -> glass bottle + dark red '~' glyph procedural liquid + pouring physics
+
+// - Bread          -> oblong baked loaf with procedurally generated crust & score marks
+
+// - Shopping Cart  -> fully assembled rod-grid basket, frame, wheels, handle
+
+// =========================================================================
+
+enum ShopProductType {
+
+    PROD_TIN = 0,
+
+    PROD_MILK,
+
+    PROD_BLOOD,
+
+    PROD_BREAD,
+
+    PROD_CART,
+
+    PROD_CHOCOLATE,
+
+    PROD_GUN
+
+};
+
+
+
+struct ShopParticle {
+
+    Vector3 pos;
+
+    Vector3 vel;
+
+    float   radius;
+
+    Color   color;
+
+    bool    landed;
+
+    float   settleTimer;
+
+    bool    isCube;
+
+};
+
+
+
+struct DustParticle {
+
+    Vector3 pos;
+
+    Vector3 vel;
+
+    float   size;
+
+    float   life;
+
+    float   maxLife;
+
+    Color   color;
+
+    float   spin;
+
+    float   spinSpeed;
+
+};
+
+
+
+struct FootstepTrail {
+
+    Vector3 pos;
+
+    float   yaw;
+
+    float   life;
+
+    float   maxLife;
+
+    bool    isLeft;
+
+};
+
+
+
+struct GunSpark {
+
+    Vector3 pos;
+
+    Vector3 vel;
+
+    float   life;
+
+    Color   color;
+
+};
+
+
+
+struct ShellCasing {
+
+    Vector3 pos;
+
+    Vector3 vel;
+
+    Vector3 rot;
+
+    Vector3 rotVel;
+
+    float   life;
+
+    bool    landed;
+
+};
+
+
+
+struct ShopProduct {
+
+    ShopProductType type;
+
+    Vector3 homePos;
+
+    Vector3 originalPos;
+
+    Vector3 vel;
+
+    bool    held;
+
+    bool    opened;
+
+    float   fill;
+
+    float   spawnTimer;
+
+    int     spawnedCount;
+
+    int     maxSpawn;
+
+    const char* label;
+
+    const char* price;
+
+    int     subType = 0; // 0, 1, 2 for chocolate varieties
+
+};
+
+
+
+static std::vector<ShopProduct> g_shopProducts;
+
+static std::vector<ShopParticle> g_shopParticles;
+
+static std::vector<DustParticle> g_dustParticles;
+
+static std::vector<FootstepTrail> g_footstepTrails;
+
+static std::vector<GunSpark> g_gunSparks;
+
+static std::vector<ShellCasing> g_shellCasings;
+
+
+
+static float g_gunRecoilTimer = 0.0f;
+
+static float g_gunMuzzleFlashTimer = 0.0f;
+
+static bool  g_isLeftFootStep = false;
 
 
 
@@ -128,13 +5380,61 @@ static bool  g_autoDispenseMode    = false; // Store counter console toggle
 static float g_stationBellBannerTimer = 0.0f;
 static char  g_stationBellBanner[128] = { 0 };
 
-#include "systems/gas_station_system.h"
+enum CustomerCarState {
+    CAR_INACTIVE,
+    CAR_APPROACHING,
+    CAR_PARKED,
+    CAR_REFUELING,
+    CAR_PAID,
+    CAR_DEPARTING
+};
+
+struct CustomerCar {
+    CustomerCarState state;
+    Vector3 pos;
+    float speed;
+    int targetPump;          // 0 = Pump 1 (Z=137.5), 1 = Pump 2 (Z=142.5)
+    float targetZ;
+    float requestedGallons;
+    float dispensedGallons;
+    float totalSale;
+    float tipAmount;
+    Color bodyColor;
+    float waitTimer;
+    char driverDialogue[128];
+};
 
 static CustomerCar g_customerCar = { CAR_INACTIVE };
 static float g_customerCarCooldown = 35.0f; // Seconds until next car arrives
 
-static inline void SpawnCustomerCar() {
-    SpawnCustomerCar(g_customerCar, g_fuelPricePerGallon);
+static void SpawnCustomerCar() {
+    g_customerCar.state = CAR_APPROACHING;
+    g_customerCar.targetPump = (GetRandomValue(0, 1) == 0) ? 0 : 1;
+    g_customerCar.targetZ = (g_customerCar.targetPump == 0) ? 137.5f : 142.5f;
+    g_customerCar.pos = (Vector3){ 123.5f, 10.02f, 65.0f }; // Approaching from Route 9 North
+    g_customerCar.speed = 14.0f;
+    g_customerCar.requestedGallons = 8.0f + (float)GetRandomValue(0, 120) / 10.0f; // 8.0 to 20.0 Gal
+    g_customerCar.dispensedGallons = 0.0f;
+    g_customerCar.totalSale = g_customerCar.requestedGallons * g_fuelPricePerGallon;
+    g_customerCar.tipAmount = 4.0f + (float)GetRandomValue(0, 80) / 10.0f;
+    g_customerCar.waitTimer = 0.0f;
+
+    Color palette[4] = {
+        (Color){ 62, 54, 48, 255 },  // Rusted brown station wagon
+        (Color){ 35, 42, 52, 255 },  // Dark midnight blue sedan
+        (Color){ 72, 68, 62, 255 },  // Weathered gray pickup
+        (Color){ 55, 24, 26, 255 }   // Muddy dark maroon coupe
+    };
+    g_customerCar.bodyColor = palette[GetRandomValue(0, 3)];
+
+    const char* quotes[] = {
+        "\"Thanks... whatever you do out here, keep your eyes on the tree line.\"",
+        "\"Did you feel that tremor under the asphalt? Something is shifting below.\"",
+        "\"I wouldn't stay out on this road past 3 AM if I were you, kid.\"",
+        "\"My radio was picking up strange Morse code all through the mountain corridor.\"",
+        "\"The air smells like sulfur and rot tonight. Don't go wandering into the mire.\""
+    };
+    snprintf(g_customerCar.driverDialogue, sizeof(g_customerCar.driverDialogue), "%s", quotes[GetRandomValue(0, 4)]);
 }
 
 
@@ -188,18 +5488,107 @@ static Font g_fontTitle;    // assets/alagard.ttf @ 52px - Strong, gothic horror
 
 static Font g_fontHeadSub;  // assets/alagard.ttf @ 30px - Distinct horror display font for headers & banners
 
-Font g_fontMenu;            // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
+static Font g_fontMenu;     // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
 
 static Font g_fontBody;     // assets/IBMPlexMono-Medium.ttf @ 20px - Crisp monospace for lore transcripts & settings
 
 static Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, timestamps & status stamps
 
-#include "systems/ui_helpers.h"
+
+
+static inline void DrawTextSharp(Font font, const char* text, float x, float y, float fontSize, Color tint, float spacing = 1.0f) {
+
+    DrawTextEx(font, text, (Vector2){ x, y }, fontSize, spacing, tint);
+
+}
+
+
+
+static inline void DrawTextSharpCentered(Font font, const char* text, float centerX, float y, float fontSize, Color tint, float spacing = 1.0f) {
+
+    Vector2 sz = MeasureTextEx(font, text, fontSize, spacing);
+
+    DrawTextEx(font, text, (Vector2){ centerX - sz.x * 0.5f, y }, fontSize, spacing, tint);
+
+}
+
+
+
+static inline float MeasureTextSharp(Font font, const char* text, float fontSize, float spacing = 1.0f) {
+
+    return MeasureTextEx(font, text, fontSize, spacing).x;
+
+}
 
 // =========================================================================
 // AAA POLISHED UI PRIMITIVES & DESIGN SYSTEM
 // =========================================================================
 
+static inline void DrawAAAPanel(Rectangle rec, Color bgColor, Color borderColor, float radius = 6.0f, bool shadow = true) {
+    float roundness = (rec.height > 0.0f) ? (radius / rec.height) : 0.1f;
+    if (roundness > 0.5f) roundness = 0.5f;
+
+    if (shadow) {
+        DrawRectangleRounded((Rectangle){ rec.x + 3.0f, rec.y + 5.0f, rec.width, rec.height }, roundness, 10, (Color){ 0, 0, 0, 105 });
+        DrawRectangleRounded((Rectangle){ rec.x + 1.0f, rec.y + 2.0f, rec.width, rec.height }, roundness, 10, (Color){ 0, 0, 0, 155 });
+    }
+
+    DrawRectangleRounded(rec, roundness, 10, bgColor);
+    DrawLine((int)(rec.x + radius), (int)(rec.y + 1.0f), (int)(rec.x + rec.width - radius), (int)(rec.y + 1.0f), (Color){ 255, 255, 255, 45 });
+    DrawRectangleRoundedLinesEx(rec, roundness, 10, 1.2f, borderColor);
+}
+
+static inline float DrawAAAKeycap(const char* key, float x, float y, Color accentCol) {
+    if (!key || !key[0]) return 0.0f;
+    float kw = MeasureTextSharp(g_fontMenu, key, 13.0f) + 12.0f;
+    if (kw < 24.0f) kw = 24.0f;
+    float kh = 22.0f;
+
+    // Soft drop shadow
+    DrawRectangleRounded((Rectangle){ x + 1.0f, y + 2.0f, kw, kh }, 0.28f, 6, (Color){ 0, 0, 0, 160 });
+
+    // Tactile keycap frame
+    DrawRectangleRounded((Rectangle){ x, y, kw, kh }, 0.28f, 6, (Color){ 22, 26, 32, 245 });
+    DrawRectangleRoundedLinesEx((Rectangle){ x, y, kw, kh }, 0.28f, 6, 1.0f, (Color){ 65, 75, 88, 230 });
+
+    // Subtle top rim light
+    DrawLine((int)(x + 3.0f), (int)(y + 1.0f), (int)(x + kw - 3.0f), (int)(y + 1.0f), (Color){ 255, 255, 255, 55 });
+
+    // Key glyph
+    DrawTextSharpCentered(g_fontMenu, key, x + kw * 0.5f, y + 4.5f, 13.0f, accentCol, 1.0f);
+
+    return kw;
+}
+
+static inline void DrawAAAInteractionBadge(const char* text, Color accentCol, float centerY) {
+    if (!text || !text[0]) return;
+    float fs = 16.0f;
+    float tw = MeasureTextSharp(g_fontMenu, text, fs);
+    float pw = tw + 38.0f;
+    if (pw < 220.0f) pw = 220.0f;
+    float ph = 36.0f;
+    float px = ((float)LOGICAL_W - pw) * 0.5f;
+    float py = centerY - ph * 0.5f;
+
+    // Dual-layer ambient drop shadow
+    DrawRectangleRounded((Rectangle){ px + 3.0f, py + 5.0f, pw, ph }, 0.25f, 10, (Color){ 0, 0, 0, 115 });
+    DrawRectangleRounded((Rectangle){ px + 1.0f, py + 2.0f, pw, ph }, 0.25f, 10, (Color){ 0, 0, 0, 165 });
+
+    // Glass acrylic dark slate body
+    DrawRectangleRounded((Rectangle){ px, py, pw, ph }, 0.25f, 10, (Color){ 14, 18, 22, 242 });
+
+    // Top specular highlight line
+    DrawLine((int)(px + 10.0f), (int)(py + 1.0f), (int)(px + pw - 10.0f), (int)(py + 1.0f), (Color){ 255, 255, 255, 45 });
+
+    // Glowing accent border
+    DrawRectangleRoundedLinesEx((Rectangle){ px, py, pw, ph }, 0.25f, 10, 1.2f, (Color){ accentCol.r, accentCol.g, accentCol.b, 225 });
+
+    // Subtle side indicator bar
+    DrawRectangleRounded((Rectangle){ px + 4.0f, py + 7.0f, 4.0f, ph - 14.0f }, 0.5f, 4, accentCol);
+
+    // Centered crisp text
+    DrawTextSharpCentered(g_fontMenu, text, (float)LOGICAL_W * 0.5f, py + 9.5f, fs, (Color){ 245, 248, 252, 255 }, 1.0f);
+}
 
 
 static int g_heldProductIndex = -1;
@@ -302,7 +5691,129 @@ static float Frand(float lo, float hi) {
 
 
 
-#include "systems/texture_factories.h"
+static RenderTexture2D GenerateGlyphTexture(const char *glyph, Color bg, Color fg,
+
+                                           int texSize, int fontSize, int jitter)
+
+{
+
+    RenderTexture2D rt = LoadRenderTexture(texSize, texSize);
+
+    BeginTextureMode(rt);
+
+        ClearBackground(bg);
+
+        int step = fontSize - fontSize / 3;
+
+        if (step < 4) step = 4;
+
+        for (int y = -fontSize; y < texSize + fontSize; y += step) {
+
+            for (int x = -fontSize; x < texSize + fontSize; x += step) {
+
+                int jx = GetRandomValue(-jitter, jitter);
+
+                int jy = GetRandomValue(-jitter, jitter);
+
+                Color shade = fg;
+
+                int variance = GetRandomValue(-18, 18);
+
+                shade.r = (unsigned char)Clamp((float)fg.r + variance, 0.0f, 255.0f);
+
+                shade.g = (unsigned char)Clamp((float)fg.g + variance, 0.0f, 255.0f);
+
+                shade.b = (unsigned char)Clamp((float)fg.b + variance, 0.0f, 255.0f);
+
+                DrawText(glyph, x + jx, y + jy, fontSize, shade);
+
+            }
+
+        }
+
+    EndTextureMode();
+
+    return rt;
+
+}
+
+
+
+static RenderTexture2D GenerateCrustTexture(int texSize)
+
+{
+
+    RenderTexture2D rt = LoadRenderTexture(texSize, texSize);
+
+    BeginTextureMode(rt);
+
+        ClearBackground((Color){ 196, 148, 84, 255 });
+
+        for (int i = 0; i < 900; i++) {
+
+            int x = GetRandomValue(0, texSize);
+
+            int y = GetRandomValue(0, texSize);
+
+            int r = GetRandomValue(2, 10);
+
+            int dark = GetRandomValue(0, 70);
+
+            Color c = (Color){ (unsigned char)Clamp(196 - dark, 90, 255),
+
+                               (unsigned char)Clamp(148 - dark, 60, 255),
+
+                               (unsigned char)Clamp(84  - dark, 20, 255), 255 };
+
+            DrawCircle(x, y, (float)r, c);
+
+        }
+
+        for (int i = 0; i < 6; i++) {
+
+            int x = GetRandomValue(20, texSize - 20);
+
+            DrawRectangle(x, 10, 6, texSize - 20, (Color){ 120, 78, 40, 180 });
+
+        }
+
+    EndTextureMode();
+
+    return rt;
+
+}
+
+
+
+static Model MakeTexturedCylinder(float radius, float height, int slices, Texture2D tex)
+
+{
+
+    Mesh mesh = GenMeshCylinder(radius, height, slices);
+
+    Model model = LoadModelFromMesh(mesh);
+
+    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = tex;
+
+    return model;
+
+}
+
+
+
+static Model MakeTexturedSphere(float radius, int rings, int slices, Texture2D tex)
+
+{
+
+    Mesh mesh = GenMeshSphere(radius, rings, slices);
+
+    Model model = LoadModelFromMesh(mesh);
+
+    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = tex;
+
+    return model;
+
+}
 
 
 
@@ -1899,7 +7410,521 @@ static void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, flo
 
 
 
-#include "systems/receipt_printer.h"
+// =========================================================================
+
+// THERMAL RECEIPT PRINTER & HORROR RECEIPT SYSTEM
+
+// Procedural aged paper, itemized horror list, curling output chain
+
+// =========================================================================
+
+// Real-world Authentic Super Mart Thermal Receipt:
+
+// Pure bright thermal paper white, prominent heading main text, total price below,
+
+// NO grocery items mentioned, and terrifying arterial blood stains.
+
+static Texture2D BuildReceiptTexture(void)
+
+{
+
+    const int TEX_W = 380;
+
+    const int TEX_H = 760;
+
+    // Pure thermal paper white background
+
+    Image paper = GenImageColor(TEX_W, TEX_H, (Color){ 252, 252, 250, 255 });
+
+
+
+    // Realistic thermal paper edge margin shading
+
+    for (int y = 0; y < TEX_H; y++) {
+
+        ImageDrawPixel(&paper, 0, y, (Color){ 220, 220, 215, 255 });
+
+        ImageDrawPixel(&paper, 1, y, (Color){ 235, 235, 230, 255 });
+
+        ImageDrawPixel(&paper, TEX_W - 2, y, (Color){ 235, 235, 230, 255 });
+
+        ImageDrawPixel(&paper, TEX_W - 1, y, (Color){ 220, 220, 215, 255 });
+
+    }
+
+
+
+    // Top & Bottom Tear Bar Serrations (Notched zig-zag cut edges)
+
+    for (int x = 0; x < TEX_W; x += 6) {
+
+        for (int dy = 0; dy < 4; dy++) {
+
+            int tooth = (x / 3) % 2 ? dy : (3 - dy);
+
+            ImageDrawPixel(&paper, x + dy, tooth, (Color){ 0, 0, 0, 0 });
+
+            ImageDrawPixel(&paper, x + dy, TEX_H - 1 - tooth, (Color){ 0, 0, 0, 0 });
+
+        }
+
+    }
+
+
+
+    auto DrawCentered = [&](const char *text, int y, int fontSize, Color color) {
+
+        int w = MeasureText(text, fontSize);
+
+        int x = (TEX_W - w) / 2;
+
+        if (x < 4) x = 4;
+
+        ImageDrawText(&paper, text, x, y, fontSize, color);
+
+    };
+
+
+
+    auto DrawDashed = [&](int y, Color color) {
+
+        for (int x = 14; x < TEX_W - 14; x += 9)
+
+            ImageDrawLine(&paper, x, y, x + 5, y, color);
+
+    };
+
+
+
+    // Realistic horror arterial blood splatters, running gravity drips, and soaked coagulated pools
+
+    auto DrawBloodPool = [&](int cx, int cy, int radius) {
+
+        for (int r = radius; r >= 1; r--) {
+
+            float t = (float)r / (float)radius;
+
+            Color col = (t < 0.45f) ? (Color){ 70, 3, 3, 250 } : (Color){ 140, 10, 10, (unsigned char)(210 - t * 70) };
+
+            ImageDrawCircle(&paper, cx, cy, r, col);
+
+        }
+
+    };
+
+
+
+    auto DrawBloodSpatter = [&](int cx, int cy, int dropletCount) {
+
+        DrawBloodPool(cx, cy, GetRandomValue(8, 18));
+
+        for (int i = 0; i < dropletCount; i++) {
+
+            int dist = GetRandomValue(6, 45);
+
+            float ang = Frand(0.0f, 6.283f);
+
+            int dx = cx + (int)(cosf(ang) * dist);
+
+            int dy = cy + (int)(sinf(ang) * dist);
+
+            int sz = GetRandomValue(1, 4);
+
+            ImageDrawCircle(&paper, dx, dy, sz, (Color){ 175, 12, 12, (unsigned char)GetRandomValue(180, 255) });
+
+        }
+
+        // Dripping gravity trails running down the receipt
+
+        int dripLen = GetRandomValue(30, 90);
+
+        int px = cx + GetRandomValue(-4, 4), py = cy;
+
+        for (int d = 0; d < dripLen; d += 3) {
+
+            int nx = px + GetRandomValue(-1, 1);
+
+            int ny = py + 3;
+
+            unsigned char a = (unsigned char)(220 - (d * 180 / (dripLen > 0 ? dripLen : 1)));
+
+            Color dCol = (d < dripLen / 2) ? (Color){ 110, 6, 6, a } : (Color){ 165, 12, 12, a };
+
+            ImageDrawLine(&paper, px, py, nx, ny, dCol);
+
+            ImageDrawLine(&paper, px + 1, py, nx + 1, ny, dCol);
+
+            px = nx; py = ny;
+
+        }
+
+    };
+
+
+
+    // Bloody finger / thumb drag smear on the side margin
+
+    auto DrawThumbSmear = [&](int sx, int sy) {
+
+        for (int step = 0; step < 26; step++) {
+
+            int y = sy + step * 2;
+
+            int x = sx + (int)(sinf(step * 0.25f) * 4.0f);
+
+            ImageDrawRectangle(&paper, x, y, 16, 3, (Color){ 120, 10, 10, (unsigned char)(140 - step * 4) });
+
+            ImageDrawRectangle(&paper, x + 2, y, 12, 2, (Color){ 80, 5, 5, (unsigned char)(160 - step * 5) });
+
+        }
+
+    };
+
+
+
+    int iy = 26;
+
+
+
+    // Header: Super Mart Brand & Register details
+
+    Color fontInk = (Color){ 18, 18, 22, 255 };
+
+    Color fontSub = (Color){ 65, 65, 72, 255 };
+
+    Color fontRule = (Color){ 90, 90, 98, 200 };
+
+
+
+    DrawCentered("*** DEAD END MART ***", iy, 22, fontInk); iy += 28;
+
+    DrawCentered("SUPERSTORE & GROCERY", iy, 14, fontSub); iy += 20;
+
+    DrawCentered("STORE #0666   TERMINAL 01   REG 04", iy, 12, fontSub); iy += 18;
+
+    DrawCentered("DATE: 10/31/2026   TIME: 03:33:13 AM", iy, 12, fontSub); iy += 22;
+
+
+
+    DrawDashed(iy, fontRule); iy += 32;
+
+
+
+    // PROMINENT HEADING MAIN TEXT (Bold, prominent, saturated thermal ink)
+
+    DrawCentered("HATE YOU FOR SHOPPING.", iy,     22, fontInk);
+
+    DrawCentered("HATE YOU FOR SHOPPING.", iy + 1, 22, fontInk); iy += 32;
+
+    DrawCentered("NEVER COME BACK!",     iy,     24, fontInk);
+
+    DrawCentered("NEVER COME BACK!",     iy + 1, 24, fontInk); iy += 42;
+
+
+
+    DrawDashed(iy, fontRule); iy += 32;
+
+
+
+    // TOTAL BILL PRICE (Crisp, bold, large thermal numerals)
+
+    // STRICTLY ZERO ITEMS MENTIONED!
+
+    DrawCentered("TOTAL USD    $666.13", iy,     26, fontInk);
+
+    DrawCentered("TOTAL USD    $666.13", iy + 1, 26, fontInk); iy += 38;
+
+    DrawCentered("CASH TENDERED:    $666.13", iy, 13, fontSub); iy += 20;
+
+    DrawCentered("CHANGE DUE:          $0.00", iy, 13, fontSub); iy += 20;
+
+    DrawCentered("TOTAL ITEMS SOLD:        0", iy, 13, fontSub); iy += 26;
+
+
+
+    DrawDashed(iy, fontRule); iy += 26;
+
+    DrawCentered("THANK YOU FOR YOUR SOUL", iy, 14, fontSub); iy += 35;
+
+
+
+    // Authentic Thermal 1D Barcode with Numbers
+
+    int barX = 35;
+
+    int barY = iy;
+
+    int barH = 42;
+
+    while (barX < TEX_W - 35) {
+
+        int w = GetRandomValue(2, 5);
+
+        if (GetRandomValue(0, 4) != 0) {
+
+            ImageDrawRectangle(&paper, barX, barY, w, barH, fontInk);
+
+        }
+
+        barX += w + GetRandomValue(2, 4);
+
+    }
+
+    iy += barH + 8;
+
+    DrawCentered("4  901234  567890", iy, 12, fontInk);
+
+
+
+    // HORRIFYING BLOOD STAINS: High contrast against crisp thermal white
+
+    DrawBloodSpatter(75, 140, 14);
+
+    DrawBloodSpatter(290, 240, 18);
+
+    DrawBloodSpatter(185, 390, 12);
+
+    DrawBloodSpatter(80, 540, 16);
+
+    DrawThumbSmear(TEX_W - 36, 170);
+
+    DrawThumbSmear(12, 340);
+
+
+
+    Texture2D tex = LoadTextureFromImage(paper);
+
+    UnloadImage(paper);
+
+    return tex;
+
+}
+
+
+
+static void DrawPrinter(Vector3 pos, float ledGlow, float t)
+
+{
+
+    Color body     = ApplyShopLighting(pos, (Color){ 36, 36, 40, 255 });
+
+    Color bodyDark = ApplyShopLighting(pos, (Color){ 18, 18, 22, 255 });
+
+    Color rust     = ApplyShopLighting(pos, (Color){ 95, 14, 14, 210 });
+
+
+
+    // Main printer chassis
+
+    Vector3 chassisCenter = { pos.x, pos.y + 0.11f, pos.z };
+
+    DrawCube(chassisCenter, 0.44f, 0.22f, 0.36f, body);
+
+    DrawCubeWires(chassisCenter, 0.44f, 0.22f, 0.36f, bodyDark);
+
+
+
+    float frontZ = pos.z + 0.18f;
+
+
+
+    // Top paper slot groove
+
+    Vector3 slotGroove = { pos.x, pos.y + 0.21f, pos.z + 0.11f };
+
+    DrawCube(slotGroove, 0.28f, 0.02f, 0.08f, BLACK);
+
+
+
+    // Guide lip
+
+    Vector3 lip = { pos.x, pos.y + 0.225f, pos.z + 0.15f };
+
+    DrawCube(lip, 0.30f, 0.015f, 0.03f, bodyDark);
+
+
+
+    // Metal tear bar flush with front
+
+    Vector3 tearBar = { pos.x, pos.y + 0.195f, frontZ + 0.003f };
+
+    DrawCube(tearBar, 0.28f, 0.012f, 0.015f, ApplyShopLighting(pos, DARKGRAY));
+
+
+
+    // Screen bezel & glowing red display
+
+    Vector3 screenBezel = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.003f };
+
+    DrawCube(screenBezel, 0.20f, 0.08f, 0.01f, bodyDark);
+
+    Vector3 screenGlow = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.007f };
+
+    DrawCube(screenGlow, 0.16f, 0.05f, 0.005f, (Color){ (unsigned char)(75 * ledGlow), 8, 8, 255 });
+
+
+
+    // Buttons
+
+    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.11f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, ApplyShopLighting(pos, GRAY));
+
+    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.06f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, (Color){ 140, 20, 20, 255 });
+
+
+
+    // Pulsing status LED
+
+    Vector3 ledPos = { pos.x + 0.16f, pos.y + 0.21f, pos.z + 0.08f };
+
+    DrawSphere(ledPos, 0.016f, (Color){ 255, (unsigned char)(35 * ledGlow), (unsigned char)(35 * ledGlow), 255 });
+
+
+
+    // Rust & blood streaks
+
+    DrawCube((Vector3){ pos.x - 0.12f, pos.y + 0.08f, frontZ + 0.004f }, 0.025f, 0.14f, 0.005f, rust);
+
+    for (int i = 0; i < 4; i++) {
+
+        float dropY = pos.y + 0.18f - i * 0.045f - fmodf(t * 0.05f, 0.045f);
+
+        DrawSphere((Vector3){ pos.x + 0.02f, dropY, frontZ + 0.006f }, 0.008f - i * 0.001f, (Color){ 130, 10, 10, 190 });
+
+    }
+
+}
+
+
+
+static void DrawReceiptChain(Vector3 slotPos, Texture2D tex, float revealedSegments, float time)
+
+{
+
+    const int TOTAL_SEGMENTS = 16;
+
+    const float PAPER_WIDTH  = 0.28f;
+
+    const float PAPER_LENGTH = 0.65f;
+
+    const float CURL_DEG_PER_SEG = 3.2f;
+
+
+
+    float segUnit = PAPER_LENGTH / (float)TOTAL_SEGMENTS;
+
+    int fullCount = (int)revealedSegments;
+
+    if (fullCount > TOTAL_SEGMENTS) fullCount = TOTAL_SEGMENTS;
+
+    float frac = revealedSegments - (float)fullCount;
+
+
+
+    rlDisableBackfaceCulling();
+
+    rlPushMatrix();
+
+        rlTranslatef(slotPos.x, slotPos.y, slotPos.z);
+
+
+
+        for (int i = 0; i < fullCount; i++)
+
+        {
+
+            float vTop = (float)i / (float)TOTAL_SEGMENTS;
+
+            float vBot = (float)(i + 1) / (float)TOTAL_SEGMENTS;
+
+            float wobble = sinf(time * 1.2f + (float)i * 0.9f) * 0.5f;
+
+
+
+            rlPushMatrix();
+
+                rlRotatef(wobble, 0.0f, 0.0f, 1.0f);
+
+                rlSetTexture(tex.id);
+
+                rlBegin(RL_QUADS);
+
+                    rlColor4ub(255, 255, 255, 255);
+
+                    rlNormal3f(0.0f, 0.0f, 1.0f);
+
+                    rlTexCoord2f(0.0f, vTop); rlVertex3f(-PAPER_WIDTH * 0.5f, 0.0f,     0.0f);
+
+                    rlTexCoord2f(0.0f, vBot); rlVertex3f(-PAPER_WIDTH * 0.5f, -segUnit, 0.0f);
+
+                    rlTexCoord2f(1.0f, vBot); rlVertex3f( PAPER_WIDTH * 0.5f, -segUnit, 0.0f);
+
+                    rlTexCoord2f(1.0f, vTop); rlVertex3f( PAPER_WIDTH * 0.5f, 0.0f,     0.0f);
+
+                rlEnd();
+
+                rlSetTexture(0);
+
+            rlPopMatrix();
+
+
+
+            rlTranslatef(0.0f, -segUnit, 0.0f);
+
+            rlRotatef(-CURL_DEG_PER_SEG, 1.0f, 0.0f, 0.0f);
+
+        }
+
+
+
+        if (frac > 0.001f && fullCount < TOTAL_SEGMENTS)
+
+        {
+
+            float vTop = (float)fullCount / (float)TOTAL_SEGMENTS;
+
+            float vBot = vTop + (1.0f / (float)TOTAL_SEGMENTS) * frac;
+
+            float segH = segUnit * frac;
+
+            float wobble = sinf(time * 1.2f + (float)fullCount * 0.9f) * 0.5f;
+
+
+
+            rlPushMatrix();
+
+                rlRotatef(wobble, 0.0f, 0.0f, 1.0f);
+
+                rlSetTexture(tex.id);
+
+                rlBegin(RL_QUADS);
+
+                    rlColor4ub(255, 255, 255, 255);
+
+                    rlNormal3f(0.0f, 0.0f, 1.0f);
+
+                    rlTexCoord2f(0.0f, vTop); rlVertex3f(-PAPER_WIDTH * 0.5f, 0.0f,  0.0f);
+
+                    rlTexCoord2f(0.0f, vBot); rlVertex3f(-PAPER_WIDTH * 0.5f, -segH, 0.0f);
+
+                    rlTexCoord2f(1.0f, vBot); rlVertex3f( PAPER_WIDTH * 0.5f, -segH, 0.0f);
+
+                    rlTexCoord2f(1.0f, vTop); rlVertex3f( PAPER_WIDTH * 0.5f, 0.0f,  0.0f);
+
+                rlEnd();
+
+                rlSetTexture(0);
+
+            rlPopMatrix();
+
+        }
+
+
+
+    rlPopMatrix();
+
+    rlEnableBackfaceCulling();
+
+}
 
 
 
@@ -7512,10 +13537,68 @@ static void DrawDirtClods()
 
 
 
-#include "systems/footprint_decals.h"
+// =========================================================================
+// DYNAMIC FOOTPRINT DECAL SYSTEM
+// Alternating left/right boot imprints stamped into dust/grime or dark blood,
+// dissolving smoothly over 8 seconds.
+// =========================================================================
+struct FootprintDecal {
+    Vector3 pos;
+    float yaw;
+    float life;
+    float maxLife;
+    bool isLeft;
+    bool isBloody;
+};
+
+#define MAX_FOOTPRINTS 200
+static FootprintDecal g_footprints[MAX_FOOTPRINTS];
+static int g_footprintHead = 0;
+static Vector3 g_lastFootprintPos = { 0.0f, -999.0f, 0.0f };
+static bool g_nextFootLeft = false;
+static float g_playerBloodStainTimer = 0.0f;
 static float g_collegeFlickerTimer = 0.0f;
 static float g_collegeCreakTimer = 12.0f;
 static bool g_collegeLightOn = true;
+
+static void DrawFootprints() {
+    for (int i = 0; i < MAX_FOOTPRINTS; i++) {
+        const FootprintDecal& fp = g_footprints[i];
+        if (fp.life <= 0.0f) continue;
+        float alphaRatio = Clamp(fp.life / fp.maxLife, 0.0f, 1.0f);
+        
+        rlPushMatrix();
+        rlTranslatef(fp.pos.x, fp.pos.y, fp.pos.z);
+        rlRotatef(fp.yaw, 0.0f, 1.0f, 0.0f);
+        
+        if (fp.isBloody) {
+            unsigned char a = (unsigned char)(alphaRatio * 220.0f);
+            Color bloodSole = { 135, 12, 18, a };
+            Color bloodHeel = { 95, 8, 12, a };
+            // Sole
+            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, bloodSole);
+            // Heel
+            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, bloodHeel);
+            // Splatter droplets
+            Color dripCol = { 110, 10, 14, (unsigned char)(a * 0.75f) };
+            DrawCube((Vector3){ fp.isLeft ? -0.065f : 0.065f, 0.001f, 0.02f }, 0.025f, 0.002f, 0.025f, dripCol);
+            DrawCube((Vector3){ fp.isLeft ? -0.08f : 0.08f, 0.001f, -0.02f }, 0.018f, 0.002f, 0.018f, dripCol);
+        } else {
+            unsigned char a = (unsigned char)(alphaRatio * 155.0f);
+            Color treadCol = { 26, 24, 22, a };
+            Color ridgeCol = { 14, 12, 11, (unsigned char)(a * 0.85f) };
+            // Sole
+            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, treadCol);
+            // Heel
+            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, treadCol);
+            // Tread grooves
+            DrawCube((Vector3){ 0.0f, 0.0015f, 0.025f }, 0.09f, 0.002f, 0.015f, ridgeCol);
+            DrawCube((Vector3){ 0.0f, 0.0015f, 0.065f }, 0.09f, 0.002f, 0.015f, ridgeCol);
+            DrawCube((Vector3){ 0.0f, 0.0015f, 0.105f }, 0.08f, 0.002f, 0.015f, ridgeCol);
+        }
+        rlPopMatrix();
+    }
+}
 
 // =========================================================================
 // ABANDONED BLACKWOOD COLLEGE: ADVANCED DYNAMIC LIGHTING & PROCEDURAL SHADER
@@ -8358,36 +14441,445 @@ static void DrawAbandonedCollege(Camera3D camera, float timeVal, float dt, float
 
 
 
-// (Crashed Sedan Site extracted to systems/crashed_sedan_site.h/.cpp)
+// =========================================================================
+// CRASHED SILVER SEDAN & ROADSIDE IMPACT SITE (Route 9 Mile Marker 14)
+// Tilted into ditch verge at X = 143.8, Z = 136.5 with crumpled accordion
+// hood, steaming cracked radiator, spiderweb fractured windshield,
+// deflated airbag, sprung ajar driver door, sheared utility pole, and skid ruts.
+// =========================================================================
+static const Vector3 g_crashedCarPos = { 143.8f, 9.92f, 136.5f };
 
-// -----------------------------------------------------------------------------
-// IN-WORLD 3D FUEL PUMP CRT & CATENARY HOSE RENDERING SYSTEM
-// (Implementation extracted to systems/gas_station_system.h/.cpp)
-// -----------------------------------------------------------------------------
-
-static inline void UpdatePumpCrtTexture(int pumpNum, float gallons, float salePrice, bool isFlowing, float flk) {
-    UpdatePumpCrtTextureEx(g_pumpScreenRT, g_pumpScreenRTLoaded, g_fontSmall, g_fontTitle, pumpNum, gallons, salePrice, isFlowing, g_fuelPricePerGallon, g_stationFuelGallons, flk);
+static inline Color CrashCarTint(Color base, float dayF, float nightF, float vertBias = 1.0f) {
+    float amb = 0.28f + 0.62f * dayF + 0.15f * nightF;
+    float r = ((float)base.r / 255.0f) * amb * vertBias;
+    float g = ((float)base.g / 255.0f) * amb * vertBias;
+    float b = ((float)base.b / 255.0f) * amb * vertBias;
+    return (Color){
+        (unsigned char)Clamp(r * 255.0f, 0.0f, 255.0f),
+        (unsigned char)Clamp(g * 255.0f, 0.0f, 255.0f),
+        (unsigned char)Clamp(b * 255.0f, 0.0f, 255.0f),
+        base.a
+    };
 }
 
-// (DrawCatenaryHose & DrawFirstPersonFuelNozzle extracted to systems/gas_station_system.h/.cpp)
+static void DrawCrashedSedan(Vector3 carPos, float timeVal, float extDayFactor, float extNightFactor, Camera3D camera) {
+    float distSq = (carPos.x - camera.position.x)*(carPos.x - camera.position.x) + (carPos.z - camera.position.z)*(carPos.z - camera.position.z);
+    if (distSq > 130.0f * 130.0f) return;
 
-#include "systems/ocean_system.h"
-#include "systems/shop_atmosphere.h"
+    // 1. Skid marks curving from Route 9 asphalt into roadside ditch verge
+    for (int t = 0; t < 18; t++) {
+        float f = (float)t / 17.0f;
+        float sx = Lerp(138.5f, 142.8f, f * f);
+        float sz = Lerp(126.0f, 134.5f, f);
+        float sy = 10.015f - f * 0.05f;
+        DrawCube((Vector3){ sx - 0.75f, sy, sz }, 0.22f, 0.005f, 0.55f, (Color){ 12, 12, 14, (unsigned char)(180 - f * 60) });
+        DrawCube((Vector3){ sx + 0.75f, sy, sz }, 0.24f, 0.005f, 0.55f, (Color){ 10, 10, 12, (unsigned char)(210 - f * 40) });
+        if (t > 10) {
+            DrawCube((Vector3){ sx + 0.95f, sy + 0.03f, sz }, 0.18f, 0.06f, 0.35f, (Color){ 36, 28, 20, 240 });
+        }
+    }
+
+    // 2. Splintered wooden utility pole sheared off at impact (Stump center: X = 145.3f, Z = 138.8f)
+    Vector3 poleBase = { 145.3f, 9.90f, 138.8f };
+    Color woodPost = CrashCarTint((Color){ 62, 52, 40, 255 }, extDayFactor, extNightFactor);
+    Color woodSplinter = CrashCarTint((Color){ 110, 95, 70, 255 }, extDayFactor, extNightFactor);
+
+    // Sheared stump in mud
+    DrawCylinder(poleBase, 0.22f, 0.24f, 0.85f, 8, woodPost);
+    DrawCube((Vector3){ poleBase.x - 0.08f, 10.80f, poleBase.z }, 0.08f, 0.35f, 0.08f, woodSplinter);
+    DrawCube((Vector3){ poleBase.x + 0.06f, 10.75f, poleBase.z - 0.05f }, 0.07f, 0.28f, 0.07f, woodSplinter);
+
+    // Tilted upper pole resting across car hood
+    rlPushMatrix();
+    rlTranslatef(poleBase.x, 10.75f, poleBase.z);
+    rlRotatef(22.0f, 0.0f, 0.0f, 1.0f);
+    rlRotatef(-14.0f, 1.0f, 0.0f, 0.0f);
+    DrawCylinder((Vector3){ 0.0f, 0.0f, 0.0f }, 0.20f, 0.17f, 6.5f, 8, woodPost);
+    DrawCube((Vector3){ 0.0f, 5.8f, 0.0f }, 1.8f, 0.12f, 0.12f, woodPost);
+    DrawCylinder((Vector3){ -0.7f, 6.0f, 0.0f }, 0.06f, 0.06f, 0.18f, 6, (Color){ 200, 210, 215, 255 });
+    DrawCylinder((Vector3){  0.7f, 6.0f, 0.0f }, 0.06f, 0.06f, 0.18f, 6, (Color){ 200, 210, 215, 255 });
+    rlPopMatrix();
+
+    // Snapped low-voltage wires dangling down into the weeds
+    DrawLine3D((Vector3){ poleBase.x + 1.2f, 15.5f, poleBase.z }, (Vector3){ poleBase.x + 0.6f, 12.0f, poleBase.z + 0.8f }, (Color){ 25, 25, 28, 220 });
+    DrawLine3D((Vector3){ poleBase.x + 0.6f, 12.0f, poleBase.z + 0.8f }, (Vector3){ poleBase.x - 0.2f, 10.1f, poleBase.z + 1.4f }, (Color){ 25, 25, 28, 220 });
+
+    // Dented "MILE 14" roadside marker post knocked askew into the mud
+    DrawCube((Vector3){ 142.2f, 10.08f, 134.8f }, 0.08f, 0.16f, 0.85f, (Color){ 90, 95, 100, 255 });
+    DrawCube((Vector3){ 142.2f, 10.15f, 134.8f }, 0.22f, 0.02f, 0.35f, (Color){ 215, 220, 210, 255 });
+
+    // Buckled steel guardrail segment bent around front bumper
+    DrawCube((Vector3){ 144.2f, 10.45f, 139.2f }, 1.8f, 0.32f, 0.08f, (Color){ 130, 135, 140, 255 });
+    DrawCubeWires((Vector3){ 144.2f, 10.45f, 139.2f }, 1.82f, 0.33f, 0.09f, (Color){ 70, 75, 80, 255 });
+
+    // Dark oil / coolant spill beneath crushed engine
+    DrawCircle3D((Vector3){ 144.6f, 9.97f, 138.2f }, 1.15f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 8, 10, 235 });
+    DrawCircle3D((Vector3){ 144.3f, 9.97f, 137.8f }, 0.65f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 15, 20, 25, 190 });
+
+    // Scattered safety glass shards glinting on ground
+    for (int g = 0; g < 14; g++) {
+        float gx = 144.0f + sinf((float)g * 1.8f) * 1.2f;
+        float gz = 137.5f + cosf((float)g * 2.3f) * 1.4f;
+        float shimmer = 0.6f + 0.4f * sinf(timeVal * 4.0f + (float)g);
+        DrawCube((Vector3){ gx, 9.98f, gz }, 0.04f, 0.015f, 0.04f, (Color){ 210, 235, 255, (unsigned char)(140 * shimmer) });
+    }
+
+    // 3. MAIN CAR BODY (Transformed with Yaw: -24 deg, Roll: -6 deg, Pitch: 3.5 deg)
+    rlPushMatrix();
+    rlTranslatef(carPos.x, carPos.y, carPos.z);
+    rlRotatef(-24.0f, 0.0f, 1.0f, 0.0f);
+    rlRotatef(-6.0f, 0.0f, 0.0f, 1.0f);
+    rlRotatef(3.5f, 1.0f, 0.0f, 0.0f);
+
+    Color carPaint      = CrashCarTint((Color){ 135, 140, 150, 255 }, extDayFactor, extNightFactor, 0.95f);
+    Color carPaintDark  = CrashCarTint((Color){ 110, 115, 125, 255 }, extDayFactor, extNightFactor, 0.85f);
+    Color crumpledMetal = CrashCarTint((Color){ 88, 92, 102, 255 }, extDayFactor, extNightFactor, 0.80f);
+
+    // Chassis drop shadow in local space
+    DrawCube((Vector3){ 0.0f, 0.02f, 0.0f }, 2.6f, 0.005f, 5.4f, (Color){ 6, 6, 8, 200 });
+
+    // Lower chassis body frame
+    DrawCube((Vector3){ 0.0f, 0.62f, -0.2f }, 2.30f, 0.65f, 4.6f, carPaint);
+    // Mud splatter along lower sills & undercarriage
+    DrawCube((Vector3){ 0.0f, 0.35f, -0.2f }, 2.34f, 0.22f, 4.62f, (Color){ 42, 34, 24, 230 });
+
+    // Crumpled front end / engine compartment (accordion crushed inwards)
+    DrawCube((Vector3){ -0.55f, 0.68f, 2.15f }, 1.10f, 0.58f, 0.85f, crumpledMetal);
+
+    // Right side crushed heavily against pole impact
+    rlPushMatrix();
+    rlTranslatef(0.50f, 0.65f, 2.05f);
+    rlRotatef(-16.0f, 0.0f, 1.0f, 0.0f);
+    rlRotatef(12.0f, 1.0f, 0.0f, 0.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 1.15f, 0.52f, 0.95f, (Color){ 75, 80, 88, 255 });
+    rlPopMatrix();
+
+    // Smashed radiator & engine block exposed inside
+    DrawCube((Vector3){ 0.0f, 0.70f, 2.10f }, 1.30f, 0.50f, 0.65f, (Color){ 28, 30, 32, 255 });
+    DrawCube((Vector3){ 0.15f, 0.72f, 2.25f }, 0.65f, 0.40f, 0.12f, (Color){ 55, 58, 62, 255 });
+    DrawCubeWires((Vector3){ 0.15f, 0.72f, 2.25f }, 0.66f, 0.41f, 0.13f, (Color){ 140, 60, 30, 255 });
+
+    // Front Bumper (accordion bent inwards at center)
+    DrawCube((Vector3){ -0.65f, 0.38f, 2.58f }, 1.15f, 0.18f, 0.18f, (Color){ 180, 185, 190, 255 });
+    rlPushMatrix();
+    rlTranslatef(0.55f, 0.38f, 2.50f);
+    rlRotatef(-28.0f, 0.0f, 1.0f, 0.0f);
+    rlRotatef(-10.0f, 0.0f, 0.0f, 1.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 1.15f, 0.18f, 0.18f, (Color){ 140, 145, 150, 255 });
+    rlPopMatrix();
+
+    // Popped V-buckled hood (two bent panels meeting in a tented crease)
+    rlPushMatrix();
+    rlTranslatef(0.0f, 0.96f, 1.45f);
+    rlRotatef(24.0f, 1.0f, 0.0f, 0.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 2.08f, 0.06f, 0.95f, carPaint);
+    rlPopMatrix();
+
+    rlPushMatrix();
+    rlTranslatef(0.08f, 1.12f, 2.08f);
+    rlRotatef(-32.0f, 1.0f, 0.0f, 0.0f);
+    rlRotatef(8.0f, 0.0f, 0.0f, 1.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 2.05f, 0.06f, 0.75f, carPaintDark);
+    rlPopMatrix();
+
+    // Trunk & Rear Bumper
+    DrawCube((Vector3){ 0.0f, 0.82f, -1.80f }, 2.15f, 0.20f, 1.35f, carPaint);
+    DrawCube((Vector3){ 0.0f, 0.38f, -2.65f }, 2.25f, 0.18f, 0.18f, (Color){ 200, 205, 210, 255 });
+
+    // Cabin Greenhouse & Roof
+    DrawCube((Vector3){ 0.0f, 1.48f, -0.30f }, 1.95f, 0.06f, 2.45f, carPaint);
+    DrawCube((Vector3){ -0.96f, 1.25f, -1.45f }, 0.08f, 0.55f, 0.08f, carPaint);
+    DrawCube((Vector3){  0.96f, 1.25f, -1.45f }, 0.08f, 0.55f, 0.08f, carPaint);
+    DrawCube((Vector3){ -0.96f, 1.25f,  0.95f }, 0.08f, 0.55f, 0.08f, carPaint);
+    DrawCube((Vector3){  0.96f, 1.25f,  0.95f }, 0.08f, 0.55f, 0.08f, carPaint);
+
+    // Dark interior cavity & seats
+    DrawCube((Vector3){ 0.0f, 1.15f, -0.30f }, 1.88f, 0.58f, 2.40f, (Color){ 16, 18, 22, 255 });
+    DrawCube((Vector3){ -0.48f, 1.02f, -0.45f }, 0.55f, 0.45f, 0.55f, (Color){ 35, 38, 42, 255 });
+    DrawCube((Vector3){  0.48f, 1.02f, -0.45f }, 0.55f, 0.45f, 0.55f, (Color){ 35, 38, 42, 255 });
+
+    // Deflated white airbag draped over driver steering wheel
+    DrawSphere((Vector3){ -0.48f, 1.18f, 0.22f }, 0.22f, (Color){ 220, 220, 215, 240 });
+    DrawCube((Vector3){ -0.48f, 1.10f, 0.24f }, 0.32f, 0.12f, 0.25f, (Color){ 195, 195, 190, 255 });
+
+    // Driver's door sprung ajar ~20 degrees
+    rlPushMatrix();
+    rlTranslatef(-1.12f, 0.72f, 0.75f);
+    rlRotatef(-20.0f, 0.0f, 1.0f, 0.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, -0.65f }, 0.08f, 0.72f, 1.25f, carPaint);
+    DrawCube((Vector3){ 0.04f, 0.0f, -0.65f }, 0.03f, 0.65f, 1.15f, (Color){ 32, 34, 38, 255 });
+    rlPopMatrix();
+
+    // Passenger door (dented shut)
+    DrawCube((Vector3){ 1.14f, 0.72f, 0.10f }, 0.06f, 0.72f, 1.30f, carPaint);
+
+    // Spiderweb Cracked Windshield
+    rlPushMatrix();
+    rlTranslatef(0.0f, 1.26f, 0.72f);
+    rlRotatef(-34.0f, 1.0f, 0.0f, 0.0f);
+    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 1.90f, 0.02f, 1.15f, (Color){ 190, 215, 235, 110 });
+    DrawLine3D((Vector3){ -0.45f, 0.02f, 0.10f }, (Vector3){ -0.15f, 0.02f, 0.45f }, (Color){ 255, 255, 255, 200 });
+    DrawLine3D((Vector3){ -0.45f, 0.02f, 0.10f }, (Vector3){ -0.75f, 0.02f, 0.35f }, (Color){ 255, 255, 255, 200 });
+    DrawLine3D((Vector3){ -0.45f, 0.02f, 0.10f }, (Vector3){ -0.55f, 0.02f, -0.35f }, (Color){ 255, 255, 255, 200 });
+    DrawLine3D((Vector3){ -0.45f, 0.02f, 0.10f }, (Vector3){  0.25f, 0.02f, -0.15f }, (Color){ 255, 255, 255, 180 });
+    DrawCircle3D((Vector3){ -0.45f, 0.025f, 0.10f }, 0.28f, (Vector3){ 0, 1, 0 }, 0.0f, (Color){ 240, 250, 255, 130 });
+    rlPopMatrix();
+
+    // 4 WHEELS (With damage & mud)
+    DrawCylinder((Vector3){ -1.15f, 0.35f, -1.60f }, 0.35f, 0.35f, 0.22f, 10, (Color){ 20, 20, 22, 255 });
+    DrawCylinder((Vector3){  1.15f, 0.30f, -1.60f }, 0.35f, 0.35f, 0.22f, 10, (Color){ 18, 18, 20, 255 });
+
+    // Front Left Wheel (tilted outward)
+    rlPushMatrix();
+    rlTranslatef(-1.18f, 0.35f, 1.60f);
+    rlRotatef(-14.0f, 0.0f, 1.0f, 0.0f);
+    DrawCylinder((Vector3){ 0.0f, 0.0f, 0.0f }, 0.35f, 0.35f, 0.22f, 10, (Color){ 22, 22, 24, 255 });
+    rlPopMatrix();
+
+    // Front Right Wheel (heavily bent camber, popped tire, jammed in mud)
+    rlPushMatrix();
+    rlTranslatef(1.12f, 0.22f, 1.55f);
+    rlRotatef(28.0f, 0.0f, 0.0f, 1.0f);
+    rlRotatef(18.0f, 0.0f, 1.0f, 0.0f);
+    DrawCylinder((Vector3){ 0.0f, 0.0f, 0.0f }, 0.32f, 0.28f, 0.25f, 10, (Color){ 28, 24, 20, 255 });
+    rlPopMatrix();
+
+    // Smashed Right Headlight (empty crushed dark socket with dangling copper wires)
+    DrawCube((Vector3){ 0.85f, 0.68f, 2.50f }, 0.28f, 0.16f, 0.12f, (Color){ 18, 18, 20, 255 });
+    DrawLine3D((Vector3){ 0.80f, 0.65f, 2.55f }, (Vector3){ 0.88f, 0.52f, 2.62f }, (Color){ 180, 100, 40, 255 });
+    DrawLine3D((Vector3){ 0.86f, 0.65f, 2.55f }, (Vector3){ 0.82f, 0.48f, 2.60f }, (Color){ 60, 120, 210, 255 });
+
+    // Left Headlight (cracked lens, flickering weakly)
+    bool lightFlicker = (fmodf(timeVal * 7.5f, 1.0f) > 0.25f);
+    Color headlitCol = lightFlicker ? (Color){ 255, 240, 180, 210 } : (Color){ 65, 60, 45, 255 };
+    DrawCube((Vector3){ -0.85f, 0.68f, 2.55f }, 0.26f, 0.15f, 0.08f, headlitCol);
+
+    // Hazard Flashers (Only rear left still pulses amber, front smashed)
+    bool hazFlash = (fmodf(timeVal, 1.1f) < 0.55f);
+    Color hazAmber = hazFlash ? (Color){ 255, 135, 15, 255 } : (Color){ 45, 20, 5, 255 };
+    DrawCube((Vector3){ -0.95f, 0.70f, -2.62f }, 0.24f, 0.12f, 0.08f, hazAmber);
+    DrawCube((Vector3){  0.95f, 0.70f, -2.62f }, 0.24f, 0.12f, 0.08f, (Color){ 30, 15, 10, 255 });
+
+    rlPopMatrix(); // End car local transform
+
+    // 4. Steam / Smoke Motes rising from the punctured radiator (world space)
+    Vector3 radPos = { carPos.x + 0.35f, carPos.y + 1.15f, carPos.z + 1.8f };
+    for (int sm = 0; sm < 5; sm++) {
+        float sSeed = (float)sm * 1.85f;
+        float sAge = fmodf(timeVal * 0.85f + sSeed, 2.2f);
+        float sAlpha = (1.0f - (sAge / 2.2f));
+        float sx = radPos.x + sinf(timeVal * 1.2f + sSeed) * 0.18f;
+        float sy = radPos.y + sAge * 0.75f;
+        float sz = radPos.z + cosf(timeVal * 1.0f + sSeed) * 0.18f;
+        float sSize = 0.06f + sAge * 0.08f;
+        DrawCube((Vector3){ sx, sy, sz }, sSize, sSize, sSize, (Color){ 230, 235, 240, (unsigned char)(sAlpha * 95.0f) });
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 2: IN-WORLD 3D FUEL PUMP CRT & CATENARY HOSE RENDERING SYSTEM
+// -----------------------------------------------------------------------------
+
+static void UpdatePumpCrtTexture(int pumpNum, float gallons, float salePrice, bool isFlowing, float flk) {
+    if (!g_pumpScreenRTLoaded) return;
+
+    static int lastPumpNum = -1;
+    static float lastGallons = -1.0f;
+    static bool lastIsFlowing = false;
+    static float lastFlk = -1.0f;
+    static double lastFlowTime = 0.0;
+
+    // Only update if state changes, or if flowing (for the bargraph animation) at 15 FPS
+    bool needsUpdate = (pumpNum != lastPumpNum || gallons != lastGallons || isFlowing != lastIsFlowing || flk != lastFlk);
+    if (isFlowing && (GetTime() - lastFlowTime > 0.06)) needsUpdate = true;
+
+    if (!needsUpdate) return;
+
+    lastPumpNum = pumpNum;
+    lastGallons = gallons;
+    lastIsFlowing = isFlowing;
+    lastFlk = flk;
+    if (isFlowing) lastFlowTime = GetTime();
+
+    BeginTextureMode(g_pumpScreenRT);
+    ClearBackground((Color){ 4, 18, 8, 255 }); // Dark retro emerald phosphorescent glass
+
+    // Horizontal phosphor scanline raster grid
+    for (int y = 0; y < 240; y += 4) {
+        DrawRectangle(0, y, 320, 2, (Color){ 2, 10, 4, 115 });
+    }
+
+    // Header Bar with border
+    DrawRectangle(10, 8, 300, 26, (Color){ 8, 36, 16, 235 });
+    DrawRectangleLines(10, 8, 300, 26, (Color){ 35, 175, 75, 255 });
+    DrawTextSharp(g_fontSmall, TextFormat("ROUTE 9 COOP // DISPENSER 0%d", pumpNum), 18, 14, 12.5f, (Color){ 140, 255, 170, 255 }, 1.2f);
+
+    // Fuel Grade & Octane Badge
+    DrawRectangle(10, 38, 140, 20, (Color){ 6, 26, 12, 225 });
+    DrawRectangleLines(10, 38, 140, 20, (Color){ 25, 120, 50, 255 });
+    DrawTextSharp(g_fontSmall, "OCTANE 87 REGULAR", 16, 42, 10.0f, (Color){ 100, 220, 130, 240 }, 1.1f);
+
+    // Status Indicator Badge
+    Color statusBg = isFlowing ? (Color){ 12, 65, 24, 255 } : (Color){ 45, 38, 12, 255 };
+    Color statusFg = isFlowing ? (Color){ 80, 255, 120, 255 } : (Color){ 245, 200, 60, 255 };
+    DrawRectangle(210, 38, 100, 20, statusBg);
+    DrawRectangleLines(210, 38, 100, 20, statusFg);
+    DrawTextSharp(g_fontSmall, isFlowing ? ">> FLOWING <<" : "[ STANDBY ]", 216, 42, 10.0f, statusFg, 1.1f);
+
+    // Large Phosphor Digital Meter Displays
+    // Box 1: THIS SALE ($)
+    DrawRectangle(10, 64, 300, 44, (Color){ 6, 24, 12, 240 });
+    DrawRectangleLines(10, 64, 300, 44, (Color){ 30, 150, 65, 255 });
+    DrawTextSharp(g_fontSmall, "THIS SALE", 18, 70, 9.5f, (Color){ 90, 190, 115, 220 }, 1.1f);
+    DrawTextSharp(g_fontTitle, TextFormat("$ %.2f", salePrice), 18, 83, 21.0f, (Color){ 50, (unsigned char)(245 * flk), 90, 255 }, 1.4f);
+
+    // Box 2: GALLONS
+    DrawRectangle(10, 114, 300, 44, (Color){ 6, 24, 12, 240 });
+    DrawRectangleLines(10, 114, 300, 44, (Color){ 30, 150, 65, 255 });
+    DrawTextSharp(g_fontSmall, "GALLONS", 18, 120, 9.5f, (Color){ 90, 190, 115, 220 }, 1.1f);
+    DrawTextSharp(g_fontTitle, TextFormat("%.2f GAL", gallons), 18, 133, 21.0f, (Color){ 50, (unsigned char)(245 * flk), 90, 255 }, 1.4f);
+
+    // Telemetry Footer
+    DrawTextSharp(g_fontSmall, TextFormat("UNIT PRICE: $%.3f/GAL", g_fuelPricePerGallon), 14, 166, 11.0f, (Color){ 100, 210, 130, 230 }, 1.1f);
+    DrawTextSharp(g_fontSmall, TextFormat("UNDERGROUND TANK: %.1f GAL", g_stationFuelGallons), 14, 182, 11.0f, (Color){ 85, 175, 110, 200 }, 1.1f);
+
+    // Dynamic 16-Segment Flow Bargraph
+    int barSegments = 16;
+    int litSegments = isFlowing ? ((int)(GetTime() * 14.0f) % (barSegments + 1)) : 0;
+    for (int b = 0; b < barSegments; b++) {
+        Color bCol = (b < litSegments) ? (Color){ 65, 255, 110, 255 } : (Color){ 16, 52, 26, 210 };
+        DrawRectangle(14 + b * 18, 206, 14, 14, bCol);
+    }
+
+    // CRT Edge Vignette & Corner Glass Glint
+    DrawRectangleLinesEx((Rectangle){ 0, 0, 320, 240 }, 4.0f, (Color){ 2, 8, 3, 255 });
+    DrawLine(10, 10, 65, 10, (Color){ 180, 255, 200, 75 });
+
+    EndTextureMode();
+}
+
+static void DrawPumpCrtScreen3D(Vector3 center, float width, float height, Texture2D tex, bool faceWest, Color tint = WHITE) {
+    float hw = width * 0.5f;
+    float hh = height * 0.5f;
+
+    rlDisableBackfaceCulling();
+    rlSetTexture(tex.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(tint.r, tint.g, tint.b, tint.a);
+
+    if (faceWest) {
+        // Quad facing -X (towards Left Lane)
+        rlNormal3f(-1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z + hw); // Bottom-left
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z - hw); // Bottom-right
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z - hw); // Top-right
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z + hw); // Top-left
+    } else {
+        // Quad facing +X (towards Right Lane)
+        rlNormal3f(1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z - hw); // Bottom-left
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(center.x, center.y - hh, center.z + hw); // Bottom-right
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z + hw); // Top-right
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(center.x, center.y + hh, center.z - hw); // Top-left
+    }
+
+    rlEnd();
+    rlSetTexture(0);
+    rlEnableBackfaceCulling();
+}
+
+static void DrawCatenaryHose(Vector3 start, Vector3 end, float maxSag, int segments, float radius, Color col) {
+    float dist = Vector3Distance(start, end);
+    float slack = 4.8f - dist;
+    if (slack < 0.1f) slack = 0.1f;
+    float sagDepth = Clamp(slack * 0.38f, 0.14f, maxSag);
+
+    Vector3 prevPt = start;
+    for (int i = 1; i <= segments; i++) {
+        float t = (float)i / (float)segments;
+        float hx = Lerp(start.x, end.x, t);
+        float hz = Lerp(start.z, end.z, t);
+        float sag = sagDepth * 4.0f * t * (1.0f - t);
+        float hy = Lerp(start.y, end.y, t) - sag;
+        if (hy < 10.035f) hy = 10.035f; // Rests on asphalt
+
+        Vector3 curPt = { hx, hy, hz };
+        DrawCylinderEx(prevPt, curPt, radius, radius, 6, col);
+        prevPt = curPt;
+    }
+
+    // Brass threaded coupling collars at both ends
+    Color brassCol = { 185, 150, 60, 255 };
+    DrawSphere(start, radius * 1.35f, brassCol);
+    DrawSphere(end, radius * 1.35f, brassCol);
+}
+
+static void DrawFirstPersonFuelNozzle(Camera3D cam, bool isFlowing, float walkTime, float timeVal) {
+    Vector3 fwd = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
+    Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, cam.up));
+    Vector3 camUp = Vector3Normalize(Vector3CrossProduct(camRight, fwd));
+
+    float stepBobY = (walkTime > 0.0f) ? sinf(walkTime * 2.0f) * 0.008f : 0.0f;
+    float breathe  = sinf(timeVal * 1.8f) * 0.004f;
+
+    // Anchor in lower right view
+    Vector3 handPos = Vector3Add(cam.position,
+        Vector3Add(Vector3Scale(camRight, 0.22f),
+                   Vector3Add(Vector3Scale(camUp, -0.20f + stepBobY + breathe),
+                              Vector3Scale(fwd, 0.40f))));
+
+    Color metalBody  = { 85, 90, 96, 255 };
+    Color rubberGrip = { 20, 20, 22, 255 };
+    Color chromePipe = { 150, 155, 165, 255 };
+    Color brassNut   = { 185, 150, 60, 255 };
+
+    // Handle (angled down/back)
+    Vector3 handleTop = handPos;
+    Vector3 handleBot = Vector3Add(handPos, Vector3Add(Vector3Scale(camUp, -0.12f), Vector3Scale(fwd, -0.06f)));
+    DrawCylinderEx(handleTop, handleBot, 0.024f, 0.022f, 8, rubberGrip);
+
+    // Swivel hose coupling at base
+    Vector3 hoseCoupling = Vector3Add(handleBot, Vector3Scale(camUp, -0.025f));
+    DrawCylinderEx(handleBot, hoseCoupling, 0.026f, 0.026f, 8, brassNut);
+
+    // Valve body (above handle)
+    Vector3 valveBody = Vector3Add(handPos, Vector3Scale(fwd, 0.05f));
+    DrawCube(valveBody, 0.045f, 0.055f, 0.075f, metalBody);
+
+    // Trigger guard loop
+    Vector3 guardMid = Vector3Add(handPos, Vector3Add(Vector3Scale(fwd, 0.04f), Vector3Scale(camUp, -0.06f)));
+    DrawCubeWires(guardMid, 0.025f, 0.065f, 0.055f, metalBody);
+
+    // Steel trigger lever (squeezed when isFlowing)
+    float trigOffset = isFlowing ? 0.015f : 0.035f;
+    Vector3 trigPos = Vector3Add(handPos, Vector3Add(Vector3Scale(fwd, trigOffset), Vector3Scale(camUp, -0.05f)));
+    DrawCube(trigPos, 0.014f, 0.045f, 0.014f, isFlowing ? (Color){ 220, 220, 220, 255 } : (Color){ 160, 165, 170, 255 });
+
+    // Angled fuel spout protruding forward & curving slightly down
+    Vector3 spoutStart = Vector3Add(valveBody, Vector3Scale(fwd, 0.04f));
+    Vector3 spoutMid   = Vector3Add(spoutStart, Vector3Add(Vector3Scale(fwd, 0.12f), Vector3Scale(camUp, 0.02f)));
+    Vector3 spoutTip   = Vector3Add(spoutMid, Vector3Add(Vector3Scale(fwd, 0.14f), Vector3Scale(camUp, -0.04f)));
+    DrawCylinderEx(spoutStart, spoutMid, 0.016f, 0.015f, 8, chromePipe);
+    DrawCylinderEx(spoutMid, spoutTip, 0.015f, 0.013f, 8, chromePipe);
+
+    // Fuel vapor shimmer particles when pumping
+    if (isFlowing) {
+        for (int v = 0; v < 3; v++) {
+            float vAge = fmodf(timeVal * 4.0f + (float)v * 1.3f, 0.6f);
+            Vector3 vPos = Vector3Add(spoutTip, Vector3Add(Vector3Scale(fwd, vAge * 0.15f), Vector3Scale(camUp, -vAge * 0.08f)));
+            DrawSphere(vPos, 0.008f + vAge * 0.012f, (Color){ 200, 235, 210, (unsigned char)(110 * (1.0f - vAge / 0.6f)) });
+        }
+    }
+}
+
+#include "ocean_system.h"
+#include "shop_atmosphere.h"
 
 int main() {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
 
     InitWindow(LOGICAL_W, LOGICAL_H, "WHAT THE GROUND KEEPS - 3D ASCII ENGINE");
-
-    // Set runtime window icon from WhatTheGroundKeeps_LogoDesign.jpg
-    if (FileExists("assets/images/WhatTheGroundKeeps_LogoDesign.jpg")) {
-        Image winIcon = LoadImage("assets/images/WhatTheGroundKeeps_LogoDesign.jpg");
-        if (winIcon.data != NULL) {
-            SetWindowIcon(winIcon);
-            UnloadImage(winIcon);
-        }
-    }
 
     int startMon = GetCurrentMonitor();
 
@@ -8410,25 +14902,16 @@ int main() {
 
 
     // Load Distinct Strong Heading & High-Legibility Menu Fonts from assets/
-    auto resolveFont = [](const char* name) -> const char* {
-        static char paths[5][256];
-        static int pathIdx = 0;
-        char* buf = paths[pathIdx++ % 5];
-        snprintf(buf, 256, "assets/fonts/%s", name);
-        if (FileExists(buf)) return buf;
-        snprintf(buf, 256, "assets/%s", name);
-        return buf;
-    };
 
-    g_fontTitle   = LoadFontEx(resolveFont("alagard.ttf"), 52, NULL, 0);
+    g_fontTitle   = LoadFontEx("assets/alagard.ttf", 52, NULL, 0);
 
-    g_fontHeadSub = LoadFontEx(resolveFont("alagard.ttf"), 30, NULL, 0);
+    g_fontHeadSub = LoadFontEx("assets/alagard.ttf", 30, NULL, 0);
 
-    g_fontMenu    = LoadFontEx(resolveFont("IBMPlexMono-Bold.ttf"), 28, NULL, 0);
+    g_fontMenu    = LoadFontEx("assets/IBMPlexMono-Bold.ttf", 28, NULL, 0);
 
-    g_fontBody    = LoadFontEx(resolveFont("IBMPlexMono-Medium.ttf"), 20, NULL, 0);
+    g_fontBody    = LoadFontEx("assets/IBMPlexMono-Medium.ttf", 20, NULL, 0);
 
-    g_fontSmall   = LoadFontEx(resolveFont("IBMPlexMono-Regular.ttf"), 16, NULL, 0);
+    g_fontSmall   = LoadFontEx("assets/IBMPlexMono-Regular.ttf", 16, NULL, 0);
 
 
 
@@ -9008,11 +15491,11 @@ int main() {
 
     drawLoadingBar(0.48f, "GROWING DENSE SWAMP SPRUCE FORESTS...");
 
-    // Generate trees across the larger map (Dense Swamp Spruce Forests across West & East zones)
+    // Generate trees across the larger map
 
-    for(int x = 8; x < CHUNK_W - 8; x += GetRandomValue(14, 22)) {
+    for(int x = 5; x < CHUNK_W - 5; x += GetRandomValue(10, 25)) {
 
-        for(int z = 8; z < CHUNK_D - 8; z += GetRandomValue(14, 22)) {
+        int z = GetRandomValue(5, CHUNK_D - 5);
 
         
 
@@ -9132,8 +15615,6 @@ int main() {
 
         }
 
-        }
-
     }
 
     
@@ -9150,13 +15631,17 @@ int main() {
 
         for(int z = 0; z < CHUNK_D; z++) {
 
+            // Keep the exact center clearing relatively clear
+
             float dx = (float)x - (CHUNK_W / 2.0f);
 
-            if (fabs(dx) < 13.5f) continue; // Keep grass off dual-lane asphalt road
+            float dz = (float)z - (CHUNK_D / 2.0f);
 
-            if (x >= 75 && x <= 116 && z >= 118 && z <= 162) continue; // Keep grass off shop building & interior
+            if (sqrtf(dx*dx + dz*dz) < 18.0f) continue;
 
-            if (x >= 126 && x <= 130 && z >= 134 && z <= 146) continue; // Keep grass off gas station island curb
+            if (fabs(dx) < 14.0f) continue; // Keep grass off dual-lane road
+
+            if (x >= 75 && x <= 127 && z >= 118 && z <= 162) continue; // Keep grass off gas station and shop lot
 
             if (x >= 148 && x <= 195 && z >= 118 && z <= 168) continue; // Keep grass off abandoned college lot
 
@@ -11238,7 +17723,7 @@ auto RunIntroCinematic = [&]() {
 
             visibleBuckets.clear();
 
-            float cullDistSq = 145.0f * 145.0f; // 145 block render distance (renders full distant rolling ASCII mountains)
+            float cullDistSq = 65.0f * 65.0f; // 65 block render distance
 
             
 
@@ -14773,19 +21258,19 @@ auto RunIntroCinematic = [&]() {
 
                 if (vz == 126 && vx >= 86 && vx <= 108) return true;
 
-                // North Wall (Z = 154, X: 86..108) with doorway into Haunted Washroom (Generous threshold X: 87..91)
+                // North Wall (Z = 154, X: 86..108) with doorway into Haunted Washroom at X: 88..90
                 if (vz == 154 && vx >= 86 && vx <= 108) {
-                    bool inWashroomDoor = (vx >= 87 && vx <= 91 && vy <= 14);
+                    bool inWashroomDoor = (vx >= 88 && vx <= 90 && vy <= 13);
                     if (!inWashroomDoor) return true;
                 }
 
                 // Haunted Washroom Solid Exterior Walls (X in [85..93], Z in [154..161])
-                if (vz >= 154 && vz <= 161 && (vx <= 85 || vx >= 92)) return true; // West & East washroom walls
-                if (vz >= 161 && vx >= 85 && vx <= 92) return true; // North washroom back wall
+                if (vz >= 154 && vz <= 161 && (vx <= 86 || vx >= 92)) return true; // West & East washroom walls
+                if (vz >= 161 && vx >= 86 && vx <= 92) return true; // North washroom back wall
 
-                // Washroom Fixtures (Porcelain Toilet & Wall Sink - compact to allow free movement)
-                if (vx >= 86 && vx <= 87 && vz >= 159 && vz <= 160 && vy <= 12) return true; // Toilet
-                if (vx >= 89 && vx <= 90 && vz >= 160 && vz <= 161 && vy <= 12) return true; // Sink
+                // Washroom Fixtures (Porcelain Toilet & Wall Sink)
+                if (vx >= 86 && vx <= 88 && vz >= 158 && vz <= 160 && vy <= 12) return true; // Toilet
+                if (vx >= 88 && vx <= 90 && vz >= 160 && vz <= 161 && vy <= 12) return true; // Sink
 
                 // East Facade Wall (X = 108, Z: 126..154, with doorway at Z: 139..141, Y: 11..13)
 
@@ -15062,7 +21547,59 @@ auto RunIntroCinematic = [&]() {
         // -------------------------------------------------------------
         // DYNAMIC DISSOLVING FOOTPRINT STAMPING & HORROR ATMOSPHERE
         // -------------------------------------------------------------
-        UpdateFootprints(camera.position, viewDir, onGround, hitStopTimer, dt);
+        if (onGround && hitStopTimer <= 0.0f) {
+            Vector2 curXZ = { camera.position.x, camera.position.z };
+            Vector2 lastXZ = { g_lastFootprintPos.x, g_lastFootprintPos.z };
+            float distMoved = Vector2Distance(curXZ, lastXZ);
+            if (distMoved >= 0.65f) {
+                g_lastFootprintPos = camera.position;
+                Vector3 fwdH = Vector3Normalize((Vector3){ viewDir.x, 0.0f, viewDir.z });
+                if (Vector3Length(fwdH) < 0.05f) fwdH = (Vector3){ 0.0f, 0.0f, 1.0f };
+                Vector3 rightH = { -fwdH.z, 0.0f, fwdH.x };
+                
+                float sideSign = g_nextFootLeft ? -1.0f : 1.0f;
+                g_nextFootLeft = !g_nextFootLeft;
+                float sideDist = 0.13f;
+                
+                float fYaw = atan2f(fwdH.x, fwdH.z) * RAD2DEG;
+                float floorY = camera.position.y - PLAYER_EYE_HEIGHT;
+                if (floorY < 10.015f && camera.position.y >= 10.0f) floorY = 10.0f;
+                
+                // Detect if stepping in or near blood pools:
+                // Abandoned College blood pools:
+                bool inCollegeBlood = (camera.position.x >= 153.0f && camera.position.x <= 186.0f && camera.position.z >= 125.0f && camera.position.z <= 159.0f) &&
+                    ((camera.position.z >= 139.3f && camera.position.z <= 141.7f && camera.position.x >= 158.0f && camera.position.x <= 178.0f) || // corridor drag
+                     (camera.position.x >= 160.0f && camera.position.x <= 170.0f && camera.position.z >= 126.0f && camera.position.z <= 136.0f) || // lecture hall pool
+                     (camera.position.x >= 161.0f && camera.position.x <= 167.0f && camera.position.z >= 148.0f && camera.position.z <= 154.0f));  // anatomy dissection pool
+                // Supermarket meat locker blood pool:
+                bool inShopBlood = (camera.position.x >= 87.0f && camera.position.x <= 95.0f && camera.position.z >= 146.0f && camera.position.z <= 153.0f);
+                
+                if (inCollegeBlood || inShopBlood) {
+                    g_playerBloodStainTimer = 16.0f; // Stains boots for several subsequent strides!
+                }
+                
+                bool isBloody = (g_playerBloodStainTimer > 0.0f);
+                
+                FootprintDecal& fp = g_footprints[g_footprintHead];
+                fp.pos = (Vector3){ camera.position.x + rightH.x * sideDist * sideSign, floorY + 0.018f, camera.position.z + rightH.z * sideDist * sideSign };
+                fp.yaw = fYaw;
+                fp.life = 8.0f; // Dissolves smoothly over 8 seconds!
+                fp.maxLife = 8.0f;
+                fp.isLeft = !g_nextFootLeft;
+                fp.isBloody = isBloody;
+                
+                g_footprintHead = (g_footprintHead + 1) % MAX_FOOTPRINTS;
+            }
+        }
+        
+        // Dissolve active footprints over time
+        for (int i = 0; i < MAX_FOOTPRINTS; i++) {
+            if (g_footprints[i].life > 0.0f) {
+                g_footprints[i].life -= dt;
+                if (g_footprints[i].life < 0.0f) g_footprints[i].life = 0.0f;
+            }
+        }
+        if (g_playerBloodStainTimer > 0.0f) g_playerBloodStainTimer -= dt;
         
         // Abandoned College Creepy Fluorescent Lighting Flicker & Audio Ambience
         g_collegeFlickerTimer -= dt;
@@ -17428,9 +23965,6 @@ auto RunIntroCinematic = [&]() {
             UpdatePumpCrtTexture(curPumpNum, dispGal, dispSale, isPumping, crtFlk);
         }
 
-        // Update Haunted Washroom Real Planar Reflection Mirror Pre-pass (BEFORE BeginTextureMode(target) to prevent FBO conflict!)
-        UpdateShopWashroomMirror(camera, ApplyShopLighting, g_shopLightsOn, timeVal);
-
         BeginTextureMode(target);
 
         
@@ -17457,6 +23991,9 @@ auto RunIntroCinematic = [&]() {
 
             255
         };
+
+        // Update Haunted Washroom Real Planar Reflection Mirror Pre-pass
+        UpdateShopWashroomMirror(camera, ApplyShopLighting, g_shopLightsOn, timeVal);
 
         ClearBackground(baseSkyClear); 
 
@@ -17890,7 +24427,32 @@ auto RunIntroCinematic = [&]() {
                 DrawCylinder((Vector3){ bellPos.x, 11.38f, bellPos.z }, 0.08f, 0.08f, 0.02f, 12, (Color){ 45, 42, 38, 255 });
 
                 // 7. 3D CUSTOMER CAR ON ROUTE 9
-                DrawCustomerCar(g_customerCar, g_nozzleInCar);
+                if (g_customerCar.state != CAR_INACTIVE) {
+                    Vector3 cPos = g_customerCar.pos;
+                    DrawCube((Vector3){ cPos.x, cPos.y + 0.50f, cPos.z }, 1.95f, 0.70f, 4.2f, g_customerCar.bodyColor);
+                    DrawCubeWires((Vector3){ cPos.x, cPos.y + 0.50f, cPos.z }, 1.96f, 0.71f, 4.21f, (Color){ 25, 22, 20, 255 });
+                    DrawCube((Vector3){ cPos.x, cPos.y + 1.05f, cPos.z - 0.25f }, 1.70f, 0.58f, 2.3f, (Color){ 22, 24, 28, 255 });
+                    DrawCube((Vector3){ cPos.x, cPos.y + 1.02f, cPos.z + 0.92f }, 1.62f, 0.48f, 0.06f, (Color){ 65, 80, 95, 220 });
+                    DrawCube((Vector3){ cPos.x, cPos.y + 0.40f, cPos.z + 2.12f }, 1.85f, 0.28f, 0.12f, (Color){ 160, 162, 168, 255 });
+                    DrawCube((Vector3){ cPos.x - 0.65f, cPos.y + 0.48f, cPos.z + 2.14f }, 0.24f, 0.16f, 0.04f, (Color){ 255, 245, 170, 255 });
+                    DrawCube((Vector3){ cPos.x + 0.65f, cPos.y + 0.48f, cPos.z + 2.14f }, 0.24f, 0.16f, 0.04f, (Color){ 255, 245, 170, 255 });
+                    DrawCube((Vector3){ cPos.x - 0.70f, cPos.y + 0.52f, cPos.z - 2.12f }, 0.22f, 0.14f, 0.04f, (Color){ 225, 30, 25, 255 });
+                    DrawCube((Vector3){ cPos.x + 0.70f, cPos.y + 0.52f, cPos.z - 2.12f }, 0.22f, 0.14f, 0.04f, (Color){ 225, 30, 25, 255 });
+
+                    Vector3 flapPos = { cPos.x + 0.98f, cPos.y + 0.65f, cPos.z - 0.85f };
+                    DrawCube(flapPos, 0.03f, 0.18f, 0.18f, (Color){ 18, 18, 18, 255 });
+
+                    if (g_nozzleInCar) {
+                        float pz = (g_customerCar.targetPump == 0) ? 137.5f : 142.5f;
+                        Vector3 pumpOutlet = { 127.42f, 11.2f, pz - 0.25f };
+                        // Seated cast-aluminum nozzle body in fuel neck
+                        DrawCube(flapPos, 0.09f, 0.09f, 0.15f, (Color){ 65, 70, 76, 255 });
+                        Vector3 nozzleCoupling = { flapPos.x + 0.08f, flapPos.y - 0.05f, flapPos.z };
+                        DrawCylinderEx(flapPos, nozzleCoupling, 0.024f, 0.022f, 8, (Color){ 140, 145, 155, 255 });
+                        // Realistic catenary heavy rubber hose draped smoothly to vehicle
+                        DrawCatenaryHose(pumpOutlet, nozzleCoupling, 0.85f, 16, 0.028f, (Color){ 16, 16, 18, 255 });
+                    }
+                }
 
                 // 8. NOZZLE HELD IN PLAYER HANDS
                 if (g_holdingFuelNozzle && !g_nozzleInCar && g_activePumpIndex != -1) {
@@ -20476,7 +27038,7 @@ auto RunIntroCinematic = [&]() {
 
                 float ledGlow = 0.6f + 0.4f * sinf(timeVal * 3.0f);
 
-                DrawPrinter(printerPos, ledGlow, timeVal, [](Vector3 p, Color c) { return ApplyShopLighting(p, c); });
+                DrawPrinter(printerPos, ledGlow, timeVal);
 
 
 
@@ -21417,9 +27979,9 @@ auto RunIntroCinematic = [&]() {
 
         if (g_flashlightActive && g_gameState == STATE_GAMEPLAY && !isRoofCamActive) {
 
-            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 340.0f, (Color){ 255, 245, 210, 22 }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient((Vector2){ (float)(LOGICAL_W / 2), (float)(LOGICAL_H / 2 + 25) }, 340.0f, (Color){ 255, 245, 210, 22 }, (Color){ 0, 0, 0, 0 });
 
-            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 170.0f, (Color){ 255, 250, 230, 18 }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient((Vector2){ (float)(LOGICAL_W / 2), (float)(LOGICAL_H / 2 + 25) }, 170.0f, (Color){ 255, 250, 230, 18 }, (Color){ 0, 0, 0, 0 });
 
         }
 
@@ -22823,9 +29385,9 @@ auto RunIntroCinematic = [&]() {
             }
 
             // Volumetric Flashlight Radial Beam (multi-tier luminous cone)
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 480.0f, (Color){ 210, 195, 160, (unsigned char)(22 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 250.0f, (Color){ 235, 215, 180, (unsigned char)(40 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 95.0f,  (Color){ 255, 245, 220, (unsigned char)(72 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient(g_menuLightPos, 480.0f, (Color){ 210, 195, 160, (unsigned char)(22 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient(g_menuLightPos, 250.0f, (Color){ 235, 215, 180, (unsigned char)(40 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient(g_menuLightPos, 95.0f,  (Color){ 255, 245, 220, (unsigned char)(72 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
 
             // Floating dust motes catching the flashlight beam
             for (int d = 0; d < 22; d++) {
@@ -24600,6 +31162,5 @@ auto RunIntroCinematic = [&]() {
     CloseWindow();
 
     return 0;
-    exit(0);
 
 }

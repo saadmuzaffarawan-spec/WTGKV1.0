@@ -41,3 +41,12 @@ void DrawFirstPersonFuelNozzle(Camera3D cam, bool isFlowing, float walkTime, flo
 // Renders the 3D customer car parked or driving on Route 9, including fuel flap and connected nozzle hose
 void DrawCustomerCar(const CustomerCar& car, bool nozzleInCar);
 
+// Updates the in-world 3D Fuel Pump CRT screen render texture with retro phosphorescent raster scanlines,
+// octane grade badge, digital meter price/gallon readouts, and dynamic flow bargraph
+void UpdatePumpCrtTextureEx(RenderTexture2D rt, bool rtLoaded, Font fontSmall, Font fontTitle, int pumpNum,
+                            float gallons, float salePrice, bool isFlowing, float fuelPricePerGallon,
+                            float stationFuelGallons, float flk);
+
+// Draws the textured 3D quad for the CRT display screen on the fuel dispenser face
+void DrawPumpCrtScreen3D(Vector3 center, float width, float height, Texture2D tex, bool faceWest, Color tint = WHITE);
+
