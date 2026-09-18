@@ -23,10 +23,11 @@
 #include "core/game_context.h"
 #include "systems/intro_cinematic.h"
 #include "systems/phone_system.h"
-#include "systems/main_menu_system.h"
+#include "systems/grethnar_system.h"
 
 bool shouldQuitGame = false;
 MainMenuSystem g_mainMenuSystem;
+GrethnarSystem g_grethnarSystem;
 
 
 
@@ -1363,59 +1364,8 @@ int main(int argc, char** argv) {
 
 
     // --- MR. GRETHNAR WOULE: UNCANNY HORROR ABILITY & JUMPSCARE ENGINE ---
-
-    enum GrethnarState {
-
-        GRETHNAR_NORMAL = 0,
-
-        GRETHNAR_STARING,
-
-        GRETHNAR_PRIMED,
-
-        GRETHNAR_VANISHED,
-
-        GRETHNAR_JUMPSCARE,
-
-        GRETHNAR_COOLDOWN
-
-    };
-
-    GrethnarState grethnarState = GRETHNAR_NORMAL;
-
-    float grethnarStareTimer = 0.0f;
-
-    float grethnarEyeScale = 1.0f; // Scales from 1.0f up to 2.85f
-
-    float grethnarBloodIntensity = 0.0f; // 0.0f to 1.0f
-
-    bool  grethnarSeenEmptyCounter = false;
-
-    float grethnarJumpscareTimer = 0.0f;
-
-    float grethnarJumpscareShake = 0.0f;
-
-    float grethnarJumpscareFov = 60.0f;
-    float grethnarBloodSpawnTimer = 0.0f;
-
-
-
-    struct GrethnarEyeBloodDrop {
-
-        Vector3 pos;
-
-        Vector3 prevPos;
-
-        Vector3 vel;
-
-        float life;
-
-        float maxLife;
-
-        float scale;
-
-    };
-
-    std::vector<GrethnarEyeBloodDrop> grethnarBloodDrops;
+    // --- MR. GRETHNAR WOULE: UNCANNY HORROR ABILITY & JUMPSCARE ENGINE ---
+    // (Now handled by g_grethnarSystem)
 
 
 
@@ -2463,302 +2413,7 @@ int main(int argc, char** argv) {
 
 
 
-        Vector3 grethnarHead = { 104.5f, 12.2f, 131.8f };
-
-        Vector3 toGrethnar = Vector3Normalize(Vector3Subtract(grethnarHead, camera.position));
-
-        Vector3 playerCamFwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-
-        float grethnarLookDot = Vector3DotProduct(playerCamFwd, toGrethnar);
-
-        float distToGrethnar = Vector3Distance(camera.position, grethnarHead);
-
-
-
-        bool isLookingAtGrethnar = (playerInShop && distToGrethnar < 11.0f && grethnarLookDot > 0.88f);
-
-        bool isLookingAwayFromCounter = (grethnarLookDot < 0.35f);
-
-
-
-        if (grethnarState == GRETHNAR_NORMAL) {
-
-            if (isLookingAtGrethnar) {
-
-                grethnarState = GRETHNAR_STARING;
-
-            }
-
-        } else if (grethnarState == GRETHNAR_STARING) {
-
-            if (isLookingAtGrethnar) {
-
-                grethnarStareTimer += dt;
-
-
-
-                // Eye swelling and bleeding ONLY happen if player keeps staring continuously for at least 5-6 seconds!
-
-                if (grethnarStareTimer >= 5.0f) {
-
-                    float bloodProg = Clamp((grethnarStareTimer - 5.0f) / 1.0f, 0.0f, 1.0f);
-
-                    // Subtle swelling (from 1.0x to max 1.18x - NOT too much bigger!)
-
-                    grethnarEyeScale = 1.0f + bloodProg * 0.18f;
-
-                    grethnarBloodIntensity = bloodProg;
-
-
-
-                    // Spawn hyper-realistic blood drops made of '~' characters dripping down to floor
-
-                    grethnarBloodSpawnTimer += dt;
-
-                    float spawnRate = 0.14f - bloodProg * 0.08f;
-
-                    if (grethnarBloodSpawnTimer >= spawnRate) {
-
-                        grethnarBloodSpawnTimer = 0.0f;
-
-                        float side = (GetRandomValue(0, 1) == 0) ? -0.09f : 0.09f;
-
-                        GrethnarEyeBloodDrop bdrop;
-
-                        bdrop.pos = {
-
-                            104.5f + side + (float)GetRandomValue(-12, 12) / 1000.0f,
-
-                            12.18f,
-
-                            131.95f + (float)GetRandomValue(-8, 8) / 1000.0f
-
-                        };
-
-                        bdrop.prevPos = bdrop.pos;
-
-                        bdrop.vel = {
-
-                            (float)GetRandomValue(-15, 15) / 1000.0f,
-
-                            -0.45f, // downward fluid velocity
-
-                            (float)GetRandomValue(5, 20) / 1000.0f
-
-                        };
-
-                        bdrop.life = 3.5f;
-
-                        bdrop.maxLife = 3.5f;
-
-                        bdrop.scale = 0.20f + (float)GetRandomValue(0, 6) / 100.0f; // Sized nicely for ASCII '~'
-
-                        grethnarBloodDrops.push_back(bdrop);
-
-                    }
-
-                } else {
-
-                    // Before 5 seconds: eyes stay normal size, normal color, no blood
-
-                    grethnarEyeScale = 1.0f;
-
-                    grethnarBloodIntensity = 0.0f;
-
-                }
-
-
-
-                // If player kept staring for AT LEAST 6 SECONDS:
-
-                if (grethnarStareTimer >= 6.0f) {
-
-                    grethnarState = GRETHNAR_PRIMED;
-
-                }
-
-            } else {
-
-                // Looked away before 6 seconds: eyes and stare timer gradually soothe back down
-
-                grethnarStareTimer = fmaxf(0.0f, grethnarStareTimer - dt * 2.5f);
-
-                grethnarEyeScale = 1.0f;
-
-                grethnarBloodIntensity = 0.0f;
-
-                if (grethnarStareTimer <= 0.05f) {
-
-                    grethnarState = GRETHNAR_NORMAL;
-
-                }
-
-            }
-
-        } else if (grethnarState == GRETHNAR_PRIMED) {
-
-            // Player kept staring for at least 6 seconds! Eyes are weeping blood.
-
-            // As soon as the player looks away from the counter:
-
-            if (isLookingAwayFromCounter) {
-
-                grethnarState = GRETHNAR_VANISHED;
-
-                grethnarSeenEmptyCounter = false;
-
-            }
-
-        } else if (grethnarState == GRETHNAR_VANISHED) {
-
-            // Turning back reveals an empty counter!
-
-            if (grethnarLookDot > 0.55f) {
-
-                grethnarSeenEmptyCounter = true; // Player registered that he is gone!
-
-            }
-
-            // Once the player turns around to head back toward aisle or exit:
-
-            bool turnedAround = (grethnarSeenEmptyCounter && grethnarLookDot < 0.15f) || (grethnarLookDot < -0.22f);
-
-            if (turnedAround && playerInShop) {
-
-                // TRIGGER JUMPSCARE SEQUENCE!
-
-                grethnarState = GRETHNAR_JUMPSCARE;
-
-                grethnarJumpscareTimer = 0.45f; // For just a glimpse!
-
-                grethnarJumpscareShake = 0.85f;
-
-                SetSoundVolume(sndJumpscare, 1.0f);
-
-                PlaySound(sndJumpscare);
-
-            }
-
-        } else if (grethnarState == GRETHNAR_JUMPSCARE) {
-
-            grethnarJumpscareTimer -= dt;
-
-            grethnarJumpscareShake = Lerp(grethnarJumpscareShake, 0.0f, dt * 6.0f);
-
-
-
-            // Glimpse duration (0.45s): then disappears and appears back to counter continuing normal operations!
-
-            if (grethnarJumpscareTimer <= 0.0f) {
-
-                grethnarState = GRETHNAR_NORMAL; // Appears back at counter continuing normal operations
-
-                grethnarStareTimer = 0.0f;
-
-                grethnarEyeScale = 1.0f;
-
-                grethnarBloodIntensity = 0.0f;
-
-                grethnarSeenEmptyCounter = false;
-
-                grethnarJumpscareFov = 60.0f; // restore FOV
-
-            }
-
-        } else if (grethnarState == GRETHNAR_COOLDOWN) {
-
-            grethnarState = GRETHNAR_NORMAL;
-
-        }
-
-
-
-        // Update falling eye-blood drops made of '~' characters dripping to floor with fluid dynamic physics
-
-        for (size_t i = 0; i < grethnarBloodDrops.size(); ) {
-
-            GrethnarEyeBloodDrop& bd = grethnarBloodDrops[i];
-
-            bd.life -= dt;
-
-            if (bd.life <= 0.0f) {
-
-                grethnarBloodDrops[i] = grethnarBloodDrops.back();
-
-                grethnarBloodDrops.pop_back();
-
-                continue;
-
-            }
-
-            bd.prevPos = bd.pos;
-
-            bd.pos = Vector3Add(bd.pos, Vector3Scale(bd.vel, dt));
-
-            bd.vel.y -= 14.0f * dt; // gravity pulling drops down to floor
-
-            bd.vel.x *= (1.0f - 0.08f * dt);
-
-            bd.vel.z *= (1.0f - 0.08f * dt);
-
-
-
-            // Floor collision at Y = 10.025 (Drips all the way to floor, NOT mid air!)
-
-            if (bd.pos.y <= 10.026f) {
-
-                if (bd.vel.y < -0.6f) {
-
-                    // Spawn fluid impact splatters and ripples on the floor
-
-                    for (int sp = 0; sp < 4; sp++) {
-
-                        float ang = (float)GetRandomValue(0, 360) * DEG2RAD;
-
-                        float spd = (float)GetRandomValue(10, 32) / 100.0f;
-
-                        BloodSplatter s;
-
-                        s.pos = { bd.pos.x, 10.027f, bd.pos.z };
-
-                        s.vel = { cosf(ang) * spd, (float)GetRandomValue(8, 26) / 100.0f, sinf(ang) * spd };
-
-                        s.size = (float)GetRandomValue(6, 12) / 1000.0f;
-
-                        s.life = 0.40f;
-
-                        s.maxLife = 0.40f;
-
-                        bloodSplatters.push_back(s);
-
-                    }
-
-                    PuddleRipple rip;
-
-                    rip.center = { bd.pos.x, 10.027f, bd.pos.z };
-
-                    rip.radius = 0.03f;
-
-                    rip.maxRadius = 0.26f;
-
-                    rip.alpha = 0.9f;
-
-                    bloodRipples.push_back(rip);
-
-                }
-
-                bd.pos.y = 10.026f;
-
-                bd.vel = { 0, 0, 0 };
-
-            }
-
-            i++;
-
-        }
-
-
-
+        g_grethnarSystem.Update(dt, camera.position, Vector3Normalize(Vector3Subtract(camera.target, camera.position)), playerInShop);
         // --- HANGING MEAT BLOOD DRIPPING FLUID DYNAMICS ---
 
         // Tip 1: Primary carcass bone tip at { 95.0f, 12.28f, 143.5f }
@@ -5872,17 +5527,17 @@ int main(int argc, char** argv) {
 
             // Apply Grethnar Jumpscare Zoom & Screen Shake to 3rd person camera as well
 
-            if (grethnarState == GRETHNAR_JUMPSCARE) {
+            if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
-                renderCam.fovy = grethnarJumpscareFov;
+                renderCam.fovy = g_grethnarSystem.GetJumpscareFov();
 
-                if (grethnarJumpscareShake > 0.005f) {
+                if (g_grethnarSystem.GetJumpscareShake() > 0.005f) {
 
-                    float jx = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.18f;
+                    float jx = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.18f;
 
-                    float jy = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.16f;
+                    float jy = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.16f;
 
-                    float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.12f;
+                    float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.12f;
 
                     renderCam.position = Vector3Add(renderCam.position, Vector3{ jx, jy, jz });
 
@@ -6053,17 +5708,17 @@ int main(int argc, char** argv) {
 
             // Apply Grethnar Jumpscare Zoom & Screen Shake
 
-            if (grethnarState == GRETHNAR_JUMPSCARE) {
+            if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
-                renderCam.fovy = grethnarJumpscareFov;
+                renderCam.fovy = g_grethnarSystem.GetJumpscareFov();
 
-                if (grethnarJumpscareShake > 0.005f) {
+                if (g_grethnarSystem.GetJumpscareShake() > 0.005f) {
 
-                    float jx = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.18f;
+                    float jx = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.18f;
 
-                    float jy = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.16f;
+                    float jy = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.16f;
 
-                    float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.12f;
+                    float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * g_grethnarSystem.GetJumpscareShake() * 0.12f;
 
                     renderCam.position = Vector3Add(renderCam.position, Vector3{ jx, jy, jz });
 
@@ -9421,244 +9076,7 @@ int main(int argc, char** argv) {
 
                 // When vanished or jumpscaring, the counter is completely empty under the warm spotlight!
 
-                if (grethnarState != GRETHNAR_VANISHED && grethnarState != GRETHNAR_JUMPSCARE) {
-
-                    Vector3 grethnarPos = { 104.5f, 10.0f, 131.8f };
-
-                    DrawCylinder(grethnarPos, 0.22f, 0.27f, 1.95f, 14, ApplyShopLighting(grethnarPos, { 16, 16, 18, 255 }));
-
-                    DrawCube({ 104.5f, 11.85f, 131.8f }, 0.78f, 0.18f, 0.36f, ApplyShopLighting({ 104.5f, 11.85f, 131.8f }, { 20, 20, 24, 255 }));
-
-
-
-                    // Drooping long arms
-
-                    DrawCylinderEx({ 104.12f, 11.75f, 131.8f }, { 104.12f, 10.60f, 131.8f }, 0.055f, 0.045f, 8, ApplyShopLighting({ 104.12f, 11.2f, 131.8f }, { 18, 18, 20, 255 }));
-
-                    DrawSphere({ 104.12f, 10.55f, 131.8f }, 0.05f, ApplyShopLighting({ 104.12f, 10.55f, 131.8f }, { 220, 220, 215, 255 }));
-
-                    DrawCylinderEx({ 104.88f, 11.75f, 131.8f }, { 104.88f, 10.60f, 131.8f }, 0.055f, 0.045f, 8, ApplyShopLighting({ 104.88f, 11.2f, 131.8f }, { 18, 18, 20, 255 }));
-
-                    DrawSphere({ 104.88f, 10.55f, 131.8f }, 0.05f, ApplyShopLighting({ 104.88f, 10.55f, 131.8f }, { 220, 220, 215, 255 }));
-
-
-
-                    float tiltRoll  = 0.0f;
-
-                    float tiltPitch = 0.0f;
-
-                    float tiltYaw   = 0.0f;
-
-
-
-                    if (playerInShop) {
-
-                        // As soon as the player enters the shop: locked-in unblinking death stare tracking the player!
-
-                        float dx = camera.position.x - 104.5f;
-
-                        float dy = camera.position.y - 12.19f;
-
-                        float dz = camera.position.z - 131.8f;
-
-                        float distXZ = sqrtf(dx * dx + dz * dz);
-
-                        tiltYaw = atan2f(dx, dz) * RAD2DEG;
-
-                        tiltPitch = -atan2f(dy, distXZ) * RAD2DEG;
-
-                        tiltRoll = 0.0f;
-
-                    } else {
-
-                        // Outside shop: subtle idle posture
-
-                        float snapCycle = fmodf(timeVal, 5.5f);
-
-                        if (snapCycle < 2.2f) {
-
-                            tiltRoll = sinf(timeVal * 1.6f) * 6.0f;
-
-                            tiltPitch = sinf(timeVal * 1.2f) * 2.5f;
-
-                        } else if (snapCycle < 2.45f) {
-
-                            tiltRoll = 18.0f;
-
-                        } else if (snapCycle < 4.4f) {
-
-                            tiltRoll = 18.0f + sinf(timeVal * 10.0f) * 0.8f;
-
-                            tiltPitch = -3.0f;
-
-                        } else {
-
-                            tiltRoll = sinf(timeVal * 2.2f) * 3.0f;
-
-                        }
-
-                    }
-
-
-
-                    rlPushMatrix();
-
-                    rlTranslatef(104.5f, 11.95f, 131.8f);
-
-                    rlRotatef(tiltYaw, 0.0f, 1.0f, 0.0f);
-
-                    rlRotatef(tiltRoll, 0.0f, 0.0f, 1.0f);
-
-                    rlRotatef(tiltPitch, 1.0f, 0.0f, 0.0f);
-
-
-
-                    // Pale spherical head (The warm tubelight illuminates the counter, BUT face stays pure stark white!)
-
-                    Color headCol = { 250, 250, 248, 255 }; // Stark corpse-white (NOT yellowed!)
-
-                    Color neckCol = { 230, 230, 226, 255 };
-
-                    DrawCylinder({ 0.0f, -0.04f, 0.0f }, 0.10f, 0.10f, 0.14f, 10, neckCol);
-
-                    DrawSphere({ 0.0f, 0.24f, 0.0f }, 0.24f, headCol);
-
-                    DrawSphereWires({ 0.0f, 0.24f, 0.0f }, 0.242f, 12, 12, { 180, 180, 178, 110 });
-
-
-
-                    // Stretched horizontal void mouth (facing +Z)
-
-                    DrawCube({ 0.0f, 0.155f, 0.225f }, 0.22f, 0.035f, 0.03f, { 8, 8, 10, 255 });
-
-
-
-                    // Eyeballs & Pupils (Normal pale/dark by default; ONLY turn red and bloody when stared at >= 5s!)
-
-                    float curEyeRad = 0.042f * grethnarEyeScale; // Normal 0.042m, max 0.0495m (subtle!)
-
-                    bool isBloody = (grethnarBloodIntensity > 0.01f);
-
-
-
-                    Color eyeballCol = isBloody ? Color{ 255, 18, 22, 255 } : Color{ 225, 225, 220, 255 };
-
-                    Color pupilCol   = isBloody ? Color{ 20, 0, 0, 255 }    : Color{ 22, 24, 28, 255 };
-
-
-
-                    // "Outer sclerae become engorged with dark crimson throbbing veins." (ONLY when bloody / >= 5s)
-
-                    if (isBloody) {
-
-                        float throb = sinf(timeVal * 16.0f) * 0.15f + 0.85f;
-
-                        Color engorgedSclera = { (unsigned char)(145 * throb), 8, 12, 255 };
-
-                        Color veinCol = { (unsigned char)(85 * throb), 4, 6, 255 };
-
-
-
-                        // Bulging outer sclera spheres & vein lattices
-
-                        DrawSphere({ -0.09f, 0.27f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
-
-                        DrawSphere({  0.09f, 0.27f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
-
-                        DrawSphereWires({ -0.09f, 0.27f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
-
-                        DrawSphereWires({  0.09f, 0.27f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
-
-
-
-                        // Branching micro-vein lines across eyes
-
-                        for (int v = 0; v < 6; v++) {
-
-                            float ang = v * 60.0f * DEG2RAD;
-
-                            float vx = cosf(ang) * curEyeRad * 1.10f;
-
-                            float vy = sinf(ang) * curEyeRad * 1.10f;
-
-                            DrawLine3D({ -0.09f, 0.27f, 0.22f }, { -0.09f + vx, 0.27f + vy, 0.222f }, veinCol);
-
-                            DrawLine3D({  0.09f, 0.27f, 0.22f }, {  0.09f + vx, 0.27f + vy, 0.222f }, veinCol);
-
-                        }
-
-                    }
-
-
-
-                    // Irises & Pupils
-
-                    DrawSphere({ -0.09f, 0.27f, 0.222f }, curEyeRad, eyeballCol);
-
-                    DrawSphere({  0.09f, 0.27f, 0.222f }, curEyeRad, eyeballCol);
-
-                    DrawSphere({ -0.09f, 0.27f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
-
-                    DrawSphere({  0.09f, 0.27f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
-
-
-
-                    // Arterial blood weeping from eyes (ONLY when bloody)
-
-                    if (isBloody) {
-
-                        float blLen = grethnarBloodIntensity * 0.16f;
-
-                        Color bCol = { 135, 8, 14, 255 };
-
-                        DrawCylinderEx({ -0.09f, 0.27f, 0.235f }, { -0.09f, 0.27f - blLen, 0.230f }, 0.012f * grethnarBloodIntensity, 0.006f, 6, bCol);
-
-                        DrawCylinderEx({  0.09f, 0.27f, 0.235f }, {  0.09f, 0.27f - blLen, 0.230f }, 0.012f * grethnarBloodIntensity, 0.006f, 6, bCol);
-
-                    }
-
-
-
-                    rlPopMatrix();
-
-                }
-
-
-
-                // Render hyper-realistic fluid trails connecting the falling '~' blood droplets down to floor
-
-                for (const auto& bd : grethnarBloodDrops) {
-
-                    float a = Clamp(bd.life / 0.5f, 0.0f, 1.0f);
-
-                    if (bd.pos.y > 10.035f) {
-
-                        DrawLine3D(bd.prevPos, bd.pos, { 145, 6, 12, (unsigned char)(220 * a) });
-
-                    } else {
-
-                        // Micro splatter puddle on the floor
-
-                        DrawCube({ bd.pos.x, 10.022f, bd.pos.z }, 0.075f, 0.002f, 0.075f, { 115, 4, 8, (unsigned char)(200 * a) });
-
-                    }
-
-                }
-
-            }
-
-            } // end if (canSeeShopInterior)
-
-
-
-            // ---------------------------------------------------------------------
-
-            // 8. RENDER SUPERSTORE PRODUCTS, SHOPPING CART & PARTICLES
-
-            // Rendered globally so held viewmodels (gun, bottles, tin) never vanish outside!
-
-            // ---------------------------------------------------------------------
-
+        g_grethnarSystem.Draw(timeVal);
             DrawShopProductsAndParticles(camera, walkTime, bobAmplitude, dt);
 
 
@@ -10001,7 +9419,7 @@ int main(int argc, char** argv) {
 
         // ---------------------------------------------------------------------
 
-        if (grethnarState == GRETHNAR_JUMPSCARE) {
+        if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
             Vector3 pFwdH = Vector3Normalize(Vector3{ forwardBob.x, 0.0f, forwardBob.z });
 
@@ -10434,7 +9852,7 @@ int main(int argc, char** argv) {
 
         // ---------------------------------------------------------------------
 
-        if (grethnarState == GRETHNAR_JUMPSCARE) {
+        if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
             float flashAlpha = Clamp(grethnarJumpscareTimer / 0.45f, 0.0f, 1.0f) * 115.0f;
 
