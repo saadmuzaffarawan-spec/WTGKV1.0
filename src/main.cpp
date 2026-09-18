@@ -20,6 +20,8 @@
 
 #include "core/game_types.h"
 #include "core/engine_systems.h"
+#include "core/game_context.h"
+
 
 
 
@@ -74,97 +76,33 @@
 
 // --- KINEMATIC HORROR CAMERA & VIEWMODEL INERTIA CONTROLLER ---
 
-float g_vmSwayX        = 0.0f; // Viewmodel mouse yaw inertial lag
-
-float g_vmSwayY        = 0.0f; // Viewmodel mouse pitch inertial lag
-
-static float g_camIdleTimer   = 0.0f; // Stationary breathing sway timer
-
-static float g_camRoll        = 0.0f; // Dynamic camera roll / banking angle (radians)
-
-static float g_camStepOffset  = 0.0f; // Damped step-up vertical smoothing offset
-
-static float g_camLandingDip  = 0.0f; // Downward kinetic impact dip upon landing
-
-static float g_lastPlayerVelY = 0.0f; // Previous frame vertical velocity for impact check
-
-static bool  g_wasOnGround    = true; // Previous frame grounded state
-
-static float g_camDynamicFov  = 60.0f;// Dynamic FOV expanded during sprint
-
-static bool  g_isSprinting    = false;// Sprint active flag ([Left Shift])
 
 
 
 // --- DYNAMIC FLASHLIGHT & WORLD LIGHTING CONTEXT ---
 
-bool           g_flashlightActive       = false; // [F] Key flashlight active state
 
 
 // --- FUNCTIONAL GAS STATION & FUEL SELLING ECONOMY (State in hud_manager.h/.cpp)
 // 3D In-World Fuel Pump CRT Monitor Texture
-static RenderTexture2D g_pumpScreenRT;
-static bool            g_pumpScreenRTLoaded = false;
-static bool            g_autoDispenseMode    = false; // Store counter console toggle
+
 
 #include "systems/gas_station_system.h"
-
-static float g_customerCarCooldown = 35.0f; // Seconds until next car arrives
 
 static inline void SpawnCustomerCar() {
     SpawnCustomerCar(g_customerCar, g_fuelPricePerGallon);
 }
 
 
-static Sound   g_sndFlashlightToggle;            // Tactile switch click sound
-
-bool    g_shopLightsOn           = true;  // Store master light switch state
-
-static Sound   g_sndLightSwitch;                 // Master relay toggle switch sound
-
-float   g_curExtDayFactor        = 0.5f;
-
-float   g_curExtNightFactor      = 0.5f;
-
-float   g_curLightningFlash      = 0.0f;
-
-Vector3 g_curSunDir              = { 0.0f, 1.0f, 0.0f };
-
-Vector3 g_playerCamPos           = { 100.0f, 12.2f, 140.0f };
-
-Vector3 g_playerCamFwd           = { 0.0f, 0.0f, 1.0f };
 
 
 
-static Sound g_sndGunshot;
 
-static Sound g_sndStoreFootstep;
-
-static Sound g_sndFoil;
-
-static Sound g_sndMenuNav;
-
-static Sound g_sndMenuBoom;
-
-static Sound g_sndRadioStatic;
-
-Sound g_sndWaterDrip;
-
-static Sound g_sndShovelDig;
-
-static Sound g_sndPhoneSlide;
-
-static Sound g_sndPhoneTap;
 
 
 
 // --- DISTINCT STRONG HEADING & HIGH-LEGIBILITY MENU FONTS FROM ASSETS ---
 
-Font g_fontTitle;    // assets/alagard.ttf @ 52px - Strong, gothic horror display font for main titles
-Font g_fontHeadSub;  // assets/alagard.ttf @ 30px - Distinct horror display font for headers & banners
-Font g_fontMenu;     // assets/IBMPlexMono-Bold.ttf @ 28px - Prominent, high-legibility monospace for menus & buttons
-Font g_fontBody;     // assets/IBMPlexMono-Medium.ttf @ 20px - Crisp monospace for lore transcripts & settings
-Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, timestamps & status stamps
 
 #include "systems/ui_helpers.h"
 
@@ -172,31 +110,6 @@ Font g_fontSmall;    // assets/IBMPlexMono-Regular.ttf @ 16px - Telemetry, times
 // AAA POLISHED UI PRIMITIVES & DESIGN SYSTEM
 // =========================================================================
 
-
-
-int g_heldProductIndex = -1;
-
-
-
-// (Procedural model & texture assets moved to systems/procedural_shop_assets.h/.cpp)
-
-Vector3 g_cartPos = { 104.5f, 10.02f, 142.5f };
-
-static Vector3 g_cartVel = { 0.0f, 0.0f, 0.0f };
-
-float   g_cartYaw = -90.0f; // Body orientation (facing -X down aisle)
-
-float   g_cartWheelSpin = 0.0f;
-
-// --- HORROR THERMAL RECEIPT PRINTER & RECEIPT GLOBALS (State in hud_manager.h/.cpp)
-PrinterState g_printerState = PRINTER_IDLE;
-float g_printerProgress = 0.0f; // 0 to 16
-
-
-
-// --- NOCTURNAL AUTONOMOUS GHOST TROLLEY ---
-
-GhostCart g_ghostCart = { { 97.0f, 10.02f, 142.5f }, 180.0f, 0.0f, 0.0f, 0, 5.0f, 0, false };
 
 
 
@@ -262,7 +175,20 @@ static inline void UpdatePumpCrtTexture(int pumpNum, float gallons, float salePr
 #include "systems/ocean_system.h"
 #include "systems/shop_atmosphere.h"
 
-int main() {
+
+int main(int argc, char** argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--test") == 0 && i + 1 < argc) g_testFrames = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "--timeofday") == 0 && i + 1 < argc) g_pinnedTimeOfDay = (float)atof(argv[i + 1]);
+        if (strcmp(argv[i], "--cloud") == 0 && i + 1 < argc) g_pinnedCoverage = (float)atof(argv[i + 1]);
+        if (strcmp(argv[i], "--cloudoffset") == 0 && i + 1 < argc) g_pinnedCloudOffset = (float)atof(argv[i + 1]);
+        if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) g_testScreenshot = argv[i + 1];
+        if (strcmp(argv[i], "--lookatsun") == 0) g_lookAtSun = true;
+        if (strcmp(argv[i], "--lookatground") == 0) g_lookAtGround = true;
+        if (strcmp(argv[i], "--lookatshop") == 0) g_lookAtShop = true;
+        if (strcmp(argv[i], "--lookatwashroom") == 0) g_lookAtWashroom = true;
+        if (strcmp(argv[i], "--lookatatm") == 0) g_lookAtAtm = true;
+    }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
 
@@ -292,6 +218,7 @@ int main() {
     InitOceanSystem();
 
     InitShopAtmosphere();
+    InitATMSystem();
 
     Shovel g_shovelRig = BuildShovel();
 
@@ -348,7 +275,7 @@ int main() {
 
         BeginDrawing();
 
-        ClearBackground((Color){ 6, 7, 9, 255 });
+        ClearBackground(Color{ 6, 7, 9, 255 });
 
 
 
@@ -368,13 +295,13 @@ int main() {
 
         int vW = scrW / 4;
 
-        DrawRectangleGradientV(0, 0, scrW, vH, (Color){ 0, 0, 0, 245 }, BLANK);
+        DrawRectangleGradientV(0, 0, scrW, vH, Color{ 0, 0, 0, 245 }, BLANK);
 
-        DrawRectangleGradientV(0, scrH - vH, scrW, vH, BLANK, (Color){ 0, 0, 0, 255 });
+        DrawRectangleGradientV(0, scrH - vH, scrW, vH, BLANK, Color{ 0, 0, 0, 255 });
 
-        DrawRectangleGradientH(0, 0, vW, scrH, (Color){ 0, 0, 0, 235 }, BLANK);
+        DrawRectangleGradientH(0, 0, vW, scrH, Color{ 0, 0, 0, 235 }, BLANK);
 
-        DrawRectangleGradientH(scrW - vW, 0, vW, scrH, BLANK, (Color){ 0, 0, 0, 235 });
+        DrawRectangleGradientH(scrW - vW, 0, vW, scrH, BLANK, Color{ 0, 0, 0, 235 });
 
 
 
@@ -382,7 +309,7 @@ int main() {
 
         for (int y = 0; y < scrH; y += 4) {
 
-            DrawLine(0, y, scrW, y, (Color){ 0, 0, 0, 28 });
+            DrawLine(0, y, scrW, y, Color{ 0, 0, 0, 28 });
 
         }
 
@@ -398,17 +325,17 @@ int main() {
 
         if (recBlink) {
 
-            DrawCircle(45, 38, 5.0f, (Color){ 225, 35, 30, 255 });
+            DrawCircle(45, 38, 5.0f, Color{ 225, 35, 30, 255 });
 
-            DrawTextSharp(g_fontBody, "REC [DISPATCH EVIDENCE REEL #09]", 58, 28, 17.0f, (Color){ 235, 55, 45, 240 });
+            DrawTextSharp(g_fontBody, "REC [DISPATCH EVIDENCE REEL #09]", 58, 28, 17.0f, Color{ 235, 55, 45, 240 });
 
         } else {
 
-            DrawTextSharp(g_fontBody, "    [DISPATCH EVIDENCE REEL #09]", 58, 28, 17.0f, (Color){ 140, 40, 35, 180 });
+            DrawTextSharp(g_fontBody, "    [DISPATCH EVIDENCE REEL #09]", 58, 28, 17.0f, Color{ 140, 40, 35, 180 });
 
         }
 
-        DrawTextSharp(g_fontSmall, "STATE POLICE CRIME LAB // UNRESOLVED CASE ARCHIVE", 45, 54, 14.0f, (Color){ 140, 135, 130, 200 });
+        DrawTextSharp(g_fontSmall, "STATE POLICE CRIME LAB // UNRESOLVED CASE ARCHIVE", 45, 54, 14.0f, Color{ 140, 135, 130, 200 });
 
 
 
@@ -416,9 +343,9 @@ int main() {
 
         // Forensic watermark stamp at top right
 
-        DrawTextSharp(g_fontSmall, "DECLASSIFIED // EVIDENCE VAULT B-9", scrW - 320, 28, 14.0f, (Color){ 170, 50, 45, 210 });
+        DrawTextSharp(g_fontSmall, "DECLASSIFIED // EVIDENCE VAULT B-9", scrW - 320, 28, 14.0f, Color{ 170, 50, 45, 210 });
 
-        DrawTextSharp(g_fontSmall, "SEC LOG: 142.85 MHz [CALIBRATED]", scrW - 320, 48, 13.0f, (Color){ 120, 115, 110, 170 });
+        DrawTextSharp(g_fontSmall, "SEC LOG: 142.85 MHz [CALIBRATED]", scrW - 320, 48, 13.0f, Color{ 120, 115, 110, 170 });
 
 
 
@@ -426,9 +353,9 @@ int main() {
 
         const char* titleHead = "WHAT THE GROUND KEEPS";
 
-        DrawTextSharpCentered(g_fontTitle, titleHead, scrW/2 + 3, scrH/2 - 118, 46.0f, (Color){ 120, 18, 14, 210 }, 3.0f);
+        DrawTextSharpCentered(g_fontTitle, titleHead, scrW/2 + 3, scrH/2 - 118, 46.0f, Color{ 120, 18, 14, 210 }, 3.0f);
 
-        DrawTextSharpCentered(g_fontTitle, titleHead, scrW/2, scrH/2 - 120, 46.0f, (Color){ 245, 240, 230, 255 }, 3.0f);
+        DrawTextSharpCentered(g_fontTitle, titleHead, scrW/2, scrH/2 - 120, 46.0f, Color{ 245, 240, 230, 255 }, 3.0f);
 
 
 
@@ -436,7 +363,7 @@ int main() {
 
         const char* quote = "\"Whatever falls into the Route 9 mire... does not decay.\"";
 
-        DrawTextSharpCentered(g_fontBody, quote, scrW/2, scrH/2 - 62, 18.0f, (Color){ 190, 180, 170, 230 });
+        DrawTextSharpCentered(g_fontBody, quote, scrW/2, scrH/2 - 62, 18.0f, Color{ 190, 180, 170, 230 });
 
 
 
@@ -458,23 +385,23 @@ int main() {
 
         // Forensic scale tick marks
 
-        DrawLine(bx, by - 8, bx, by + barH + 8, (Color){ 90, 85, 80, 200 });
+        DrawLine(bx, by - 8, bx, by + barH + 8, Color{ 90, 85, 80, 200 });
 
-        DrawLine(bx + barW/4, by - 4, bx + barW/4, by + barH + 4, (Color){ 60, 55, 50, 150 });
+        DrawLine(bx + barW/4, by - 4, bx + barW/4, by + barH + 4, Color{ 60, 55, 50, 150 });
 
-        DrawLine(bx + barW/2, by - 6, bx + barW/2, by + barH + 6, (Color){ 90, 85, 80, 200 });
+        DrawLine(bx + barW/2, by - 6, bx + barW/2, by + barH + 6, Color{ 90, 85, 80, 200 });
 
-        DrawLine(bx + barW*3/4, by - 4, bx + barW*3/4, by + barH + 4, (Color){ 60, 55, 50, 150 });
+        DrawLine(bx + barW*3/4, by - 4, bx + barW*3/4, by + barH + 4, Color{ 60, 55, 50, 150 });
 
-        DrawLine(bx + barW, by - 8, bx + barW, by + barH + 8, (Color){ 90, 85, 80, 200 });
+        DrawLine(bx + barW, by - 8, bx + barW, by + barH + 8, Color{ 90, 85, 80, 200 });
 
 
 
         // Dark track background
 
-        DrawRectangle(bx, by, barW, barH, (Color){ 14, 16, 18, 255 });
+        DrawRectangle(bx, by, barW, barH, Color{ 14, 16, 18, 255 });
 
-        DrawRectangleLines(bx - 1, by - 1, barW + 2, barH + 2, (Color){ 45, 30, 28, 240 });
+        DrawRectangleLines(bx - 1, by - 1, barW + 2, barH + 2, Color{ 45, 30, 28, 240 });
 
 
 
@@ -484,11 +411,11 @@ int main() {
 
         if (fillW > 0) {
 
-            DrawRectangle(bx, by, fillW, barH, (Color){ 200, 35, 25, 255 });
+            DrawRectangle(bx, by, fillW, barH, Color{ 200, 35, 25, 255 });
 
-            DrawRectangle(bx + fillW - 3, by - 2, 4, barH + 4, (Color){ 255, 90, 70, 255 });
+            DrawRectangle(bx + fillW - 3, by - 2, 4, barH + 4, Color{ 255, 90, 70, 255 });
 
-            DrawCircle(bx + fillW, by + barH/2, 5.0f, (Color){ 255, 120, 80, 110 });
+            DrawCircle(bx + fillW, by + barH/2, 5.0f, Color{ 255, 120, 80, 110 });
 
         }
 
@@ -496,7 +423,7 @@ int main() {
 
         // Active forensic step description
 
-        DrawTextSharpCentered(g_fontBody, statusText, scrW / 2, by + 24, 18.0f, (Color){ 215, 210, 200, 250 });
+        DrawTextSharpCentered(g_fontBody, statusText, scrW / 2, by + 24, 18.0f, Color{ 215, 210, 200, 250 });
 
 
 
@@ -504,19 +431,19 @@ int main() {
 
         const char* pct = TextFormat("%02d%%", (int)(progress * 100.0f));
 
-        DrawTextSharp(g_fontMenu, pct, bx + barW + 18, by - 11, 22.0f, (Color){ 235, 55, 45, 255 });
+        DrawTextSharp(g_fontMenu, pct, bx + barW + 18, by - 11, 22.0f, Color{ 235, 55, 45, 255 });
 
 
 
         // Telemetry readout
 
-        DrawTextSharp(g_fontSmall, "ARCHIVE COORD: 44.9184° N, 71.3820° W", bx, by + 56, 14.0f, (Color){ 130, 125, 120, 190 });
+        DrawTextSharp(g_fontSmall, "ARCHIVE COORD: 44.9184° N, 71.3820° W", bx, by + 56, 14.0f, Color{ 130, 125, 120, 190 });
 
         const char* incTag = "INCIDENT FILE: #09-B // EVIDENCE LOGGED";
 
         float incW = MeasureTextSharp(g_fontSmall, incTag, 14.0f);
 
-        DrawTextSharp(g_fontSmall, incTag, bx + barW - incW, by + 56, 14.0f, (Color){ 130, 125, 120, 190 });
+        DrawTextSharp(g_fontSmall, incTag, bx + barW - incW, by + 56, 14.0f, Color{ 130, 125, 120, 190 });
 
 
 
@@ -576,9 +503,11 @@ int main() {
     g_sndPumpFlow         = GeneratePumpFlowSound();
     g_sndNozzleLatch      = GenerateNozzleLatchSound();
     g_sndNozzleShutoff    = GenerateNozzleShutoffSound();
+    g_sndStepperMotor     = GenerateStepperMotorSound();
 
     SetSoundVolume(g_sndNozzleLatch, 0.70f);
     SetSoundVolume(g_sndNozzleShutoff, 0.85f);
+    SetSoundVolume(g_sndStepperMotor, 0.60f);
 
     g_pumpScreenRT        = LoadRenderTexture(320, 240);
     g_pumpScreenRTLoaded  = true;
@@ -619,11 +548,11 @@ int main() {
 
     Camera3D camera = { 0 };
 
-    camera.position = (Vector3){ CHUNK_W/2.0f, 11.65f, CHUNK_D/2.0f };
+    camera.position = Vector3{ CHUNK_W/2.0f, 11.65f, CHUNK_D/2.0f };
 
-    camera.target = (Vector3){ CHUNK_W/2.0f, 12.2f, CHUNK_D/2.0f + 1.0f };
+    camera.target = Vector3{ CHUNK_W/2.0f, 12.2f, CHUNK_D/2.0f + 1.0f };
 
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
 
     camera.fovy = 60.0f;
 
@@ -639,6 +568,8 @@ int main() {
 
     instancedShader.locs[SHADER_LOC_MATRIX_PROJECTION] = GetShaderLocation(instancedShader, "matProjection");
 
+    instancedShader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(instancedShader, "instanceTransform");
+    if (instancedShader.locs[SHADER_LOC_MATRIX_MODEL] == -1) instancedShader.locs[SHADER_LOC_MATRIX_MODEL] = 4;
     
 
     int uvOffsetLoc = GetShaderLocation(instancedShader, "uvOffset");
@@ -646,9 +577,6 @@ int main() {
     int uvScaleLoc = GetShaderLocation(instancedShader, "uvScale");
 
     int timeLoc = GetShaderLocation(instancedShader, "time");
-
-    int lightPosLoc = GetShaderLocation(instancedShader, "lightPos");
-
     int playerPosLoc = GetShaderLocation(instancedShader, "playerPos");
 
     int trailPosLoc = GetShaderLocation(instancedShader, "trailPos");
@@ -848,7 +776,7 @@ int main() {
 
                     v.glyphIndex = (x <= 34) ? 0 : '#';
 
-                    v.fgColor = (Color){10, 7, 5, 255}; 
+                    v.fgColor = Color{10, 7, 5, 255}; 
 
                 } else if (y == surfaceY) {
 
@@ -862,19 +790,19 @@ int main() {
 
                         v.glyphIndex = '#';
 
-                        v.fgColor = (Color){20, 20, 22, 255}; 
+                        v.fgColor = Color{20, 20, 22, 255}; 
 
                     } else if (x <= 42) {
 
                         v.glyphIndex = ',';
 
-                        v.fgColor = (Color){ 48, 46, 42, 255 }; // Coastal pebble beach
+                        v.fgColor = Color{ 48, 46, 42, 255 }; // Coastal pebble beach
 
                     } else {
 
                         v.glyphIndex = (GetRandomValue(0, 1) == 0) ? '|' : '/';
 
-                        v.fgColor = (Color){50, 200, 50, 255}; 
+                        v.fgColor = Color{50, 200, 50, 255}; 
 
                     }
 
@@ -912,7 +840,7 @@ int main() {
 
         if (fabs(dx) < 14.0f) continue; // Keep dual-lane road and central station clear of trees
 
-        if (x >= 75 && x <= 118 && z >= 118 && z <= 162) continue; // Keep trees off shop lot
+        if (x >= 75 && x <= 118 && z >= 118 && z <= 170) continue; // Keep trees off shop lot
 
         if (x >= 148 && x <= 195 && z >= 118 && z <= 168) continue; // Keep trees off abandoned college lot
 
@@ -970,7 +898,7 @@ int main() {
 
                     // Slightly darken outer edges for depth
 
-                    v.fgColor = (i == 0) ? (Color){80, 50, 30, 255} : (Color){60, 35, 20, 255}; 
+                    v.fgColor = (i == 0) ? Color{80, 50, 30, 255} : Color{60, 35, 20, 255}; 
 
                 }
 
@@ -1008,7 +936,7 @@ int main() {
 
                             v.glyphIndex = '&';
 
-                            v.fgColor = (Color){30, (unsigned char)GetRandomValue(150, 220), 50, 255};
+                            v.fgColor = Color{30, (unsigned char)GetRandomValue(150, 220), 50, 255};
 
                         }
 
@@ -1042,7 +970,7 @@ int main() {
 
             if (fabs(dx) < 13.5f) continue; // Keep grass off dual-lane asphalt road
 
-            if (x >= 75 && x <= 116 && z >= 118 && z <= 162) continue; // Keep grass off shop building & interior
+            if (x >= 75 && x <= 116 && z >= 118 && z <= 170) continue; // Keep grass off shop building & interior
 
             if (x >= 126 && x <= 130 && z >= 134 && z <= 146) continue; // Keep grass off gas station island curb
 
@@ -1120,7 +1048,7 @@ int main() {
 
                                 int b = GetRandomValue(180, 210);
 
-                                v.fgColor = (Color){(unsigned char)r, (unsigned char)g, (unsigned char)b, 254};
+                                v.fgColor = Color{(unsigned char)r, (unsigned char)g, (unsigned char)b, 254};
 
                             } else {
 
@@ -1134,7 +1062,7 @@ int main() {
 
                                 int b = GetRandomValue(30, 70);
 
-                                v.fgColor = (Color){(unsigned char)r, (unsigned char)g, (unsigned char)b, 255};
+                                v.fgColor = Color{(unsigned char)r, (unsigned char)g, (unsigned char)b, 255};
 
                             }
 
@@ -1225,6 +1153,15 @@ int main() {
     float dayCycleDuration = 240.0f;    // 4 minutes per full celestial orbit
 
     bool  dayCyclePaused = false;
+
+    if (g_pinnedCoverage >= 0.0f) {
+        SetCloudCoverage(g_pinnedCoverage);
+    }
+    SetCloudOffset(g_pinnedCloudOffset);
+    if (g_pinnedTimeOfDay >= 0.0f) {
+        dayCycleTime = g_pinnedTimeOfDay * dayCycleDuration;
+        dayCyclePaused = true;
+    }
 
     
 
@@ -1448,9 +1385,6 @@ int main() {
     float grethnarJumpscareShake = 0.0f;
 
     float grethnarJumpscareFov = 60.0f;
-
-    float grethnarCooldownTimer = 0.0f;
-
     float grethnarBloodSpawnTimer = 0.0f;
 
 
@@ -1485,10 +1419,18 @@ int main() {
 
     // Surreal Shop System
 
+    // Realistic Store Inventory System
     bool isShopOpen = false;
 
-    bool playerHasDuplicateKey = false;
+    bool playerHasDuplicateKey = false; (void)playerHasDuplicateKey;
 
+    int  playerMotorOilCount = 0;
+    int  playerFlareCount = 0;
+    int  playerBatteryCount = 0;
+    int  playerRationCount = 0;
+    int  playerWaterCount = 0;
+    int  playerMatchCount = 0;
+    int  playerBandageCount = 0;
     const char* shopFeedbackMsg = nullptr;
 
     float shopFeedbackTimer = 0.0f;
@@ -3825,7 +3767,7 @@ auto RunIntroCinematic = [&]() {
 
             if (showPlayer) {
 
-                Vector3 driverHead = false ? (Vector3){ iCarX - 0.50f, carCY() + 0.35f, iCarZ + 0.15f } : pPos;
+                Vector3 driverHead = false ? Vector3{ iCarX - 0.50f, carCY() + 0.35f, iCarZ + 0.15f } : pPos;
 
                 Vector2 pSS = GetWorldToScreen(driverHead, shakeCam);
 
@@ -4175,9 +4117,9 @@ auto RunIntroCinematic = [&]() {
 
         if (hoverSkip) {
 
-            DrawRectangleRec(skipRec, (Color){ 35, 45, 60, 200 });
+            DrawRectangleRec(skipRec, Color{ 35, 45, 60, 200 });
 
-            DrawRectangleLinesEx(skipRec, 1.0f, (Color){ 100, 140, 190, 240 });
+            DrawRectangleLinesEx(skipRec, 1.0f, Color{ 100, 140, 190, 240 });
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
 
@@ -4189,7 +4131,7 @@ auto RunIntroCinematic = [&]() {
 
         }
 
-        Color skipCol = hoverSkip ? WHITE : (Color){ 180, 180, 180, 180 };
+        Color skipCol = hoverSkip ? WHITE : Color{ 180, 180, 180, 180 };
 
         DrawText("[ESC] SKIP INTRO", (int)(destX + destW - 140.0f * scale), (int)(destY + destH - 24.0f * scale), escFontSize, skipCol);
 
@@ -4197,7 +4139,7 @@ auto RunIntroCinematic = [&]() {
 
         // Window resize hint during intro
 
-        DrawText("Resize / Maximize window or press [F11] for Fullscreen", (int)(destX + 16.0f * scale), (int)(destY + 12.0f * scale), (int)(13.0f * scale), (Color){ 140, 165, 190, 180 });
+        DrawText("Resize / Maximize window or press [F11] for Fullscreen", (int)(destX + 16.0f * scale), (int)(destY + 12.0f * scale), (int)(13.0f * scale), Color{ 140, 165, 190, 180 });
 
         EndDrawing();
 
@@ -4253,9 +4195,9 @@ auto RunIntroCinematic = [&]() {
 
     // ===========================================================
 
-    isStormActive       = false;
+    isStormActive       = true;
 
-    stormDuration       = 0.0f;
+    stormDuration       = 60.0f;
 
     lightningFlashTimer = 0.0f;
 
@@ -4269,11 +4211,11 @@ auto RunIntroCinematic = [&]() {
 
 
 
-    camera.position = (Vector3){ CHUNK_W / 2.0f, 12.2f, CHUNK_D / 2.0f };
+    camera.position = Vector3{ CHUNK_W / 2.0f, 12.2f, CHUNK_D / 2.0f };
 
-    camera.target   = (Vector3){ CHUNK_W / 2.0f, 12.2f, CHUNK_D / 2.0f + 1.0f };
+    camera.target   = Vector3{ CHUNK_W / 2.0f, 12.2f, CHUNK_D / 2.0f + 1.0f };
 
-    camera.up       = (Vector3){ 0.0f, 1.0f, 0.0f };
+    camera.up       = Vector3{ 0.0f, 1.0f, 0.0f };
 
     camera.fovy     = 60.0f;
 
@@ -4303,120 +4245,51 @@ auto RunIntroCinematic = [&]() {
 
     // =========================================================================
 
-    enum GameState {
 
-        STATE_MAIN_MENU = 0,
 
-        STATE_GAMEPLAY,
 
-        STATE_PAUSED
 
-    };
-
-    GameState g_gameState = STATE_MAIN_MENU;
-
-    bool g_hasPlayedIntro = false;
-
-    bool g_showSettingsModal = false;
-
-    bool g_showCaseFilesModal = false;
-
-    bool g_showManifestModal = false;
-
-    bool g_showSurvivalModal = false;
-
-    int  g_caseFileSelected = 0;
 
     // --- Phase 1: Ultimate Interactive Horror Menu State ---
-    static float   g_menuIdleTimer          = 0.0f;   // Seconds mouse has remained stationary
-    static float   g_menuAwakeIntensity     = 1.0f;   // 1.0 = fully awake/bright, 0.12 = dark slumber
-    static Vector2 g_menuLightPos           = { 640.0f, 360.0f }; // Smoothed volumetric beam tracking pos
-    static float   g_lurkerEyeFlee          = 0.0f;   // Flee/vanish animation timer for lurking eyes (0.0 to 1.0)
-    static float   g_menuCamSmoothX         = 0.0f;   // Damped cursor parallax X for 3D camera
-    static float   g_menuCamSmoothY         = 0.0f;   // Damped cursor parallax Y for 3D camera
-    static float   g_skullEyeSmoothX        = 0.0f;   // Smoothed pupil tracking X for horned bovine skull
-    static float   g_skullEyeSmoothY        = 0.0f;   // Smoothed pupil tracking Y for horned bovine skull
-    static float   g_skullGazeFlare         = 0.0f;   // Pupil flare / intensity on menu interaction
-    static int     g_prevMenuSelection      = -1;     // Previous hover selection for audio feedback
-    static float   g_menuOptionHover[5]     = { 0 };  // Per-option smooth hover transition factor (0.0 -> 1.0)
 
 
 
     // Exterior Carpet & Secret Underground Tunnel & Bunker State
 
-    static float g_carpetAnim         = 0.0f;  // 0.0 (flat) -> 1.0 (pulled / folded)
-    static float g_hatchAnim          = 0.0f;  // 0.0 (closed) -> 1.0 (open)
-
-    static bool  g_radioPower         = true;  // Clandestine vacuum tube radio power
-
-    static float g_radioAnim          = 0.0f;  // Tuning dial / magic eye pulse
-
-    static float g_radioMsgTimer      = 0.0f;  // Periodic transmission timer
-
-    static bool  g_showDossierModal   = false; // Attendant's clandestine dossier modal
-
-    static bool  g_dossierReadOnce    = false; // Unlocked chest code knowledge (0-8-4-2)
-
-    static int   g_dossierFileSelected = 0;    // Selected tab in dossier modal
-
-    static bool  g_chestUnlocked      = false; // True when chest padlock opened
-
-    static float g_chestLidAnim       = 0.0f;  // 0.0 (closed) -> 1.0 (open)
-
-    static bool  g_chestLooted        = false; // True once survival items collected
-
-    static float g_tunnelDripTimer    = 0.0f;  // Pail water drip timer
-
-    static float g_workLightFlicker   = 1.0f;  // Caged light intensity multiplier
-
-    static float g_workLightBuzzTimer = 0.0f;  // Light flicker spark timer
-
-    static float g_digAnimTimer       = 0.0f;  // Shovel strike feedback timer
-
-    static ShovelAnimState g_shovelAnimState   = SHOVEL_ANIM_IDLE;
-
-    static float g_shovelAnimTime              = 0.0f;
-
-    static float g_shovelIdleClock             = 0.0f;
-
-    static bool  g_shovelDigImpactDone         = false;
-
-    static bool  g_shovelDigThrowDone          = false;
-
-    static bool  g_shovelAttackImpactDone      = false;
-
-    static float g_tunnelBannerTimer  = 0.0f;  // Top notification banner timer
-
-    static char  g_tunnelBannerText[160] = { 0 };
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     // Hyper-Realistic Phone & Live GPS Map State
 
-    static bool  g_phoneActive        = false; // false = in pocket, true = held in hand
-
-    static float g_phoneAnim          = 0.0f;  // 0.0 (pocket) -> 1.0 (raised in hand)
-
-    static int   g_phoneZoomMode      = 0;     // 0: Local Sector Tactical (1x), 1: Full Region Overview (2x)
-
-    static float g_phoneRadarPulse    = 0.0f;  // Radar beacon pulse animation
-
-    static float g_phoneSignalFlicker = 0.0f;  // Carrier bar flicker timer
-
-    bool g_isMenuStartingGame = false;
-
-    float g_menuPlayTransitionTimer = 0.0f;
-
+    
+    
+    
+    
+    
+    
+    
 
 
     // User settings & calibration
 
-    float g_userMasterVolume = 1.0f;
-
-    float g_userMouseSensitivity = 1.0f;
-
-    float g_userFov = 60.0f;
-
-    float g_userHorrorGamma = 1.0f;
-
+    
+    
+    
+    
 
 
     bool isCursorCaptured = false;
@@ -4429,6 +4302,16 @@ auto RunIntroCinematic = [&]() {
 
     float gameIntroFade = 0.0f;
 
+    if (g_lookAtAtm) {
+        camera.position = Vector3{ 105.2f, 11.6f, 143.5f };
+        camera.target = Vector3{ 107.45f, 11.4f, 143.5f };
+    } else if (g_lookAtWashroom) {
+        camera.position = Vector3{ 89.25f, 11.8f, 148.5f };
+        camera.target = Vector3{ 89.25f, 11.6f, 158.0f };
+    } else if (g_lookAtShop) {
+        camera.position = Vector3{ 104.5f, 12.0f, 135.2f };
+        camera.target = Vector3{ 104.4f, 11.72f, 133.5f };
+    }
 
 
     while(!shouldQuitGame) {
@@ -4575,15 +4458,14 @@ auto RunIntroCinematic = [&]() {
 
 
 
-            if (IsKeyPressed(KEY_ESCAPE) && !showQuitConfirm && !isShopOpen && !g_showSettingsModal && !g_showManifestModal) {
+            if (IsKeyPressed(KEY_ESCAPE) && !showQuitConfirm && !isShopOpen && !IsATMActive() && !g_showSettingsModal && !g_showManifestModal) {
                 isCursorCaptured = !isCursorCaptured;
                 if (isCursorCaptured) DisableCursor();
                 else EnableCursor();
             }
 
-            // Modals automatically free cursor so user can click buttons or resize window
-
-            if (showQuitConfirm || isShopOpen || g_showSettingsModal || g_showManifestModal) {
+            // Modals and ATM automatically free cursor so user can click buttons or resize window
+            if (showQuitConfirm || isShopOpen || IsATMActive() || g_showSettingsModal || g_showManifestModal) {
 
                 if (isCursorCaptured) {
 
@@ -4675,6 +4557,11 @@ auto RunIntroCinematic = [&]() {
 
                     escCooldown = 0.25f;
 
+                } else if (IsATMActive()) {
+                    CloseATMInteraction();
+                    isCursorCaptured = true;
+                    DisableCursor();
+                    escCooldown = 0.25f;
                 } else if (isShopOpen) {
 
                     isShopOpen = false;
@@ -4987,7 +4874,7 @@ auto RunIntroCinematic = [&]() {
 
             // Spatial audio playback for electrical snap/crackle
 
-            float distToSpark = Vector3Distance(camera.position, (Vector3){ 90.25f, 15.02f, 148.0f });
+            float distToSpark = Vector3Distance(camera.position, Vector3{ 90.25f, 15.02f, 148.0f });
 
             float sparkVol = Clamp(1.0f - (distToSpark / 24.0f), 0.0f, 1.0f) * 0.85f;
 
@@ -5195,7 +5082,7 @@ auto RunIntroCinematic = [&]() {
 
         float sunElev_loop = sinf(sunTheta_loop);
 
-        g_curSunDir         = Vector3Normalize((Vector3){ cosf(sunTheta_loop), sunElev_loop, cosf(sunTheta_loop) * 0.28f });
+        g_curSunDir         = Vector3Normalize(Vector3{ cosf(sunTheta_loop), sunElev_loop, cosf(sunTheta_loop) * 0.28f });
 
         g_curExtNightFactor = Clamp((-sunElev_loop + 0.08f) / 0.28f, 0.0f, 1.0f);
 
@@ -5213,7 +5100,7 @@ auto RunIntroCinematic = [&]() {
 
         if (IsKeyPressed(KEY_F) && !isShopOpen && !showQuitConfirm && !g_showSettingsModal && !g_showManifestModal && g_gameState == STATE_GAMEPLAY) {
 
-            float dToCartF = Vector2Distance((Vector2){ camera.position.x, camera.position.z }, (Vector2){ g_cartPos.x, g_cartPos.z });
+            float dToCartF = Vector2Distance(Vector2{ camera.position.x, camera.position.z }, Vector2{ g_cartPos.x, g_cartPos.z });
 
             if (!(g_heldProductIndex != -1 && (dToCartF < 2.2f || g_isHoldingCart))) {
 
@@ -5252,34 +5139,34 @@ auto RunIntroCinematic = [&]() {
         if (g_shopLightsOn) {
 
             // Light 0: Central Swaying Tungsten Pendant Bulb (Directly hanging beside & illuminating red meat carcass)
-            SetShopLight(0, bulbHeadPos, (Color){ 255, 215, 135, 255 }, shopLightIntensity * 3.60f, 18.0f);
+            SetShopLight(0, bulbHeadPos, Color{ 255, 215, 135, 255 }, shopLightIntensity * 3.60f, 18.0f);
 
             // Light 1: Tubelight 1 - North Aisle (Aisle 3 above north shelves)
-            SetShopLight(1, (Vector3){ 95.0f, 15.00f, 150.5f }, (Color){ 215, 235, 255, 255 }, 2.80f, 12.0f);
+            SetShopLight(1, Vector3{ 95.0f, 15.00f, 150.5f }, Color{ 215, 235, 255, 255 }, 2.80f, 12.0f);
 
             // Light 2: Tubelight 2 - Checkout Counter Task Spotlight
-            SetShopLight(2, (Vector3){ 104.5f, 14.20f, 133.5f }, (Color){ 255, 220, 150, 255 }, 3.00f, 9.5f);
+            SetShopLight(2, Vector3{ 104.5f, 14.20f, 133.5f }, Color{ 255, 220, 150, 255 }, 3.00f, 9.5f);
 
             // Light 3: Tubelight 3 - South Aisle (Aisle 1 above grocery shelves)
-            SetShopLight(3, (Vector3){ 95.0f, 15.00f, 136.5f }, (Color){ 225, 235, 245, 255 }, 2.80f, 12.0f);
+            SetShopLight(3, Vector3{ 95.0f, 15.00f, 136.5f }, Color{ 225, 235, 245, 255 }, 2.80f, 12.0f);
 
             // Light 4: Commercial Island Freezer LEDs (Icy cyan basin glow)
-            SetShopLight(4, (Vector3){ 94.5f, 10.75f, 133.5f }, (Color){ 100, 205, 255, 255 }, 1.50f, 5.5f);
+            SetShopLight(4, Vector3{ 94.5f, 10.75f, 133.5f }, Color{ 100, 205, 255, 255 }, 1.50f, 5.5f);
 
             // Light 5: Tubelight 5 - Entrance Corridor & Shopping Cart Bay
-            SetShopLight(5, (Vector3){ 104.5f, 15.00f, 143.5f }, (Color){ 220, 230, 240, 255 }, 2.80f, 11.0f);
+            SetShopLight(5, Vector3{ 104.5f, 15.00f, 143.5f }, Color{ 220, 230, 240, 255 }, 2.80f, 11.0f);
 
             // Light 6: Tubelight 6 - Rear Storage Corner
-            SetShopLight(6, (Vector3){ 89.0f, 15.00f, 133.5f }, (Color){ 210, 230, 250, 255 }, 2.60f, 10.5f);
+            SetShopLight(6, Vector3{ 89.0f, 15.00f, 133.5f }, Color{ 210, 230, 250, 255 }, 2.60f, 10.5f);
 
             // Light 7: Haunted Washroom Overhead Flickering Fixture
-            SetShopLight(7, (Vector3){ 89.0f, 13.85f, 157.5f }, (Color){ 230, 248, 205, 255 }, 2.40f, 8.5f);
+            SetShopLight(7, Vector3{ 89.0f, 13.85f, 157.5f }, Color{ 230, 248, 205, 255 }, 2.40f, 8.5f);
 
         } else {
 
             // Master store power switch OFF: blackout fixtures
             for (int li = 0; li < 8; li++) {
-                SetShopLight(li, (Vector3){ 95.0f, 15.0f, 140.0f }, (Color){ 0, 0, 0, 0 }, 0.0f, 0.0f);
+                SetShopLight(li, Vector3{ 95.0f, 15.0f, 140.0f }, Color{ 0, 0, 0, 0 }, 0.0f, 0.0f);
             }
 
         }
@@ -5287,12 +5174,18 @@ auto RunIntroCinematic = [&]() {
         bool isPlayerMoving = (IsKeyDown(KEY_W) || IsKeyDown(KEY_A) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D));
         UpdateShopAtmosphere(dt, timeVal, camera.position, isPlayerMoving, g_shopLightsOn, sinf(shopLightSwayX) * 2.05f, sinf(shopLightSwayZ) * 2.05f);
 
+        // 24-HR Cashpoint ATM Terminal: Proximity interaction & update
+        bool nearATM = IsPlayerNearATM(camera.position);
+        if (nearATM && IsKeyPressed(KEY_E) && !IsATMActive() && !isShopOpen && !showQuitConfirm) {
+            StartATMInteraction();
+        }
+        bool atmInteracting = IsATMActive();
+        UpdateATMSystem(dt, camera.position, atmInteracting);
+
         // --- MR. GRETHNAR WOULE: GAZE DETECTION, EYE SWELL & JUMPSCARE ENGINE ---
 
-        bool playerInShop = ((camera.position.x >= 86.0f && camera.position.x <= 109.2f &&
-                              camera.position.z >= 125.5f && camera.position.z <= 154.5f) ||
-                             (camera.position.x >= 85.5f && camera.position.x <= 92.8f &&
-                              camera.position.z >= 153.5f && camera.position.z <= 161.5f));
+        bool playerInShop = (camera.position.x >= 85.5f && camera.position.x <= 109.2f &&
+                             camera.position.z >= 125.5f && camera.position.z <= 168.0f);
 
 
 
@@ -5930,9 +5823,9 @@ auto RunIntroCinematic = [&]() {
 
                     sc.vel = Vector3Subtract(sc.vel, Vector3Scale(fwd, Frand(0.2f, 0.6f)));
 
-                    sc.rot = (Vector3){ Frand(0, 360), Frand(0, 360), Frand(0, 360) };
+                    sc.rot = Vector3{ Frand(0, 360), Frand(0, 360), Frand(0, 360) };
 
-                    sc.rotVel = (Vector3){ Frand(450, 950), Frand(350, 850), Frand(350, 850) };
+                    sc.rotVel = Vector3{ Frand(450, 950), Frand(350, 850), Frand(350, 850) };
 
                     sc.life = 4.0f;
 
@@ -5998,11 +5891,11 @@ auto RunIntroCinematic = [&]() {
 
                         gs.pos = hitPoint;
 
-                        gs.vel = (Vector3){ Frand(-2.5f, 2.5f) - fwd.x * 1.5f, Frand(0.8f, 3.2f), Frand(-2.5f, 2.5f) - fwd.z * 1.5f };
+                        gs.vel = Vector3{ Frand(-2.5f, 2.5f) - fwd.x * 1.5f, Frand(0.8f, 3.2f), Frand(-2.5f, 2.5f) - fwd.z * 1.5f };
 
                         gs.life = Frand(0.2f, 0.45f);
 
-                        gs.color = (Color){ 255, (unsigned char)GetRandomValue(180, 240), 70, 255 };
+                        gs.color = Color{ 255, (unsigned char)GetRandomValue(180, 240), 70, 255 };
 
                         g_gunSparks.push_back(gs);
 
@@ -6020,7 +5913,7 @@ auto RunIntroCinematic = [&]() {
 
                 hp.opened = false;
 
-                hp.vel = (Vector3){ 0.0f, -0.5f, 0.0f };
+                hp.vel = Vector3{ 0.0f, -0.5f, 0.0f };
 
                 g_heldProductIndex = -1;
 
@@ -6063,49 +5956,103 @@ auto RunIntroCinematic = [&]() {
 
 
             if (IsKeyPressed(KEY_ONE)) {
-
-                shopFeedbackMsg = "You purchase Bottled Whispers ($6.66). Faint trapped voices murmur from the corked glass.";
-
-                shopFeedbackTimer = 5.0f;
-
+                float price = 4.99f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerMotorOilCount++;
+                    shopFeedbackMsg = "Purchased 10W-40 Motor Oil ($4.99). Heavy quart bottle placed in inventory.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "10W-40 MOTOR OIL");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $4.99.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_TWO)) {
-
-                shopFeedbackMsg = "You purchase Canned Silence ($4.44). Total acoustic deadness wraps your fingers. Nothing rattles.";
-
-                shopFeedbackTimer = 5.0f;
-
+                float price = 6.50f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerFlareCount += 3;
+                    shopFeedbackMsg = "Purchased Magnesium Road Flares [3-Pack] ($6.50). High-intensity emergency red.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "ROAD FLARES 3PK");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $6.50.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_THREE)) {
-
-                shopFeedbackMsg = "You take Expired Sunlight ($0.00). It flares faintly warm and smells of old asphalt and dusk.";
-
-                shopFeedbackTimer = 5.0f;
-
+                float price = 3.89f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerBatteryCount += 2;
+                    shopFeedbackMsg = "Purchased C-Cell Alkaline Batteries [2-Pack] ($3.89). Heavy-duty flashlight power.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "C-CELL BATTERIES");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $3.89.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_FOUR)) {
-
-                shopFeedbackMsg = "You purchase Your Old Wallet ($9). Inside is an expired driver's license with your name and face.";
-
-                shopFeedbackTimer = 5.0f;
-
+                float price = 2.75f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerRationCount++;
+                    shopFeedbackMsg = "Purchased Canned Beef Rations & Stew ($2.75). Sealed 16oz tin with pull tab.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "BEEF RATIONS");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $2.75.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_FIVE)) {
-
-                playerHasDuplicateKey = true;
-
-                shopFeedbackMsg = "You slip the duplicate key into your pocket beside your original.\nThey are identical down to the scratch on the brass.\nThe new one feels freezing cold.";
-
-                shopFeedbackTimer = 7.0f;
-
+                float price = 1.99f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerWaterCount++;
+                    shopFeedbackMsg = "Purchased Mountain Spring Water (1 Gallon) ($1.99). Pure sealed drinking water.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "SPRING WATER 1GAL");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $1.99.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_SIX)) {
-
-                shopFeedbackMsg = "You purchase the Jar of Loose Teeth ($13.13). They clatter with a dry ceramic snap when you look away.";
-
-                shopFeedbackTimer = 5.0f;
-
+                float price = 1.25f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerMatchCount += 250;
+                    shopFeedbackMsg = "Purchased Strike-Anywhere Matches [Box 250] ($1.25). Red sulfur tip matches.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "STRIKE MATCHES");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $1.25.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_SEVEN)) {
-
-                shopFeedbackMsg = "You take the Donkey Milk ($7.77). The glass is warm.\nThe thick bone-white cream turns slowly against the glass of its own volition.";
-
-                shopFeedbackTimer = 6.0f;
-
+                float price = 5.45f;
+                if (g_playerCash >= price) {
+                    g_playerCash -= price;
+                    playerBandageCount++;
+                    shopFeedbackMsg = "Purchased Trauma Compression Bandage ($5.45). Sterile medical-grade dressing.";
+                    shopFeedbackTimer = 5.0f;
+                    PlaySound(g_sndCashRegister);
+                    TriggerCashPopup(-price, "TRAUMA BANDAGE");
+                    g_camLandingDip = -0.010f;
+                } else {
+                    shopFeedbackMsg = "Insufficient funds. Requires $5.45.";
+                    shopFeedbackTimer = 4.0f;
+                }
             } else if (IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_E) && !nearCounter)) {
 
                 isShopOpen = false;
@@ -6120,7 +6067,7 @@ auto RunIntroCinematic = [&]() {
 
         Vector3 oldPos = camera.position;
 
-        if (g_gameState == STATE_GAMEPLAY && hitStopTimer <= 0.0f && !isShopOpen && !isRoofCamActive && !showQuitConfirm && !g_showSettingsModal && !g_showManifestModal) {
+        if (g_gameState == STATE_GAMEPLAY && hitStopTimer <= 0.0f && !isShopOpen && !IsATMActive() && !isRoofCamActive && !showQuitConfirm && !g_showSettingsModal && !g_showManifestModal) {
 
             if (IsWindowFocused()) {
 
@@ -6150,7 +6097,7 @@ auto RunIntroCinematic = [&]() {
 
             Vector3 fwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 
-            Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwd, (Vector3){0, 1, 0}));
+            Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwd, Vector3{0, 1, 0}));
 
             Vector3 upClean = Vector3CrossProduct(rgt, fwd);
 
@@ -6184,13 +6131,13 @@ auto RunIntroCinematic = [&]() {
 
                         ShopParticle p;
 
-                        p.pos = (Vector3){ hp.homePos.x + Frand(-0.03f, 0.03f), hp.homePos.y + 0.22f, hp.homePos.z + Frand(-0.03f, 0.03f) };
+                        p.pos = Vector3{ hp.homePos.x + Frand(-0.03f, 0.03f), hp.homePos.y + 0.22f, hp.homePos.z + Frand(-0.03f, 0.03f) };
 
-                        p.vel = (Vector3){ Frand(-0.4f, 0.4f) + fwd.x * 0.4f, Frand(0.35f, 0.75f), Frand(-0.4f, 0.4f) + fwd.z * 0.4f };
+                        p.vel = Vector3{ Frand(-0.4f, 0.4f) + fwd.x * 0.4f, Frand(0.35f, 0.75f), Frand(-0.4f, 0.4f) + fwd.z * 0.4f };
 
                         p.radius = 0.013f;
 
-                        p.color = (Color){ (unsigned char)GetRandomValue(245, 255), (unsigned char)GetRandomValue(225, 245), (unsigned char)GetRandomValue(160, 195), 255 };
+                        p.color = Color{ (unsigned char)GetRandomValue(245, 255), (unsigned char)GetRandomValue(225, 245), (unsigned char)GetRandomValue(160, 195), 255 };
 
                         p.landed = false;
 
@@ -6220,15 +6167,15 @@ auto RunIntroCinematic = [&]() {
 
                         ShopParticle p;
 
-                        Vector3 mouth = (Vector3){ hp.homePos.x + fwd.x * 0.20f, hp.homePos.y + 0.12f, hp.homePos.z + fwd.z * 0.20f };
+                        Vector3 mouth = Vector3{ hp.homePos.x + fwd.x * 0.20f, hp.homePos.y + 0.12f, hp.homePos.z + fwd.z * 0.20f };
 
                         p.pos = mouth;
 
-                        p.vel = (Vector3){ Frand(-0.1f, 0.1f) + fwd.x * 0.25f, -0.35f, Frand(-0.1f, 0.1f) + fwd.z * 0.25f };
+                        p.vel = Vector3{ Frand(-0.1f, 0.1f) + fwd.x * 0.25f, -0.35f, Frand(-0.1f, 0.1f) + fwd.z * 0.25f };
 
                         p.radius = 0.010f;
 
-                        p.color = (hp.type == PROD_MILK) ? (Color){ 245, 245, 252, 255 } : (Color){ 160, 10, 16, 255 };
+                        p.color = (hp.type == PROD_MILK) ? Color{ 245, 245, 252, 255 } : Color{ 160, 10, 16, 255 };
 
                         p.landed = false;
 
@@ -6304,7 +6251,7 @@ auto RunIntroCinematic = [&]() {
 
                     p.homePos.y = 10.02f;
 
-                    p.vel = (Vector3){ 0, 0, 0 };
+                    p.vel = Vector3{ 0, 0, 0 };
 
                 }
 
@@ -6497,12 +6444,13 @@ auto RunIntroCinematic = [&]() {
             if ((vx - 8)*(vx - 8) + (vz - 165)*(vz - 165) <= 12 && vy >= 4 && vy <= 13) return true;
             if (vx >= 8 && vx <= 12 && vz >= 149 && vz <= 155 && vy >= 5 && vy <= 7) return true;
 
-            // Western Ocean Boundary (X <= 35): Open infinite sea for swimming & diving!
+            // Western Ocean Boundary (X <= 35): Open sea for swimming & diving!
             if (vx <= 35) {
+                if (vx < -18 || vz <= 2 || vz >= CHUNK_D - 3) return true; // Deep ocean safety perimeter
                 // Submarine floor support: seabed slopes from Y=7.5m down to Y=3.8m in open sea
                 float bedY = (vx >= 0) ? (3.8f + ((float)vx / 35.0f) * 3.7f) : 3.8f;
                 if ((float)vy <= bedY) return true; // Solid seabed floor
-                return false; // Water volume is 100% open for infinite swimming westward!
+                return false; // Water volume is open for swimming & diving!
             }
 
             // Treat the outer land edges of the world (and beneath y=0) as solid unbreakable walls
@@ -6558,68 +6506,62 @@ auto RunIntroCinematic = [&]() {
                 }
             }
 
-            // Shop lot & surrounding grounds subfloor support (flush flat Y <= 10 across entire clearing)
-
-            if (vx >= 60 && vx <= 127 && vz >= 108 && vz <= 172 && vy <= 10) return true;
+            // Shop lot, road, gas station & sedan grounds subfloor support (flush flat Y <= 10 across entire clearing)
+            if (vx >= 60 && vx <= 147 && vz >= 108 && vz <= 172 && vy <= 10) return true;
 
             // Real geometric shop walls collision:
-
             if (vy >= 11 && vy <= 15) {
-
                 // West Wall (X = 86, Z: 126..154)
-
-                if (vx == 86 && vz >= 126 && vz <= 154) return true;
+                if (vx == 85 && vz >= 126 && vz <= 154) return true;
 
                 // South Wall (Z = 126, X: 86..108)
-
                 if (vz == 126 && vx >= 86 && vx <= 108) return true;
 
-                // North Wall (Z = 154, X: 86..108) with doorway into Haunted Washroom (Generous threshold X: 87..91)
+                // North Wall (Z = 154, X: 86..108) with Doorway into Haunted Washroom at X: 88..90
                 if (vz == 154 && vx >= 86 && vx <= 108) {
-                    bool inWashroomDoor = (vx >= 87 && vx <= 91 && vy <= 14);
-                    if (!inWashroomDoor) return true;
+                    bool inWashroomDoor = (vx >= 88 && vx <= 90 && vy <= 13);
+                    if (inWashroomDoor) {
+                        if (g_washroomDoorAngle < 15.0f) return true; // Closed door blocks player
+                        return false; // Open door allows passage
+                    }
+                    return true; // Solid wall
                 }
 
-                // Haunted Washroom Solid Exterior Walls (X in [85..93], Z in [154..161])
-                if (vz >= 154 && vz <= 161 && (vx <= 85 || vx >= 92)) return true; // West & East washroom walls
-                if (vz >= 161 && vx >= 85 && vx <= 92) return true; // North washroom back wall
+                // Haunted Washroom Solid Walls (X in [85..93], Z in [154..165])
+                if (vz >= 154 && vz <= 165) {
+                    if (vx <= 85 || vx >= 93) return true; // West & East washroom walls
+                }
+                if (vz >= 164 && vx >= 85 && vx <= 93) return true; // North washroom back wall
 
                 // Washroom Fixtures (Porcelain Toilet & Wall Sink - compact to allow free movement)
-                if (vx >= 86 && vx <= 87 && vz >= 159 && vz <= 160 && vy <= 12) return true; // Toilet
-                if (vx >= 89 && vx <= 90 && vz >= 160 && vz <= 161 && vy <= 12) return true; // Sink
+                if ((vx == 86 || vx == 87) && vz >= 162 && vz <= 164 && vy <= 12) return true; // Toilet
+                if ((vx >= 88 && vx <= 90) && vz >= 163 && vz <= 164 && vy <= 12) return true; // Sink
 
                 // East Facade Wall (X = 108, Z: 126..154, with doorway at Z: 139..141, Y: 11..13)
-
                 if (vx == 108 && vz >= 126 && vz <= 154) {
-
                     bool inDoorway = (vz >= 139 && vz <= 141 && vy <= 13);
-
                     if (inDoorway) {
-
                         if (doorSlideProgress < 0.55f) return true; // Closed / mostly closed glass door is solid
-
                     } else {
-
                         return true; // Wall is solid
-
                     }
-
                 }
 
-                // Exactly Two Shelving Racks (Vertical along X: Rack 1 at Z = 140, Rack 2 at Z = 147, X: 89..101, Y: 11..13)
+                // Exactly Two Superstore Gondola Shelving Racks (Rack 1 at Z = 140, Rack 2 at Z = 146, X: 89..101, Y: 11..13)
+                if ((vz >= 139 && vz <= 141 && vx >= 89 && vx <= 101 && vy <= 13) ||
+                    (vz >= 145 && vz <= 147 && vx >= 89 && vx <= 101 && vy <= 13)) return true;
 
-                if ((vz >= 139 && vz <= 140 && vx >= 89 && vx <= 101 && vy <= 13) ||
-
-                    (vz >= 146 && vz <= 147 && vx >= 89 && vx <= 101 && vy <= 13)) return true;
+                // 6-Door Cold Beverage Vault along West Wall (X = 86, Z: 128..150)
+                if (vx == 86 && vz >= 128 && vz <= 150 && vy <= 14) return true;
 
                 // Checkout Counter in Start Left Corner (X: 102..107, Z: 132..134, Y = 11)
-
                 if (vx >= 102 && vx <= 107 && vz >= 132 && vz <= 134 && vy == 11) return true;
 
-                // Commercial Horizontal Refrigerator Island (X: 93..96, Z: 133..134, Y = 11)
+                // Hot Food & Coffee Convenience Island (X: 93..97, Z: 132..135, Y = 11)
+                if (vx >= 93 && vx <= 97 && vz >= 132 && vz <= 135 && vy == 11) return true;
 
-                if (vx >= 93 && vx <= 96 && vz >= 133 && vz <= 134 && vy == 11) return true;
-
+                // 24-HR ATM Terminal near Entrance (X = 107, Z: 143..144, Y: 11..13)
+                if (vx == 107 && (vz == 143 || vz == 144) && vy <= 13) return true;
             }
 
             return chunk->voxels[vx][vy][vz].isSolid;
@@ -6927,11 +6869,11 @@ auto RunIntroCinematic = [&]() {
 
             if (g_isHoldingCart) {
 
-                Vector3 camFwd = Vector3Normalize((Vector3){ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
+                Vector3 camFwd = Vector3Normalize(Vector3{ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
 
                 Vector3 targetCartPos = { camera.position.x + camFwd.x * 1.15f, 10.02f, camera.position.z + camFwd.z * 1.15f };
 
-                float moveDist = Vector2Distance((Vector2){ g_cartPos.x, g_cartPos.z }, (Vector2){ targetCartPos.x, targetCartPos.z });
+                float moveDist = Vector2Distance(Vector2{ g_cartPos.x, g_cartPos.z }, Vector2{ targetCartPos.x, targetCartPos.z });
 
                 g_cartPos.x = Lerp(g_cartPos.x, targetCartPos.x, 14.0f * dt);
 
@@ -6987,7 +6929,7 @@ auto RunIntroCinematic = [&]() {
 
                     g_isHoldingCart = true;
 
-                    g_cartVel = (Vector3){ 0, 0, 0 };
+                    g_cartVel = Vector3{ 0, 0, 0 };
 
                 }
 
@@ -7013,6 +6955,20 @@ auto RunIntroCinematic = [&]() {
 
             }
 
+            // Hook D: Take phantom item from ghost shopping cart [E]
+            if (g_ghostCart.active && g_ghostCart.alpha > 0.35f && g_ghostCart.itemsInCart > 0 && !g_isHoldingCart) {
+                float dGhost = Vector3Distance(camera.position, g_ghostCart.pos);
+                if (dGhost < 2.4f && g_heldProductIndex == -1) {
+                    if (IsKeyPressed(KEY_E)) {
+                        g_ghostCart.itemsInCart--;
+                        g_ghostCart.rattleTimer = 2.8f;
+                        shopLightState = 1; // Violent light flicker surge
+                        shopLightFlickerTimer = 0.0f;
+                        PlaySound(g_sndFoil);
+                    }
+                }
+            }
+
 
 
             // Sync items placed inside the cart
@@ -7033,7 +6989,7 @@ auto RunIntroCinematic = [&]() {
 
                 float wz = g_cartPos.z - lx * sinY + lz * cosY;
 
-                g_shopProducts[pIdx].homePos = (Vector3){ wx, 10.64f, wz };
+                g_shopProducts[pIdx].homePos = Vector3{ wx, 10.64f, wz };
 
             }
 
@@ -7065,6 +7021,21 @@ auto RunIntroCinematic = [&]() {
 
             }
 
+            // Washroom Ceramic Sink Faucet Interaction [E]
+            if (IsPlayerNearWashroomSink(camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
+                if (IsKeyPressed(KEY_E)) {
+                    ToggleWashroomSinkFaucet();
+                }
+            }
+
+            // Washroom Entrance Door Interaction [E]
+            if (IsPlayerNearWashroomDoor(camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
+                if (IsKeyPressed(KEY_E)) {
+                    ToggleWashroomDoor();
+                    PlaySound(g_sndChestOpen);
+                }
+            }
+
 
 
             if (distToCounter < 2.6f && (cartDistToCounter < 2.8f || g_cartProductIndices.size() > 0)) {
@@ -7085,9 +7056,14 @@ auto RunIntroCinematic = [&]() {
 
 
 
-            // Update printer animation
-
+            // Update printer animation & stepper sound
             if (g_printerState == PRINTER_PRINTING) {
+                static float s_stepperTimer = 0.0f;
+                s_stepperTimer += dt;
+                if (s_stepperTimer >= 0.12f) {
+                    s_stepperTimer = 0.0f;
+                    PlaySound(g_sndStepperMotor);
+                }
 
                 g_printerProgress += dt * 2.8f;
 
@@ -7143,9 +7119,9 @@ auto RunIntroCinematic = [&]() {
 
                         g_receiptThrown = true;
 
-                        Vector3 camFwd = Vector3Normalize((Vector3){ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
+                        Vector3 camFwd = Vector3Normalize(Vector3{ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
 
-                        g_thrownReceiptPos = (Vector3){ camera.position.x + camFwd.x * 1.1f, 10.03f, camera.position.z + camFwd.z * 1.1f };
+                        g_thrownReceiptPos = Vector3{ camera.position.x + camFwd.x * 1.1f, 10.03f, camera.position.z + camFwd.z * 1.1f };
 
                     }
 
@@ -7271,6 +7247,23 @@ auto RunIntroCinematic = [&]() {
                         g_activePumpIndex = -1;
                         PlaySound(g_sndNozzleLatch);
                     }
+
+                    // Hook B: Escalation on vehicle departure - thermal printer churns stalker warning
+                    static int s_departureEscalation = 0;
+                    const char* stalkerNotes[] = {
+                        "THEY DID NOT DRIVE HOME",
+                        "SOMEONE IS WATCHING FROM AISLE 2",
+                        "DO NOT LOOK IN THE WASHROOM MIRROR",
+                        "CHECK THE BASEMENT HATCH",
+                        "THE GROUND REMEMBERS"
+                    };
+                    const char* note = stalkerNotes[s_departureEscalation % 5];
+                    s_departureEscalation++;
+                    UnloadTexture(g_receiptTex);
+                    g_receiptTex = BuildReceiptTexture(note);
+                    SetTextureFilter(g_receiptTex, TEXTURE_FILTER_BILINEAR);
+                    g_printerState = PRINTER_PRINTING;
+                    g_printerProgress = 0.0f;
                 }
             } else if (g_customerCar.state == CAR_DEPARTING) {
                 g_customerCar.speed += 8.0f * dt;
@@ -7401,7 +7394,7 @@ auto RunIntroCinematic = [&]() {
 
             if (!g_tunnelDug) {
 
-                float dToCaveIn = Vector3Distance(camera.position, (Vector3){ 63.2f, 2.4f, 140.0f });
+                float dToCaveIn = Vector3Distance(camera.position, Vector3{ 63.2f, 2.4f, 140.0f });
 
                 if (dToCaveIn < 3.4f && camera.position.x > 61.5f && camera.position.y < 8.0f) {
 
@@ -7479,7 +7472,7 @@ auto RunIntroCinematic = [&]() {
 
                     g_tunnelDripTimer = 0.0f;
 
-                    float dToBucket = Vector3Distance(camera.position, (Vector3){ 98.5f, 5.0f, 137.6f });
+                    float dToBucket = Vector3Distance(camera.position, Vector3{ 98.5f, 5.0f, 137.6f });
 
                     if (dToBucket < 14.0f) {
 
@@ -7531,7 +7524,7 @@ auto RunIntroCinematic = [&]() {
 
                         g_radioMsgTimer = 0.0f;
 
-                        float dToRadio = Vector3Distance(camera.position, (Vector3){ 100.5f, 6.2f, 140.6f });
+                        float dToRadio = Vector3Distance(camera.position, Vector3{ 100.5f, 6.2f, 140.6f });
 
                         if (dToRadio < 11.0f) {
 
@@ -7549,9 +7542,9 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                float dToTable = Vector3Distance(camera.position, (Vector3){ 100.2f, 6.2f, 140.0f });
+                float dToTable = Vector3Distance(camera.position, Vector3{ 100.2f, 6.2f, 140.0f });
 
-                float dToChest = Vector3Distance(camera.position, (Vector3){ 100.4f, 5.5f, 137.8f });
+                float dToChest = Vector3Distance(camera.position, Vector3{ 100.4f, 5.5f, 137.8f });
 
 
 
@@ -8060,7 +8053,7 @@ auto RunIntroCinematic = [&]() {
 
         float sunElev = sinf(sunTheta);
 
-        Vector3 sunDir = Vector3Normalize((Vector3){ cosf(sunTheta), sunElev, cosf(sunTheta) * 0.28f });
+        Vector3 sunDir = Vector3Normalize(Vector3{ cosf(sunTheta), sunElev, cosf(sunTheta) * 0.28f });
 
         Vector3 moonDir = Vector3Negate(sunDir);
 
@@ -8120,7 +8113,7 @@ auto RunIntroCinematic = [&]() {
 
             Vector3 moonForward = Vector3Normalize(Vector3Subtract(camera.position, moonCenter)); 
 
-            Vector3 upRefMoon = (fabsf(moonForward.y) > 0.88f) ? (Vector3){0, 0, 1} : (Vector3){0, 1, 0};
+            Vector3 upRefMoon = (fabsf(moonForward.y) > 0.88f) ? Vector3{0, 0, 1} : Vector3{0, 1, 0};
 
             Vector3 moonRight = Vector3Normalize(Vector3CrossProduct(upRefMoon, moonForward));
 
@@ -8140,7 +8133,7 @@ auto RunIntroCinematic = [&]() {
 
                     Vector3 pos = Vector3Add(moonCenter, Vector3Scale(moonRight, dx));
 
-                    pos = Vector3Add(pos, Vector3Scale((Vector3){0,1,0}, dy));
+                    pos = Vector3Add(pos, Vector3Scale(Vector3{0,1,0}, dy));
 
                     Matrix m = MatrixIdentity();
 
@@ -8306,7 +8299,7 @@ auto RunIntroCinematic = [&]() {
 
                 Vector3 stepFwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 
-                Vector3 stepRgt = Vector3Normalize(Vector3CrossProduct(stepFwd, (Vector3){0, 1, 0}));
+                Vector3 stepRgt = Vector3Normalize(Vector3CrossProduct(stepFwd, Vector3{0, 1, 0}));
 
                 float footOffset = g_isLeftFootStep ? -0.16f : 0.16f;
 
@@ -8328,9 +8321,9 @@ auto RunIntroCinematic = [&]() {
 
                         DustParticle p;
 
-                        p.pos = (Vector3){ footPos.x + Frand(-0.02f, 0.02f), 10.03f, footPos.z + Frand(-0.02f, 0.02f) };
+                        p.pos = Vector3{ footPos.x + Frand(-0.02f, 0.02f), 10.03f, footPos.z + Frand(-0.02f, 0.02f) };
 
-                        p.vel = (Vector3){ Frand(-0.06f, 0.06f), Frand(0.06f, 0.14f), Frand(-0.06f, 0.06f) };
+                        p.vel = Vector3{ Frand(-0.06f, 0.06f), Frand(0.06f, 0.14f), Frand(-0.06f, 0.06f) };
 
                         p.size = Frand(0.006f, 0.012f);
 
@@ -8338,7 +8331,7 @@ auto RunIntroCinematic = [&]() {
 
                         p.life = p.maxLife;
 
-                        p.color = (Color){ 165, 160, 150, 150 };
+                        p.color = Color{ 165, 160, 150, 150 };
 
                         p.spin = Frand(0.0f, 360.0f);
 
@@ -8372,7 +8365,7 @@ auto RunIntroCinematic = [&]() {
 
         Vector3 forwardBob = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 
-        Vector3 rightBob   = Vector3Normalize(Vector3CrossProduct(forwardBob, (Vector3){ 0.0f, 1.0f, 0.0f }));
+        Vector3 rightBob   = Vector3Normalize(Vector3CrossProduct(forwardBob, Vector3{ 0.0f, 1.0f, 0.0f }));
 
         Vector3 upClean    = Vector3CrossProduct(rightBob, forwardBob);
 
@@ -8491,8 +8484,7 @@ auto RunIntroCinematic = [&]() {
                 const float SHOP_CAM_MAX_X = 107.2f;
 
                 const float SHOP_CAM_MIN_Z = 126.8f;
-
-                const float SHOP_CAM_MAX_Z = 153.2f;
+                const float SHOP_CAM_MAX_Z = 167.2f;
 
                 const float SHOP_CAM_MIN_Y = 10.6f;
 
@@ -8542,7 +8534,7 @@ auto RunIntroCinematic = [&]() {
 
                 }
 
-                maxT = Clamp(maxT, 0.25f, 1.0f);
+                maxT = Clamp(maxT, 0.55f, 1.0f);
 
                 idealPos = Vector3Add(camera.position, Vector3Scale(camDir, maxT));
 
@@ -8570,9 +8562,9 @@ auto RunIntroCinematic = [&]() {
 
                 }
 
-                renderCam.target = (Vector3){ camera.position.x, camera.position.y - 0.20f, camera.position.z };
+                renderCam.target = Vector3{ camera.position.x, camera.position.y - 0.20f, camera.position.z };
 
-                renderCam.up = (Vector3){0, 1, 0};
+                renderCam.up = Vector3{0, 1, 0};
 
             } else {
 
@@ -8590,7 +8582,7 @@ auto RunIntroCinematic = [&]() {
 
                 renderCam.target = camera.position;
 
-                renderCam.up = (Vector3){0, 1, 0};
+                renderCam.up = Vector3{0, 1, 0};
 
             }
 
@@ -8618,9 +8610,9 @@ auto RunIntroCinematic = [&]() {
 
                     float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.12f;
 
-                    renderCam.position = Vector3Add(renderCam.position, (Vector3){ jx, jy, jz });
+                    renderCam.position = Vector3Add(renderCam.position, Vector3{ jx, jy, jz });
 
-                    renderCam.target   = Vector3Add(renderCam.target,   (Vector3){ jx * 1.6f, jy * 1.6f, jz * 1.6f });
+                    renderCam.target   = Vector3Add(renderCam.target,   Vector3{ jx * 1.6f, jy * 1.6f, jz * 1.6f });
 
                 }
 
@@ -8637,33 +8629,20 @@ auto RunIntroCinematic = [&]() {
             float playerScale = 1.45f; // Bigger size
 
             Matrix m = MatrixIdentity();
-
             if (playerInShop) {
-
                 Color pLit = ApplyShopLighting(camera.position, { 230, 230, 235, 255 });
-
                 m.m0 = pLit.r / 255.0f;
-
                 m.m1 = pLit.g / 255.0f;
-
                 m.m2 = pLit.b / 255.0f;
-
+                m.m9 = 1.0f; // Precomputed lighting: bypass directional sun/moon override
             } else {
-
                 m.m0 = 1.0f; m.m1 = 1.0f; m.m2 = 1.0f;
-
+                m.m9 = 0.0f; // Exterior lighting with silhouette ambient floor in shader
             }
-
             m.m3 = 1.0f;
-
             m.m4 = playerScale; m.m5 = playerScale;
-
-            m.m8 = 3.0f; // Transparent entity
-
-            m.m9 = 0.0f; 
-
+            m.m8 = 3.0f; // Transparent entity (Player '@')
             m.m10 = 0.0f; // Billboard
-
             m.m11 = 1.0f;
 
             
@@ -8720,11 +8699,23 @@ auto RunIntroCinematic = [&]() {
 
             // Ground contact drop shadow for player entity
 
-            DrawCircle3D((Vector3){ camera.position.x, 10.018f, camera.position.z }, 0.45f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 8, 12, 185 });
+            DrawCircle3D(Vector3{ camera.position.x, 10.018f, camera.position.z }, 0.45f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 8, 12, 185 });
 
         } else {
 
-            if (g_gameState == STATE_MAIN_MENU) {
+            if (g_lookAtShop) {
+                renderCam.position = Vector3{ 104.5f, 12.0f, 135.2f };
+                renderCam.target = Vector3{ 104.4f, 11.72f, 133.5f };
+                renderCam.up = Vector3{ 0.0f, 1.0f, 0.0f };
+            } else if (g_lookAtWashroom) {
+                renderCam.position = Vector3{ 89.25f, 11.8f, 148.5f };
+                renderCam.target = Vector3{ 89.25f, 11.6f, 158.0f };
+                renderCam.up = Vector3{ 0.0f, 1.0f, 0.0f };
+            } else if (g_lookAtAtm) {
+                renderCam.position = Vector3{ 105.2f, 11.6f, 143.5f };
+                renderCam.target = Vector3{ 107.45f, 11.4f, 143.5f };
+                renderCam.up = Vector3{ 0.0f, 1.0f, 0.0f };
+            } else if (g_gameState == STATE_MAIN_MENU) {
 
                 Vector2 mPos = GetMousePosition();
                 float mNormX = Clamp((mPos.x / (float)curWinW - 0.5f) * 2.0f, -1.0f, 1.0f);
@@ -8753,7 +8744,7 @@ auto RunIntroCinematic = [&]() {
 
                 renderCam.position = basePos;
                 renderCam.target   = baseTgt;
-                renderCam.up       = (Vector3){ 0.0f, 1.0f, 0.0f };
+                renderCam.up       = Vector3{ 0.0f, 1.0f, 0.0f };
                 renderCam.fovy     = targetFov;
 
             } else {
@@ -8766,11 +8757,21 @@ auto RunIntroCinematic = [&]() {
 
                 renderCam.target = Vector3Add(renderCam.target, bobOffset);
 
-                if (g_waterState == WATER_STATE_SURFACE) {
-                    renderCam.target.y += g_waterSmoothTiltPitch;
+                if (g_lookAtSun) {
+                    Vector3 camFwd = (sunElev < -0.05f) ? moonDir : sunDir;
+                    Vector3 refUp = (fabsf(camFwd.y) > 0.90f) ? Vector3{ 0.0f, 0.0f, -1.0f } : Vector3{ 0.0f, 1.0f, 0.0f };
+                    Vector3 camR = Vector3Normalize(Vector3CrossProduct(camFwd, refUp));
+                    renderCam.target = Vector3Add(renderCam.position, Vector3Scale(camFwd, 20.0f));
+                    renderCam.up = Vector3Normalize(Vector3CrossProduct(camR, camFwd));
+                } else if (g_lookAtGround) {
+                    renderCam.target = Vector3Add(renderCam.position, Vector3{ 8.0f, -4.5f, 14.0f });
+                    renderCam.up = Vector3{ 0.0f, 1.0f, 0.0f };
+                } else {
+                    if (g_waterState == WATER_STATE_SURFACE) {
+                        renderCam.target.y += g_waterSmoothTiltPitch;
+                    }
+                    renderCam.up = rollUp;
                 }
-
-                renderCam.up = rollUp;
 
             }
 
@@ -8790,9 +8791,9 @@ auto RunIntroCinematic = [&]() {
 
                     float jz = ((float)GetRandomValue(-100, 100) / 100.0f) * grethnarJumpscareShake * 0.12f;
 
-                    renderCam.position = Vector3Add(renderCam.position, (Vector3){ jx, jy, jz });
+                    renderCam.position = Vector3Add(renderCam.position, Vector3{ jx, jy, jz });
 
-                    renderCam.target   = Vector3Add(renderCam.target,   (Vector3){ jx * 1.6f, jy * 1.6f, jz * 1.6f });
+                    renderCam.target   = Vector3Add(renderCam.target,   Vector3{ jx * 1.6f, jy * 1.6f, jz * 1.6f });
 
                 }
 
@@ -8932,7 +8933,7 @@ auto RunIntroCinematic = [&]() {
                     float sinA = sinf(angle);
 
                     Vector3 refFwd = (g_gameState == STATE_MAIN_MENU) ? Vector3Normalize(Vector3Subtract(renderCam.target, renderCam.position)) : forwardBob;
-                    if (Vector3Length(refFwd) < 0.01f) refFwd = (Vector3){ 0.0f, 0.0f, 1.0f };
+                    if (Vector3Length(refFwd) < 0.01f) refFwd = Vector3{ 0.0f, 0.0f, 1.0f };
                     float dx = refFwd.x * cosA - refFwd.z * sinA;
                     float dz = refFwd.x * sinA + refFwd.z * cosA;
                     Vector3 rainCenter = (g_gameState == STATE_MAIN_MENU) ? renderCam.position : camera.position;
@@ -9152,36 +9153,31 @@ auto RunIntroCinematic = [&]() {
         }
 
         // Update Haunted Washroom Real Planar Reflection Mirror Pre-pass (BEFORE BeginTextureMode(target) to prevent FBO conflict!)
-        UpdateShopWashroomMirror(camera, ApplyShopLighting, g_shopLightsOn, timeVal);
+        Camera3D shopEvalCam = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson) ? renderCam : camera;
+        UpdateShopWashroomMirror(shopEvalCam, ApplyShopLighting, g_shopLightsOn, timeVal);
+
+        // Update Midnight Security Monitor (CCTV CRT) Pre-pass
+        UpdateCounterCCTV(shopEvalCam, ApplyShopLighting, g_shopLightsOn, timeVal);
+
+        // Render Physically-Based Atmospheric Sky & Volumetric Clouds with Temporal Reconstruction
+        RenderAtmosphericSkyAndClouds(renderCam, sunTheta, sunDir, sunElev, lightningFlashTimer, timeVal, isUnderwaterScene);
 
         BeginTextureMode(target);
 
-        
-
         // Dynamic Celestial Atmospheric Sky Clearing (Bright realistic daylight in day, twilight in dusk, obsidian at night)
-
         float skyClearDay = Clamp((sunElev + 0.10f) / 0.35f, 0.0f, 1.0f);
-
         float skyClearTwi = Clamp(1.0f - fabsf(sunElev - 0.04f) / 0.16f, 0.0f, 1.0f);
-
         float skyClearNight = Clamp((-sunElev - 0.04f) / 0.22f, 0.0f, 1.0f);
-
         float sumSkyW = skyClearDay + skyClearTwi + skyClearNight;
-
         if (sumSkyW > 0.001f) { skyClearDay /= sumSkyW; skyClearTwi /= sumSkyW; skyClearNight /= sumSkyW; }
-
         Color baseSkyClear = {
-
             (unsigned char)Clamp(65.0f * skyClearDay + 35.0f * skyClearTwi + 4.0f * skyClearNight, 0.0f, 255.0f),
-
             (unsigned char)Clamp(145.0f * skyClearDay + 28.0f * skyClearTwi + 6.0f * skyClearNight, 0.0f, 255.0f),
-
             (unsigned char)Clamp(235.0f * skyClearDay + 55.0f * skyClearTwi + 14.0f * skyClearNight, 0.0f, 255.0f),
-
             255
         };
 
-        ClearBackground(baseSkyClear); 
+        CompositeAtmosphericSkyToTarget(target, isUnderwaterScene, baseSkyClear);
 
         
 
@@ -9281,11 +9277,7 @@ auto RunIntroCinematic = [&]() {
 
         
 
-        bool isDeepInStore = (camera.position.x <= 104.0f && camera.position.x >= 86.2f &&
-
-                              camera.position.z >= 126.2f && camera.position.z <= 153.8f);
-
-        float activeCullDistSq = isDeepInStore ? (38.0f * 38.0f) : cullDistSq;
+        float activeCullDistSq = cullDistSq;
 
 
 
@@ -9454,11 +9446,6 @@ auto RunIntroCinematic = [&]() {
 
         
 
-        // 3D Cloud Ground Shadows on Highway, Apron, and Terrain
-        if (!isUnderwaterScene) {
-            DrawCloudGroundShadows(renderCam, sunDir, sunElev);
-        }
-
         
 
         // 3D Player Ground Contact Shadow
@@ -9559,7 +9546,7 @@ auto RunIntroCinematic = [&]() {
 
 
 
-            return (Color){
+            return Color{
 
                 (unsigned char)Clamp(baseColor.r * rMul, 0.0f, 255.0f),
 
@@ -9602,15 +9589,15 @@ auto RunIntroCinematic = [&]() {
                 float manholeZs[2] = { 137.5f, 142.5f };
                 for (int m = 0; m < 2; m++) {
                     Vector3 mhPos = { 130.5f, 10.025f, manholeZs[m] };
-                    DrawCylinder(mhPos, 0.44f, 0.44f, 0.015f, 14, (Color){ 32, 30, 28, 255 });
-                    DrawCylinder((Vector3){ mhPos.x, mhPos.y + 0.016f, mhPos.z }, 0.12f, 0.12f, 0.02f, 10, (Color){ 180, 145, 55, 255 });
-                    DrawCircle3D(mhPos, 0.46f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 220, 180, 35, 180 });
+                    DrawCylinder(mhPos, 0.44f, 0.44f, 0.015f, 14, Color{ 32, 30, 28, 255 });
+                    DrawCylinder(Vector3{ mhPos.x, mhPos.y + 0.016f, mhPos.z }, 0.12f, 0.12f, 0.02f, 10, Color{ 180, 145, 55, 255 });
+                    DrawCircle3D(mhPos, 0.46f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 220, 180, 35, 180 });
                 }
 
                 // 6. ATTENDANT SERVICE BELL ON CENTRAL PILLAR (Z = 140.0)
                 Vector3 bellPos = { 127.72f, 11.45f, 140.0f };
-                DrawSphere(bellPos, 0.065f, (Color){ 215, 175, 55, 255 });
-                DrawCylinder((Vector3){ bellPos.x, 11.38f, bellPos.z }, 0.08f, 0.08f, 0.02f, 12, (Color){ 45, 42, 38, 255 });
+                DrawSphere(bellPos, 0.065f, Color{ 215, 175, 55, 255 });
+                DrawCylinder(Vector3{ bellPos.x, 11.38f, bellPos.z }, 0.08f, 0.08f, 0.02f, 12, Color{ 45, 42, 38, 255 });
 
                 // 7. 3D CUSTOMER CAR ON ROUTE 9
                 DrawCustomerCar(g_customerCar, g_nozzleInCar);
@@ -9632,7 +9619,7 @@ auto RunIntroCinematic = [&]() {
                     Vector3 hoseCoupling = Vector3Add(handleBot, Vector3Scale(camUp, -0.025f));
 
                     // Heavy catenary rubber hose from pump outlet to nozzle handle coupling
-                    DrawCatenaryHose(pumpOutlet, hoseCoupling, 0.90f, 16, 0.026f, (Color){ 16, 16, 18, 255 });
+                    DrawCatenaryHose(pumpOutlet, hoseCoupling, 0.90f, 16, 0.026f, Color{ 16, 16, 18, 255 });
 
                     // Draw first-person nozzle viewmodel if not in roof cam
                     if (!isRoofCamActive) {
@@ -9674,13 +9661,13 @@ auto RunIntroCinematic = [&]() {
                     // Outer Bezel
                     DrawCube({ sx, 11.75f, pz }, 0.035f, 0.72f, 0.62f, { 18, 20, 22, 255 });
                     // CRT Screen glass backing (dark glowing emerald green)
-                    Color crtCol = fluorLightOn ? (Color){ 6, 26, 12, 255 } : (Color){ 2, 8, 4, 255 };
+                    Color crtCol = fluorLightOn ? Color{ 6, 26, 12, 255 } : Color{ 2, 8, 4, 255 };
                     DrawCube({ sx, 11.75f, pz }, 0.040f, 0.64f, 0.54f, crtCol);
                     
                     // In-World 3D Textured CRT Screen
                     if (g_pumpScreenRTLoaded) {
                         float screenXOffset = (s == 0) ? -0.023f : 0.023f;
-                        Color crtTint = fluorLightOn ? WHITE : (Color){ 85, 95, 90, 255 };
+                        Color crtTint = fluorLightOn ? WHITE : Color{ 85, 95, 90, 255 };
                         DrawPumpCrtScreen3D({ sx + screenXOffset, 11.75f, pz }, 0.58f, 0.44f, g_pumpScreenRT.texture, (s == 0), crtTint);
                     }
 
@@ -9692,7 +9679,7 @@ auto RunIntroCinematic = [&]() {
                     rlPushMatrix();
                     rlTranslatef(sightGlassPos.x, sightGlassPos.y + 0.04f, sightGlassPos.z);
                     rlRotatef(turbAngle, 0.0f, 1.0f, 0.0f);
-                    DrawCube((Vector3){ 0.0f, 0.0f, 0.0f }, 0.06f, 0.03f, 0.015f, { 220, 25, 20, 255 }); // Red flow impeller
+                    DrawCube(Vector3{ 0.0f, 0.0f, 0.0f }, 0.06f, 0.03f, 0.015f, { 220, 25, 20, 255 }); // Red flow impeller
                     rlPopMatrix();
                 }
 
@@ -9703,14 +9690,14 @@ auto RunIntroCinematic = [&]() {
                     DrawCube({ 127.38f, 11.16f, pz - 0.25f }, 0.06f, 0.14f, 0.07f, { 70, 75, 82, 255 });
                     Vector3 pumpOutlet = { 127.42f, 11.2f, pz - 0.25f };
                     Vector3 cradleBase = { 127.42f, 10.3f, pz - 0.25f };
-                    DrawCatenaryHose(pumpOutlet, cradleBase, 0.35f, 8, 0.024f, (Color){ 16, 16, 18, 255 });
+                    DrawCatenaryHose(pumpOutlet, cradleBase, 0.35f, 8, 0.024f, Color{ 16, 16, 18, 255 });
                 }
                 // Right Lane Nozzle Cradle & Heavy Rubber Hose (East face, X = 128.58)
                 DrawCube({ 128.58f, 11.1f, pz + 0.25f }, 0.08f, 0.18f, 0.12f, { 18, 18, 18, 255 });
                 DrawCube({ 128.62f, 11.16f, pz + 0.25f }, 0.06f, 0.14f, 0.07f, { 70, 75, 82, 255 });
                 Vector3 pumpOutletR = { 128.58f, 11.2f, pz + 0.25f };
                 Vector3 cradleBaseR = { 128.58f, 10.3f, pz + 0.25f };
-                DrawCatenaryHose(pumpOutletR, cradleBaseR, 0.35f, 8, 0.024f, (Color){ 16, 16, 18, 255 });
+                DrawCatenaryHose(pumpOutletR, cradleBaseR, 0.35f, 8, 0.024f, Color{ 16, 16, 18, 255 });
             }
 
 
@@ -9720,14 +9707,14 @@ auto RunIntroCinematic = [&]() {
                 for (int v = 0; v < 3; v++) {
                     float vy = flapPos.y + (float)v * 0.12f + sinf(timeVal * 12.0f + (float)v) * 0.05f;
                     float vz = flapPos.z + cosf(timeVal * 8.0f + (float)v) * 0.06f;
-                    DrawCube((Vector3){ flapPos.x, vy, vz }, 0.06f, 0.06f, 0.06f, (Color){ 200, 200, 190, 45 }); // Vapor shimmer
+                    DrawCube(Vector3{ flapPos.x, vy, vz }, 0.06f, 0.06f, 0.06f, Color{ 200, 200, 190, 45 }); // Vapor shimmer
                 }
             } else if (g_customerCar.state == CAR_DEPARTING) {
                 Vector3 exhaustPos = { g_customerCar.pos.x - 0.70f, 10.35f, g_customerCar.pos.z - 2.2f };
                 for (int ex = 0; ex < 4; ex++) {
                     float exZ = exhaustPos.z - (float)ex * 0.45f;
                     float exY = exhaustPos.y + (float)ex * 0.14f;
-                    DrawSphere((Vector3){ exhaustPos.x, exY, exZ }, 0.12f + (float)ex * 0.08f, (Color){ 45, 45, 48, (unsigned char)(140 - ex * 30) });
+                    DrawSphere(Vector3{ exhaustPos.x, exY, exZ }, 0.12f + (float)ex * 0.08f, Color{ 45, 45, 48, (unsigned char)(140 - ex * 30) });
                 }
             }
 
@@ -9745,7 +9732,7 @@ auto RunIntroCinematic = [&]() {
 
             DrawCube({ 128.0f, 16.4f, 131.0f }, 3.6f, 1.8f, 0.20f, { 18, 12, 10, 255 });
 
-            Color signNeon = fluorLightOn ? (Color){ (unsigned char)(190 * flk), 10, 20, 255 } : (Color){ 25, 0, 5, 255 };
+            Color signNeon = fluorLightOn ? Color{ (unsigned char)(190 * flk), 10, 20, 255 } : Color{ 25, 0, 5, 255 };
 
             DrawCubeWires({ 128.0f, 16.4f, 131.0f }, 3.65f, 1.85f, 0.24f, signNeon);
 
@@ -9797,11 +9784,11 @@ auto RunIntroCinematic = [&]() {
 
             // Contact drop shadows for exterior gas pump island & pillars
 
-            DrawCube((Vector3){ 128.0f, 10.012f, 140.0f }, 4.6f, 0.005f, 14.6f, (Color){ 10, 10, 14, 185 });
+            DrawCube(Vector3{ 128.0f, 10.012f, 140.0f }, 4.6f, 0.005f, 14.6f, Color{ 10, 10, 14, 185 });
 
-            DrawCircle3D((Vector3){ 128.0f, 10.015f, 135.0f }, 0.85f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 8, 12, 195 });
+            DrawCircle3D(Vector3{ 128.0f, 10.015f, 135.0f }, 0.85f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 8, 12, 195 });
 
-            DrawCircle3D((Vector3){ 128.0f, 10.015f, 145.0f }, 0.85f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 8, 12, 195 });
+            DrawCircle3D(Vector3{ 128.0f, 10.015f, 145.0f }, 0.85f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 8, 12, 195 });
 
 
 
@@ -9849,7 +9836,7 @@ auto RunIntroCinematic = [&]() {
 
                 // South Lot Lamp Post
 
-                DrawCircle3D({ 113.5f, 10.015f, 127.0f }, 0.75f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 10, 10, 14, 175 });
+                DrawCircle3D({ 113.5f, 10.015f, 127.0f }, 0.75f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 10, 10, 14, 175 });
 
                 DrawCylinder({ 113.5f, 10.0f, 127.0f }, 0.09f, 0.09f, 4.8f, 8, { 35, 38, 42, 255 });
 
@@ -9863,7 +9850,7 @@ auto RunIntroCinematic = [&]() {
 
                 // North Lot Lamp Post
 
-                DrawCircle3D({ 113.5f, 10.015f, 153.0f }, 0.75f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 10, 10, 14, 175 });
+                DrawCircle3D({ 113.5f, 10.015f, 153.0f }, 0.75f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 10, 10, 14, 175 });
 
                 DrawCylinder({ 113.5f, 10.0f, 153.0f }, 0.09f, 0.09f, 4.8f, 8, { 35, 38, 42, 255 });
 
@@ -9955,21 +9942,21 @@ auto RunIntroCinematic = [&]() {
 
                 // A. HEAVY CAST-IRON HATCH RIM FLUSH WITH GROUND (X = 83.8, Y = 10.01, Z = 140.0)
 
-                DrawCube({ 83.8f, 10.005f, 140.0f }, 2.4f, 0.03f, 2.8f, (Color){ 30, 32, 36, 255 }); // Dark iron rim
+                DrawCube({ 83.8f, 10.005f, 140.0f }, 2.4f, 0.03f, 2.8f, Color{ 30, 32, 36, 255 }); // Dark iron rim
 
-                DrawCubeWires({ 83.8f, 10.010f, 140.0f }, 2.42f, 0.035f, 2.82f, (Color){ 18, 20, 22, 255 });
+                DrawCubeWires({ 83.8f, 10.010f, 140.0f }, 2.42f, 0.035f, 2.82f, Color{ 18, 20, 22, 255 });
 
 
 
                 // Corner mounting anchor bolts
 
-                DrawSphere({ 82.8f, 10.025f, 138.8f }, 0.04f, (Color){ 70, 72, 78, 255 });
+                DrawSphere({ 82.8f, 10.025f, 138.8f }, 0.04f, Color{ 70, 72, 78, 255 });
 
-                DrawSphere({ 84.8f, 10.025f, 138.8f }, 0.04f, (Color){ 70, 72, 78, 255 });
+                DrawSphere({ 84.8f, 10.025f, 138.8f }, 0.04f, Color{ 70, 72, 78, 255 });
 
-                DrawSphere({ 82.8f, 10.025f, 141.2f }, 0.04f, (Color){ 70, 72, 78, 255 });
+                DrawSphere({ 82.8f, 10.025f, 141.2f }, 0.04f, Color{ 70, 72, 78, 255 });
 
-                DrawSphere({ 84.8f, 10.025f, 141.2f }, 0.04f, (Color){ 70, 72, 78, 255 });
+                DrawSphere({ 84.8f, 10.025f, 141.2f }, 0.04f, Color{ 70, 72, 78, 255 });
 
 
 
@@ -9981,31 +9968,31 @@ auto RunIntroCinematic = [&]() {
 
                     Vector3 hPos = { 83.8f, 10.02f, 140.0f };
 
-                    DrawCube(hPos, 2.1f, 0.05f, 2.5f, (Color){ 48, 46, 44, 255 }); // Rusted steel diamond-plate
+                    DrawCube(hPos, 2.1f, 0.05f, 2.5f, Color{ 48, 46, 44, 255 }); // Rusted steel diamond-plate
 
-                    DrawCubeWires(hPos, 2.11f, 0.055f, 2.51f, (Color){ 24, 22, 20, 255 });
+                    DrawCubeWires(hPos, 2.11f, 0.055f, 2.51f, Color{ 24, 22, 20, 255 });
 
                     // Yellow & Black Industrial Hazard Stripes along border
 
-                    DrawCube({ hPos.x, hPos.y + 0.01f, hPos.z - 1.15f }, 2.0f, 0.01f, 0.14f, (Color){ 195, 155, 30, 255 });
+                    DrawCube({ hPos.x, hPos.y + 0.01f, hPos.z - 1.15f }, 2.0f, 0.01f, 0.14f, Color{ 195, 155, 30, 255 });
 
-                    DrawCube({ hPos.x, hPos.y + 0.01f, hPos.z + 1.15f }, 2.0f, 0.01f, 0.14f, (Color){ 195, 155, 30, 255 });
+                    DrawCube({ hPos.x, hPos.y + 0.01f, hPos.z + 1.15f }, 2.0f, 0.01f, 0.14f, Color{ 195, 155, 30, 255 });
 
-                    DrawCube({ hPos.x - 0.95f, hPos.y + 0.01f, hPos.z }, 0.14f, 0.01f, 2.2f, (Color){ 195, 155, 30, 255 });
+                    DrawCube({ hPos.x - 0.95f, hPos.y + 0.01f, hPos.z }, 0.14f, 0.01f, 2.2f, Color{ 195, 155, 30, 255 });
 
-                    DrawCube({ hPos.x + 0.95f, hPos.y + 0.01f, hPos.z }, 0.14f, 0.01f, 2.2f, (Color){ 195, 155, 30, 255 });
+                    DrawCube({ hPos.x + 0.95f, hPos.y + 0.01f, hPos.z }, 0.14f, 0.01f, 2.2f, Color{ 195, 155, 30, 255 });
 
                     // Heavy Rotary Latching Dog-Wheel & Center Lock Spindle
 
-                    DrawCylinder({ hPos.x, hPos.y + 0.02f, hPos.z }, 0.22f, 0.22f, 0.06f, 12, (Color){ 32, 34, 38, 255 });
+                    DrawCylinder({ hPos.x, hPos.y + 0.02f, hPos.z }, 0.22f, 0.22f, 0.06f, 12, Color{ 32, 34, 38, 255 });
 
-                    DrawCylinder({ hPos.x, hPos.y + 0.05f, hPos.z }, 0.06f, 0.06f, 0.08f, 8, (Color){ 65, 68, 75, 255 });
+                    DrawCylinder({ hPos.x, hPos.y + 0.05f, hPos.z }, 0.06f, 0.06f, 0.08f, 8, Color{ 65, 68, 75, 255 });
 
                     // Dual heavy steel slide bolts
 
-                    DrawCube({ hPos.x, hPos.y + 0.025f, hPos.z - 0.55f }, 1.6f, 0.04f, 0.09f, (Color){ 75, 78, 85, 255 });
+                    DrawCube({ hPos.x, hPos.y + 0.025f, hPos.z - 0.55f }, 1.6f, 0.04f, 0.09f, Color{ 75, 78, 85, 255 });
 
-                    DrawCube({ hPos.x, hPos.y + 0.025f, hPos.z + 0.55f }, 1.6f, 0.04f, 0.09f, (Color){ 75, 78, 85, 255 });
+                    DrawCube({ hPos.x, hPos.y + 0.025f, hPos.z + 0.55f }, 1.6f, 0.04f, 0.09f, Color{ 75, 78, 85, 255 });
 
                 } else {
 
@@ -10019,15 +10006,15 @@ auto RunIntroCinematic = [&]() {
 
                     Vector3 hCenter = { hPivot.x - sinf(radH) * 1.05f, hPivot.y + cosf(radH) * 1.05f, 140.0f };
 
-                    DrawCube(hCenter, 0.08f, 2.1f, 2.5f, (Color){ 48, 46, 44, 255 });
+                    DrawCube(hCenter, 0.08f, 2.1f, 2.5f, Color{ 48, 46, 44, 255 });
 
-                    DrawCubeWires(hCenter, 0.085f, 2.11f, 2.51f, (Color){ 24, 22, 20, 255 });
+                    DrawCubeWires(hCenter, 0.085f, 2.11f, 2.51f, Color{ 24, 22, 20, 255 });
 
                     // Heavy hinge brackets
 
-                    DrawCube({ 82.75f, 10.05f, 139.2f }, 0.24f, 0.12f, 0.16f, (Color){ 32, 34, 38, 255 });
+                    DrawCube({ 82.75f, 10.05f, 139.2f }, 0.24f, 0.12f, 0.16f, Color{ 32, 34, 38, 255 });
 
-                    DrawCube({ 82.75f, 10.05f, 140.8f }, 0.24f, 0.12f, 0.16f, (Color){ 32, 34, 38, 255 });
+                    DrawCube({ 82.75f, 10.05f, 140.8f }, 0.24f, 0.12f, 0.16f, Color{ 32, 34, 38, 255 });
 
                 }
 
@@ -10039,9 +10026,9 @@ auto RunIntroCinematic = [&]() {
 
                     // Weathered timber resting block supporting the leaning shovel shaft
 
-                    DrawCube((Vector3){ 84.40f, 10.20f, 138.15f }, 0.30f, 0.36f, 0.45f, (Color){ 58, 42, 28, 255 });
+                    DrawCube(Vector3{ 84.40f, 10.20f, 138.15f }, 0.30f, 0.36f, 0.45f, Color{ 58, 42, 28, 255 });
 
-                    DrawCubeWires((Vector3){ 84.40f, 10.20f, 138.15f }, 0.31f, 0.37f, 0.46f, (Color){ 32, 22, 16, 255 });
+                    DrawCubeWires(Vector3{ 84.40f, 10.20f, 138.15f }, 0.31f, 0.37f, 0.46f, Color{ 32, 22, 16, 255 });
 
 
 
@@ -10061,7 +10048,7 @@ auto RunIntroCinematic = [&]() {
 
                     float shGlow = 0.5f + 0.35f * sinf(timeVal * 4.0f);
 
-                    DrawCircle3D((Vector3){ 84.22f, 10.035f, 138.87f }, 0.45f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 255, 215, 80, (unsigned char)(45 * shGlow) });
+                    DrawCircle3D(Vector3{ 84.22f, 10.035f, 138.87f }, 0.45f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 255, 215, 80, (unsigned char)(45 * shGlow) });
 
                 }
 
@@ -10079,17 +10066,17 @@ auto RunIntroCinematic = [&]() {
 
                 // Heavy wool fabric base
 
-                DrawCube(cPos, cScaleX, 0.03f + cFoldY, 3.4f, (Color){ 105, 18, 22, 255 });
+                DrawCube(cPos, cScaleX, 0.03f + cFoldY, 3.4f, Color{ 105, 18, 22, 255 });
 
-                DrawCube({ cPos.x, cPos.y + 0.006f, cPos.z }, cScaleX * 0.88f, 0.03f, 3.0f, (Color){ 165, 125, 35, 255 });
+                DrawCube({ cPos.x, cPos.y + 0.006f, cPos.z }, cScaleX * 0.88f, 0.03f, 3.0f, Color{ 165, 125, 35, 255 });
 
-                DrawCube({ cPos.x, cPos.y + 0.010f, cPos.z }, cScaleX * 0.74f, 0.03f, 2.6f, (Color){ 75, 12, 15, 255 });
+                DrawCube({ cPos.x, cPos.y + 0.010f, cPos.z }, cScaleX * 0.74f, 0.03f, 2.6f, Color{ 75, 12, 15, 255 });
 
                 // Fringe & damp mud weathering
 
-                DrawCube({ cPos.x, cPos.y + 0.003f, cPos.z - 1.72f }, cScaleX, 0.015f, 0.12f, (Color){ 175, 160, 125, 240 });
+                DrawCube({ cPos.x, cPos.y + 0.003f, cPos.z - 1.72f }, cScaleX, 0.015f, 0.12f, Color{ 175, 160, 125, 240 });
 
-                DrawCube({ cPos.x, cPos.y + 0.003f, cPos.z + 1.72f }, cScaleX, 0.015f, 0.12f, (Color){ 175, 160, 125, 240 });
+                DrawCube({ cPos.x, cPos.y + 0.003f, cPos.z + 1.72f }, cScaleX, 0.015f, 0.12f, Color{ 175, 160, 125, 240 });
 
 
 
@@ -10099,11 +10086,11 @@ auto RunIntroCinematic = [&]() {
 
                     // Dark steel & concrete lined shaft interior walls
 
-                    DrawCube({ 83.8f, 8.0f, 138.6f }, 2.4f, 4.0f, 0.20f, (Color){ 26, 28, 32, 255 }); // South wall
+                    DrawCube({ 83.8f, 8.0f, 138.6f }, 2.4f, 4.0f, 0.20f, Color{ 26, 28, 32, 255 }); // South wall
 
-                    DrawCube({ 83.8f, 8.0f, 141.4f }, 2.4f, 4.0f, 0.20f, (Color){ 26, 28, 32, 255 }); // North wall
+                    DrawCube({ 83.8f, 8.0f, 141.4f }, 2.4f, 4.0f, 0.20f, Color{ 26, 28, 32, 255 }); // North wall
 
-                    DrawCube({ 85.0f, 8.0f, 140.0f }, 0.20f, 4.0f, 2.6f, (Color){ 26, 28, 32, 255 }); // East wall
+                    DrawCube({ 85.0f, 8.0f, 140.0f }, 0.20f, 4.0f, 2.6f, Color{ 26, 28, 32, 255 }); // East wall
 
 
 
@@ -10119,23 +10106,23 @@ auto RunIntroCinematic = [&]() {
 
                         // Steel step tread
 
-                        DrawCube({ stX, stY, 140.0f }, 0.36f, 0.08f, 2.2f, (Color){ 52, 50, 48, 255 });
+                        DrawCube({ stX, stY, 140.0f }, 0.36f, 0.08f, 2.2f, Color{ 52, 50, 48, 255 });
 
                         // Safety yellow abrasive nosing strip
 
-                        DrawCube({ stX - 0.16f, stY + 0.01f, 140.0f }, 0.05f, 0.08f, 2.18f, (Color){ 210, 175, 40, 255 });
+                        DrawCube({ stX - 0.16f, stY + 0.01f, 140.0f }, 0.05f, 0.08f, 2.18f, Color{ 210, 175, 40, 255 });
 
                     }
 
                     // Tubular steel safety handrails inside the shaft
 
-                    DrawLine3D({ 84.6f, 10.4f, 139.0f }, { 82.0f, 7.3f, 139.0f }, (Color){ 55, 58, 65, 255 });
+                    DrawLine3D({ 84.6f, 10.4f, 139.0f }, { 82.0f, 7.3f, 139.0f }, Color{ 55, 58, 65, 255 });
 
-                    DrawLine3D({ 84.6f, 10.4f, 141.0f }, { 82.0f, 7.3f, 141.0f }, (Color){ 55, 58, 65, 255 });
+                    DrawLine3D({ 84.6f, 10.4f, 141.0f }, { 82.0f, 7.3f, 141.0f }, Color{ 55, 58, 65, 255 });
 
                     // Cold green-blue industrial mist wafting from shaft
 
-                    DrawCube({ 83.4f, 7.5f, 140.0f }, 2.0f, 2.8f, 2.2f, (Color){ 120, 180, 200, 28 });
+                    DrawCube({ 83.4f, 7.5f, 140.0f }, 2.0f, 2.8f, 2.2f, Color{ 120, 180, 200, 28 });
 
                 }
 
@@ -10187,25 +10174,25 @@ auto RunIntroCinematic = [&]() {
 
                         // 1. Rusted Heavy Diamond-Plate Steel Floor with Center Drainage Grate
 
-                        DrawCube({ cx, cy - 0.12f, 140.0f }, dx, 0.24f, 5.8f, (Color){ 36, 34, 33, 255 });
+                        DrawCube({ cx, cy - 0.12f, 140.0f }, dx, 0.24f, 5.8f, Color{ 36, 34, 33, 255 });
 
                         // Raised floor plating (Left & Right walkways)
 
-                        DrawCube({ cx, cy + 0.02f, 138.4f }, dx * 0.95f, 0.06f, 2.2f, (Color){ 48, 45, 43, 255 });
+                        DrawCube({ cx, cy + 0.02f, 138.4f }, dx * 0.95f, 0.06f, 2.2f, Color{ 48, 45, 43, 255 });
 
-                        DrawCube({ cx, cy + 0.02f, 141.6f }, dx * 0.95f, 0.06f, 2.2f, (Color){ 48, 45, 43, 255 });
+                        DrawCube({ cx, cy + 0.02f, 141.6f }, dx * 0.95f, 0.06f, 2.2f, Color{ 48, 45, 43, 255 });
 
                         // Recessed Center Drainage Trench with Rusted Iron Grate
 
-                        DrawCube({ cx, cy - 0.08f, 140.0f }, dx, 0.14f, 1.1f, (Color){ 16, 15, 14, 255 });
+                        DrawCube({ cx, cy - 0.08f, 140.0f }, dx, 0.14f, 1.1f, Color{ 16, 15, 14, 255 });
 
-                        DrawCube({ cx, cy - 0.02f, 140.0f }, dx * 0.9f, 0.02f, 1.0f, (Color){ 30, 28, 26, 255 }); // Grating
+                        DrawCube({ cx, cy - 0.02f, 140.0f }, dx * 0.9f, 0.02f, 1.0f, Color{ 30, 28, 26, 255 }); // Grating
 
                         // Stagnant black fluid / dried blood in trench
 
                         if (s % 2 == 0) {
 
-                            DrawCube({ cx, cy - 0.04f, 140.0f }, dx * 0.7f, 0.01f, 0.85f, (Color){ 35, 10, 12, 230 });
+                            DrawCube({ cx, cy - 0.04f, 140.0f }, dx * 0.7f, 0.01f, 0.85f, Color{ 35, 10, 12, 230 });
 
                         }
 
@@ -10213,13 +10200,13 @@ auto RunIntroCinematic = [&]() {
 
                         // 2. Dark Rusted Corrugated Steel Walls
 
-                        DrawCube({ cx, cy + wallH * 0.5f, 137.1f }, dx, wallH, 0.35f, (Color){ 42, 40, 38, 255 }); // South wall
+                        DrawCube({ cx, cy + wallH * 0.5f, 137.1f }, dx, wallH, 0.35f, Color{ 42, 40, 38, 255 }); // South wall
 
-                        DrawCube({ cx, cy + wallH * 0.5f, 142.9f }, dx, wallH, 0.35f, (Color){ 42, 40, 38, 255 }); // North wall
+                        DrawCube({ cx, cy + wallH * 0.5f, 142.9f }, dx, wallH, 0.35f, Color{ 42, 40, 38, 255 }); // North wall
 
                         // Heavy Rusted Corrugated Arched Steel Ceiling
 
-                        DrawCube({ cx, ceilY, 140.0f }, dx, 0.32f, 6.0f, (Color){ 32, 30, 28, 255 });
+                        DrawCube({ cx, ceilY, 140.0f }, dx, 0.32f, 6.0f, Color{ 32, 30, 28, 255 });
 
 
 
@@ -10241,17 +10228,17 @@ auto RunIntroCinematic = [&]() {
 
                             // Riveted triangular corner gussets
 
-                            DrawCube({ cx, ceilY - 0.40f, 137.75f }, 0.26f, 0.32f, 0.32f, (Color){ 40, 38, 36, 255 });
+                            DrawCube({ cx, ceilY - 0.40f, 137.75f }, 0.26f, 0.32f, 0.32f, Color{ 40, 38, 36, 255 });
 
-                            DrawCube({ cx, ceilY - 0.40f, 142.25f }, 0.26f, 0.32f, 0.32f, (Color){ 40, 38, 36, 255 });
+                            DrawCube({ cx, ceilY - 0.40f, 142.25f }, 0.26f, 0.32f, 0.32f, Color{ 40, 38, 36, 255 });
 
 
 
                             // Yellow/Black Hazard Stencil on bulkheads
 
-                            DrawCube({ cx + 0.15f, cy + 1.6f, 137.45f }, 0.02f, 0.6f, 0.18f, (Color){ 190, 150, 25, 240 });
+                            DrawCube({ cx + 0.15f, cy + 1.6f, 137.45f }, 0.02f, 0.6f, 0.18f, Color{ 190, 150, 25, 240 });
 
-                            DrawCube({ cx + 0.15f, cy + 1.6f, 142.55f }, 0.02f, 0.6f, 0.18f, (Color){ 190, 150, 25, 240 });
+                            DrawCube({ cx + 0.15f, cy + 1.6f, 142.55f }, 0.02f, 0.6f, 0.18f, Color{ 190, 150, 25, 240 });
 
 
 
@@ -10269,11 +10256,11 @@ auto RunIntroCinematic = [&]() {
 
                                 // Protective steel wire cage
 
-                                DrawCubeWires(lampP, 0.24f, 0.28f, 0.24f, (Color){ 60, 58, 55, 240 });
+                                DrawCubeWires(lampP, 0.24f, 0.28f, 0.24f, Color{ 60, 58, 55, 240 });
 
                                 // Sickly pool of light on the diamond-plate floor
 
-                                DrawCircle3D((Vector3){ cx, cy + 0.05f, 140.0f }, 4.4f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 200, 120, 25, (unsigned char)(40 * flicker) });
+                                DrawCircle3D(Vector3{ cx, cy + 0.05f, 140.0f }, 4.4f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 200, 120, 25, (unsigned char)(40 * flicker) });
 
                             }
 
@@ -10285,17 +10272,17 @@ auto RunIntroCinematic = [&]() {
 
                         // High-pressure steam/water utility pipes along North wall
 
-                        DrawCylinderEx({ x0, cy + 2.8f, 142.45f }, { x1, cy + 2.8f, 142.45f }, 0.07f, 0.07f, 6, (Color){ 75, 45, 35, 255 });
+                        DrawCylinderEx({ x0, cy + 2.8f, 142.45f }, { x1, cy + 2.8f, 142.45f }, 0.07f, 0.07f, 6, Color{ 75, 45, 35, 255 });
 
-                        DrawCylinderEx({ x0, cy + 2.6f, 142.45f }, { x1, cy + 2.6f, 142.45f }, 0.05f, 0.05f, 6, (Color){ 65, 40, 30, 255 });
+                        DrawCylinderEx({ x0, cy + 2.6f, 142.45f }, { x1, cy + 2.6f, 142.45f }, 0.05f, 0.05f, 6, Color{ 65, 40, 30, 255 });
 
                         // Sagging black rubber electrical cable bundle along ceiling
 
                         float cableSag = 0.14f * sinf(frac0 * PI * 12.0f);
 
-                        DrawLine3D({ x0, ceilY - 0.25f, 138.8f }, { x1, ceilY - 0.25f - cableSag, 138.8f }, (Color){ 20, 20, 22, 255 });
+                        DrawLine3D({ x0, ceilY - 0.25f, 138.8f }, { x1, ceilY - 0.25f - cableSag, 138.8f }, Color{ 20, 20, 22, 255 });
 
-                        DrawLine3D({ x0, ceilY - 0.28f, 139.0f }, { x1, ceilY - 0.28f - cableSag, 139.0f }, (Color){ 22, 22, 24, 255 });
+                        DrawLine3D({ x0, ceilY - 0.28f, 139.0f }, { x1, ceilY - 0.28f - cableSag, 139.0f }, Color{ 22, 22, 24, 255 });
 
                     }
 
@@ -10307,43 +10294,43 @@ auto RunIntroCinematic = [&]() {
 
                         // Catastrophic structural collapse: buckled corrugated steel plates, sheared I-beams & rock
 
-                        DrawCube({ 62.0f, 2.8f, 140.0f }, 2.6f, 4.2f, 5.8f, (Color){ 34, 32, 30, 255 }); // Core impassable rubble
+                        DrawCube({ 62.0f, 2.8f, 140.0f }, 2.6f, 4.2f, 5.8f, Color{ 34, 32, 30, 255 }); // Core impassable rubble
 
                         // Buckled, torn corrugated steel siding crushed inward
 
-                        DrawCube({ 62.6f, 2.4f, 138.6f }, 0.9f, 2.2f, 2.0f, (Color){ 52, 48, 44, 255 });
+                        DrawCube({ 62.6f, 2.4f, 138.6f }, 0.9f, 2.2f, 2.0f, Color{ 52, 48, 44, 255 });
 
-                        DrawCube({ 62.5f, 3.2f, 141.4f }, 1.1f, 1.8f, 1.8f, (Color){ 46, 44, 42, 255 });
+                        DrawCube({ 62.5f, 3.2f, 141.4f }, 1.1f, 1.8f, 1.8f, Color{ 46, 44, 42, 255 });
 
                         // Sheared twisted structural I-Beams protruding out at angles
 
-                        DrawCube({ 62.8f, 2.6f, 139.5f }, 0.22f, 3.0f, 0.22f, (Color){ 68, 64, 60, 255 });
+                        DrawCube({ 62.8f, 2.6f, 139.5f }, 0.22f, 3.0f, 0.22f, Color{ 68, 64, 60, 255 });
 
-                        DrawCube({ 62.7f, 3.5f, 140.6f }, 0.24f, 0.24f, 2.6f, (Color){ 62, 58, 54, 255 });
+                        DrawCube({ 62.7f, 3.5f, 140.6f }, 0.24f, 0.24f, 2.6f, Color{ 62, 58, 54, 255 });
 
                         // Fractured rebar mesh and sharp bedrock slabs
 
-                        DrawCube({ 62.9f, 1.7f, 140.2f }, 0.8f, 1.3f, 2.2f, (Color){ 38, 36, 34, 255 });
+                        DrawCube({ 62.9f, 1.7f, 140.2f }, 0.8f, 1.3f, 2.2f, Color{ 38, 36, 34, 255 });
 
-                        DrawLine3D({ 62.9f, 3.2f, 139.0f }, { 63.3f, 1.8f, 141.0f }, (Color){ 90, 85, 80, 255 });
+                        DrawLine3D({ 62.9f, 3.2f, 139.0f }, { 63.3f, 1.8f, 141.0f }, Color{ 90, 85, 80, 255 });
 
-                        DrawLine3D({ 62.9f, 2.2f, 141.5f }, { 63.4f, 3.6f, 139.5f }, (Color){ 90, 85, 80, 255 });
+                        DrawLine3D({ 62.9f, 2.2f, 141.5f }, { 63.4f, 3.6f, 139.5f }, Color{ 90, 85, 80, 255 });
 
                     } else {
 
                         // Excavated passage breach: sheared steel and rubble cleared to the flanks
 
-                        DrawCube({ 62.0f, 1.8f, 137.6f }, 2.4f, 2.4f, 1.2f, (Color){ 42, 40, 38, 255 });
+                        DrawCube({ 62.0f, 1.8f, 137.6f }, 2.4f, 2.4f, 1.2f, Color{ 42, 40, 38, 255 });
 
-                        DrawCube({ 62.0f, 1.8f, 142.4f }, 2.4f, 2.4f, 1.2f, (Color){ 42, 40, 38, 255 });
+                        DrawCube({ 62.0f, 1.8f, 142.4f }, 2.4f, 2.4f, 1.2f, Color{ 42, 40, 38, 255 });
 
                         // Excavated trench through the buckled diamond-plate floor
 
-                        DrawCube({ 62.0f, 1.12f, 140.0f }, 2.6f, 0.06f, 3.4f, (Color){ 22, 20, 18, 255 });
+                        DrawCube({ 62.0f, 1.12f, 140.0f }, 2.6f, 0.06f, 3.4f, Color{ 22, 20, 18, 255 });
 
                         // Cold draft & blue haze drifting from the lower abyss
 
-                        DrawCube({ 61.2f, 2.5f, 140.0f }, 2.0f, 3.2f, 3.4f, (Color){ 130, 185, 210, 32 });
+                        DrawCube({ 61.2f, 2.5f, 140.0f }, 2.0f, 3.2f, 3.4f, Color{ 130, 185, 210, 32 });
 
                     }
 
@@ -10377,15 +10364,15 @@ auto RunIntroCinematic = [&]() {
 
                             // 1. Massive Circular Ribbed Subterranean Conduit Plating
 
-                            DrawCube({ cx, cy - 0.14f, 140.0f }, dx, 0.28f, 5.8f, (Color){ 28, 26, 26, 255 });
+                            DrawCube({ cx, cy - 0.14f, 140.0f }, dx, 0.28f, 5.8f, Color{ 28, 26, 26, 255 });
 
                             // Murky sludgy water pooling over the steel plates
 
-                            DrawCube({ cx, cy + 0.02f, 140.0f }, dx * 0.95f, 0.05f, 5.4f, (Color){ 20, 22, 25, 255 });
+                            DrawCube({ cx, cy + 0.02f, 140.0f }, dx * 0.95f, 0.05f, 5.4f, Color{ 20, 22, 25, 255 });
 
                             if (ds % 3 == 0) {
 
-                                DrawCube({ cx, cy + 0.05f, 140.0f }, dx * 0.8f, 0.01f, 3.8f, (Color){ 10, 14, 18, 235 });
+                                DrawCube({ cx, cy + 0.05f, 140.0f }, dx * 0.8f, 0.01f, 3.8f, Color{ 10, 14, 18, 235 });
 
                             }
 
@@ -10393,11 +10380,11 @@ auto RunIntroCinematic = [&]() {
 
                             // Curved corrugated steel conduit walls & ceiling
 
-                            DrawCube({ cx, cy + 2.0f, 137.1f }, dx, 4.2f, 0.40f, (Color){ 32, 30, 30, 255 });
+                            DrawCube({ cx, cy + 2.0f, 137.1f }, dx, 4.2f, 0.40f, Color{ 32, 30, 30, 255 });
 
-                            DrawCube({ cx, cy + 2.0f, 142.9f }, dx, 4.2f, 0.40f, (Color){ 32, 30, 30, 255 });
+                            DrawCube({ cx, cy + 2.0f, 142.9f }, dx, 4.2f, 0.40f, Color{ 32, 30, 30, 255 });
 
-                            DrawCube({ cx, cy + 4.1f, 140.0f }, dx, 0.40f, 6.0f, (Color){ 26, 25, 26, 255 });
+                            DrawCube({ cx, cy + 4.1f, 140.0f }, dx, 0.40f, 6.0f, Color{ 26, 25, 26, 255 });
 
 
 
@@ -10419,11 +10406,11 @@ auto RunIntroCinematic = [&]() {
 
                                 if (ds == 8 || ds == 12) {
 
-                                    DrawLine3D({ cx, cy + 3.8f, 142.5f }, { cx + 0.3f, cy + 2.6f, 142.1f }, (Color){ 25, 25, 28, 255 });
+                                    DrawLine3D({ cx, cy + 3.8f, 142.5f }, { cx + 0.3f, cy + 2.6f, 142.1f }, Color{ 25, 25, 28, 255 });
 
                                     if ((int)(GetTime() * 5.0f) % 3 == 0) {
 
-                                        DrawSphere({ cx + 0.3f, cy + 2.6f, 142.1f }, 0.08f, (Color){ 140, 220, 255, 255 });
+                                        DrawSphere({ cx + 0.3f, cy + 2.6f, 142.1f }, 0.08f, Color{ 140, 220, 255, 255 });
 
                                     }
 
@@ -10439,11 +10426,11 @@ auto RunIntroCinematic = [&]() {
 
                         // Opening out of the mountain bedrock into The Abandoned Village
 
-                        DrawCube({ 32.0f, -13.8f, 140.0f }, 0.8f, 4.8f, 5.8f, (Color){ 24, 22, 24, 255 });
+                        DrawCube({ 32.0f, -13.8f, 140.0f }, 0.8f, 4.8f, 5.8f, Color{ 24, 22, 24, 255 });
 
                         // Heavy sheared pressure door propped against rock wall
 
-                        DrawCube({ 31.6f, -14.2f, 137.8f }, 0.16f, 3.8f, 1.8f, (Color){ 48, 45, 44, 255 });
+                        DrawCube({ 31.6f, -14.2f, 137.8f }, 0.16f, 3.8f, 1.8f, Color{ 48, 45, 44, 255 });
 
                     }
 
@@ -10465,29 +10452,29 @@ auto RunIntroCinematic = [&]() {
 
                     // A. Vast Sunken Valley Ground Plane
 
-                    DrawCube({ -6.5f, -16.12f, 140.0f }, 78.0f, 0.24f, 70.0f, (Color){ 18, 22, 17, 255 });
+                    DrawCube({ -6.5f, -16.12f, 140.0f }, 78.0f, 0.24f, 70.0f, Color{ 18, 22, 17, 255 });
 
                     // Muddy cart tracks and cobblestone path winding through village
 
-                    DrawCube({ 3.5f, -16.00f, 140.0f }, 58.0f, 0.02f, 3.2f, (Color){ 28, 25, 20, 255 });
+                    DrawCube({ 3.5f, -16.00f, 140.0f }, 58.0f, 0.02f, 3.2f, Color{ 28, 25, 20, 255 });
 
                     // Rolling ground mist sheets
 
-                    DrawCube({ -6.5f, -15.55f, 140.0f }, 76.0f, 0.65f, 68.0f, (Color){ 175, 195, 210, 32 });
+                    DrawCube({ -6.5f, -15.55f, 140.0f }, 76.0f, 0.65f, 68.0f, Color{ 175, 195, 210, 32 });
 
 
 
                     // Surrounding Dark Mountain Cliff Backdrops
 
-                    DrawCube({ -45.5f, -8.0f, 140.0f }, 2.0f, 18.0f, 72.0f, (Color){ 14, 16, 18, 255 }); // West cliff
+                    DrawCube({ -45.5f, -8.0f, 140.0f }, 2.0f, 18.0f, 72.0f, Color{ 14, 16, 18, 255 }); // West cliff
 
-                    DrawCube({ 32.5f, -8.0f, 122.0f }, 2.0f, 18.0f, 34.0f, (Color){ 14, 16, 18, 255 });  // East cliff South
+                    DrawCube({ 32.5f, -8.0f, 122.0f }, 2.0f, 18.0f, 34.0f, Color{ 14, 16, 18, 255 });  // East cliff South
 
-                    DrawCube({ 32.5f, -8.0f, 158.0f }, 2.0f, 18.0f, 34.0f, (Color){ 14, 16, 18, 255 });  // East cliff North
+                    DrawCube({ 32.5f, -8.0f, 158.0f }, 2.0f, 18.0f, 34.0f, Color{ 14, 16, 18, 255 });  // East cliff North
 
-                    DrawCube({ -6.5f, -8.0f, 104.5f }, 80.0f, 18.0f, 2.0f, (Color){ 14, 16, 18, 255 });  // South cliff
+                    DrawCube({ -6.5f, -8.0f, 104.5f }, 80.0f, 18.0f, 2.0f, Color{ 14, 16, 18, 255 });  // South cliff
 
-                    DrawCube({ -6.5f, -8.0f, 175.5f }, 80.0f, 18.0f, 2.0f, (Color){ 14, 16, 18, 255 });  // North cliff
+                    DrawCube({ -6.5f, -8.0f, 175.5f }, 80.0f, 18.0f, 2.0f, Color{ 14, 16, 18, 255 });  // North cliff
 
 
 
@@ -10499,31 +10486,31 @@ auto RunIntroCinematic = [&]() {
 
                         // Circular stone cylinder well lip
 
-                        DrawCylinder(wellP, 1.25f, 1.25f, 1.1f, 14, (Color){ 62, 65, 70, 255 });
+                        DrawCylinder(wellP, 1.25f, 1.25f, 1.1f, 14, Color{ 62, 65, 70, 255 });
 
-                        DrawCylinder((Vector3){ wellP.x, wellP.y + 0.05f, wellP.z }, 0.95f, 0.95f, 1.2f, 14, (Color){ 8, 9, 11, 255 }); // Dark interior void
+                        DrawCylinder(Vector3{ wellP.x, wellP.y + 0.05f, wellP.z }, 0.95f, 0.95f, 1.2f, 14, Color{ 8, 9, 11, 255 }); // Dark interior void
 
                         // Weathered timber upright canopy posts
 
-                        DrawCube({ 8.0f, -13.8f, 138.9f }, 0.16f, 2.4f, 0.16f, (Color){ 68, 50, 32, 255 });
+                        DrawCube({ 8.0f, -13.8f, 138.9f }, 0.16f, 2.4f, 0.16f, Color{ 68, 50, 32, 255 });
 
-                        DrawCube({ 8.0f, -13.8f, 141.1f }, 0.16f, 2.4f, 0.16f, (Color){ 68, 50, 32, 255 });
+                        DrawCube({ 8.0f, -13.8f, 141.1f }, 0.16f, 2.4f, 0.16f, Color{ 68, 50, 32, 255 });
 
                         // Crank spindle axle and wooden drum
 
-                        DrawCylinderEx({ 8.0f, -13.6f, 138.9f }, { 8.0f, -13.6f, 141.1f }, 0.07f, 0.07f, 8, (Color){ 52, 38, 24, 255 });
+                        DrawCylinderEx({ 8.0f, -13.6f, 138.9f }, { 8.0f, -13.6f, 141.1f }, 0.07f, 0.07f, 8, Color{ 52, 38, 24, 255 });
 
                         // A-frame shingled roof canopy
 
-                        DrawCube({ 8.0f, -12.5f, 140.0f }, 1.8f, 0.22f, 2.6f, (Color){ 44, 34, 24, 255 });
+                        DrawCube({ 8.0f, -12.5f, 140.0f }, 1.8f, 0.22f, 2.6f, Color{ 44, 34, 24, 255 });
 
-                        DrawLine3D({ 7.1f, -12.7f, 140.0f }, { 8.0f, -12.2f, 140.0f }, (Color){ 75, 55, 35, 255 });
+                        DrawLine3D({ 7.1f, -12.7f, 140.0f }, { 8.0f, -12.2f, 140.0f }, Color{ 75, 55, 35, 255 });
 
                         // Frayed rope & wooden bucket
 
-                        DrawLine3D({ 8.0f, -13.6f, 140.0f }, { 8.0f, -15.2f, 140.0f }, (Color){ 160, 145, 115, 255 });
+                        DrawLine3D({ 8.0f, -13.6f, 140.0f }, { 8.0f, -15.2f, 140.0f }, Color{ 160, 145, 115, 255 });
 
-                        DrawCylinder({ 8.0f, -15.35f, 140.0f }, 0.14f, 0.12f, 0.22f, 8, (Color){ 75, 52, 32, 255 });
+                        DrawCylinder({ 8.0f, -15.35f, 140.0f }, 0.14f, 0.12f, 0.22f, 8, Color{ 75, 52, 32, 255 });
 
                     }
 
@@ -10537,45 +10524,45 @@ auto RunIntroCinematic = [&]() {
 
                         // Wooden floor foundation
 
-                        DrawCube({ cabP.x, cabP.y + 0.15f, cabP.z }, 8.0f, 0.30f, 6.4f, (Color){ 48, 36, 24, 255 });
+                        DrawCube({ cabP.x, cabP.y + 0.15f, cabP.z }, 8.0f, 0.30f, 6.4f, Color{ 48, 36, 24, 255 });
 
                         // Weathered horizontal log walls
 
-                        DrawCube({ cabP.x, cabP.y + 2.0f, cabP.z + 3.1f }, 8.0f, 3.5f, 0.22f, (Color){ 58, 44, 30, 255 }); // Back (North)
+                        DrawCube({ cabP.x, cabP.y + 2.0f, cabP.z + 3.1f }, 8.0f, 3.5f, 0.22f, Color{ 58, 44, 30, 255 }); // Back (North)
 
-                        DrawCube({ cabP.x - 3.9f, cabP.y + 2.0f, cabP.z }, 0.22f, 3.5f, 6.4f, (Color){ 58, 44, 30, 255 }); // West
+                        DrawCube({ cabP.x - 3.9f, cabP.y + 2.0f, cabP.z }, 0.22f, 3.5f, 6.4f, Color{ 58, 44, 30, 255 }); // West
 
-                        DrawCube({ cabP.x + 3.9f, cabP.y + 2.0f, cabP.z }, 0.22f, 3.5f, 6.4f, (Color){ 58, 44, 30, 255 }); // East
+                        DrawCube({ cabP.x + 3.9f, cabP.y + 2.0f, cabP.z }, 0.22f, 3.5f, 6.4f, Color{ 58, 44, 30, 255 }); // East
 
                         // Front South wall with open doorway at X = 6.0
 
-                        DrawCube({ cabP.x - 2.4f, cabP.y + 2.0f, cabP.z - 3.1f }, 3.2f, 3.5f, 0.22f, (Color){ 58, 44, 30, 255 });
+                        DrawCube({ cabP.x - 2.4f, cabP.y + 2.0f, cabP.z - 3.1f }, 3.2f, 3.5f, 0.22f, Color{ 58, 44, 30, 255 });
 
-                        DrawCube({ cabP.x + 2.4f, cabP.y + 2.0f, cabP.z - 3.1f }, 3.2f, 3.5f, 0.22f, (Color){ 58, 44, 30, 255 });
+                        DrawCube({ cabP.x + 2.4f, cabP.y + 2.0f, cabP.z - 3.1f }, 3.2f, 3.5f, 0.22f, Color{ 58, 44, 30, 255 });
 
-                        DrawCube({ cabP.x, cabP.y + 3.3f, cabP.z - 3.1f }, 1.8f, 0.9f, 0.22f, (Color){ 58, 44, 30, 255 }); // Door header
+                        DrawCube({ cabP.x, cabP.y + 3.3f, cabP.z - 3.1f }, 1.8f, 0.9f, 0.22f, Color{ 58, 44, 30, 255 }); // Door header
 
                         // Covered front porch & steps
 
-                        DrawCube({ cabP.x, cabP.y + 0.10f, cabP.z - 4.1f }, 6.2f, 0.20f, 1.8f, (Color){ 42, 32, 20, 255 });
+                        DrawCube({ cabP.x, cabP.y + 0.10f, cabP.z - 4.1f }, 6.2f, 0.20f, 1.8f, Color{ 42, 32, 20, 255 });
 
-                        DrawCube({ cabP.x - 2.8f, cabP.y + 1.8f, cabP.z - 4.9f }, 0.16f, 3.4f, 0.16f, (Color){ 55, 40, 26, 255 });
+                        DrawCube({ cabP.x - 2.8f, cabP.y + 1.8f, cabP.z - 4.9f }, 0.16f, 3.4f, 0.16f, Color{ 55, 40, 26, 255 });
 
-                        DrawCube({ cabP.x + 2.8f, cabP.y + 1.8f, cabP.z - 4.9f }, 0.16f, 3.4f, 0.16f, (Color){ 55, 40, 26, 255 });
+                        DrawCube({ cabP.x + 2.8f, cabP.y + 1.8f, cabP.z - 4.9f }, 0.16f, 3.4f, 0.16f, Color{ 55, 40, 26, 255 });
 
                         // Sloping cottage roof
 
-                        DrawCube({ cabP.x, cabP.y + 4.1f, cabP.z }, 8.4f, 0.25f, 7.2f, (Color){ 38, 28, 18, 255 });
+                        DrawCube({ cabP.x, cabP.y + 4.1f, cabP.z }, 8.4f, 0.25f, 7.2f, Color{ 38, 28, 18, 255 });
 
                         // Hearth fireplace with stone chimney
 
-                        DrawCube({ cabP.x + 3.4f, cabP.y + 2.4f, cabP.z + 1.5f }, 1.2f, 4.6f, 1.2f, (Color){ 52, 54, 58, 255 });
+                        DrawCube({ cabP.x + 3.4f, cabP.y + 2.4f, cabP.z + 1.5f }, 1.2f, 4.6f, 1.2f, Color{ 52, 54, 58, 255 });
 
                         // Solitary glowing candle in front window pane casting creepy warmth
 
-                        DrawSphere({ cabP.x + 2.2f, cabP.y + 1.6f, cabP.z - 3.0f }, 0.05f, (Color){ 255, 190, 80, 255 });
+                        DrawSphere({ cabP.x + 2.2f, cabP.y + 1.6f, cabP.z - 3.0f }, 0.05f, Color{ 255, 190, 80, 255 });
 
-                        DrawCircle3D((Vector3){ cabP.x + 2.2f, cabP.y + 0.2f, cabP.z - 3.2f }, 2.4f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 210, 140, 40, 45 });
+                        DrawCircle3D(Vector3{ cabP.x + 2.2f, cabP.y + 0.2f, cabP.z - 3.2f }, 2.4f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 210, 140, 40, 45 });
 
                     }
 
@@ -10589,41 +10576,41 @@ auto RunIntroCinematic = [&]() {
 
                         // Fieldstone chapel foundation
 
-                        DrawCube({ chP.x, chP.y + 0.20f, chP.z }, 11.5f, 0.40f, 8.2f, (Color){ 45, 48, 52, 255 });
+                        DrawCube({ chP.x, chP.y + 0.20f, chP.z }, 11.5f, 0.40f, 8.2f, Color{ 45, 48, 52, 255 });
 
                         // Weathered timber walls (height 5.2m)
 
-                        DrawCube({ chP.x - 5.5f, chP.y + 2.8f, chP.z }, 0.30f, 5.2f, 8.0f, (Color){ 42, 36, 30, 255 }); // West wall
+                        DrawCube({ chP.x - 5.5f, chP.y + 2.8f, chP.z }, 0.30f, 5.2f, 8.0f, Color{ 42, 36, 30, 255 }); // West wall
 
-                        DrawCube({ chP.x, chP.y + 2.8f, chP.z - 3.9f }, 11.0f, 5.2f, 0.30f, (Color){ 42, 36, 30, 255 }); // South wall
+                        DrawCube({ chP.x, chP.y + 2.8f, chP.z - 3.9f }, 11.0f, 5.2f, 0.30f, Color{ 42, 36, 30, 255 }); // South wall
 
-                        DrawCube({ chP.x, chP.y + 2.8f, chP.z + 3.9f }, 11.0f, 5.2f, 0.30f, (Color){ 42, 36, 30, 255 }); // North wall
+                        DrawCube({ chP.x, chP.y + 2.8f, chP.z + 3.9f }, 11.0f, 5.2f, 0.30f, Color{ 42, 36, 30, 255 }); // North wall
 
                         // East facade with grand double-door entrance
 
-                        DrawCube({ chP.x + 5.5f, chP.y + 2.8f, chP.z - 2.5f }, 0.30f, 5.2f, 3.0f, (Color){ 42, 36, 30, 255 });
+                        DrawCube({ chP.x + 5.5f, chP.y + 2.8f, chP.z - 2.5f }, 0.30f, 5.2f, 3.0f, Color{ 42, 36, 30, 255 });
 
-                        DrawCube({ chP.x + 5.5f, chP.y + 2.8f, chP.z + 2.5f }, 0.30f, 5.2f, 3.0f, (Color){ 42, 36, 30, 255 });
+                        DrawCube({ chP.x + 5.5f, chP.y + 2.8f, chP.z + 2.5f }, 0.30f, 5.2f, 3.0f, Color{ 42, 36, 30, 255 });
 
-                        DrawCube({ chP.x + 5.5f, chP.y + 4.4f, chP.z }, 0.30f, 2.0f, 2.2f, (Color){ 42, 36, 30, 255 });
+                        DrawCube({ chP.x + 5.5f, chP.y + 4.4f, chP.z }, 0.30f, 2.0f, 2.2f, Color{ 42, 36, 30, 255 });
 
                         // Crooked Belfry Tower above entrance
 
                         Vector3 belfryP = { chP.x + 4.8f, chP.y + 6.8f, chP.z };
 
-                        DrawCube(belfryP, 2.2f, 3.4f, 2.2f, (Color){ 36, 30, 24, 255 });
+                        DrawCube(belfryP, 2.2f, 3.4f, 2.2f, Color{ 36, 30, 24, 255 });
 
-                        DrawCubeWires(belfryP, 2.25f, 3.45f, 2.25f, (Color){ 65, 55, 45, 255 });
+                        DrawCubeWires(belfryP, 2.25f, 3.45f, 2.25f, Color{ 65, 55, 45, 255 });
 
                         // Bronze church bell hanging in belfry
 
-                        DrawCylinder({ belfryP.x, belfryP.y - 0.2f, belfryP.z }, 0.32f, 0.20f, 0.55f, 8, (Color){ 165, 125, 45, 255 });
+                        DrawCylinder({ belfryP.x, belfryP.y - 0.2f, belfryP.z }, 0.32f, 0.20f, 0.55f, 8, Color{ 165, 125, 45, 255 });
 
                         // Shattered cross lying on stone steps
 
-                        DrawCube({ chP.x + 6.8f, chP.y + 0.15f, chP.z - 0.5f }, 1.4f, 0.08f, 0.12f, (Color){ 85, 65, 42, 255 });
+                        DrawCube({ chP.x + 6.8f, chP.y + 0.15f, chP.z - 0.5f }, 1.4f, 0.08f, 0.12f, Color{ 85, 65, 42, 255 });
 
-                        DrawCube({ chP.x + 6.4f, chP.y + 0.17f, chP.z - 0.5f }, 0.12f, 0.08f, 0.75f, (Color){ 85, 65, 42, 255 });
+                        DrawCube({ chP.x + 6.4f, chP.y + 0.17f, chP.z - 0.5f }, 0.12f, 0.08f, 0.75f, Color{ 85, 65, 42, 255 });
 
                         // Broken church pews inside
 
@@ -10631,9 +10618,9 @@ auto RunIntroCinematic = [&]() {
 
                             float px = chP.x - 3.2f + (float)pw * 2.0f;
 
-                            DrawCube({ px, chP.y + 0.65f, chP.z - 1.8f }, 0.45f, 0.55f, 2.0f, (Color){ 52, 40, 28, 255 });
+                            DrawCube({ px, chP.y + 0.65f, chP.z - 1.8f }, 0.45f, 0.55f, 2.0f, Color{ 52, 40, 28, 255 });
 
-                            DrawCube({ px, chP.y + 0.65f, chP.z + 1.8f }, 0.45f, 0.55f, 2.0f, (Color){ 52, 40, 28, 255 });
+                            DrawCube({ px, chP.y + 0.65f, chP.z + 1.8f }, 0.45f, 0.55f, 2.0f, Color{ 52, 40, 28, 255 });
 
                         }
 
@@ -10649,35 +10636,35 @@ auto RunIntroCinematic = [&]() {
 
                         // Heavy timber corner columns
 
-                        DrawCube({ smP.x - 3.2f, smP.y + 1.8f, smP.z - 2.4f }, 0.22f, 3.6f, 0.22f, (Color){ 55, 42, 28, 255 });
+                        DrawCube({ smP.x - 3.2f, smP.y + 1.8f, smP.z - 2.4f }, 0.22f, 3.6f, 0.22f, Color{ 55, 42, 28, 255 });
 
-                        DrawCube({ smP.x + 3.2f, smP.y + 1.8f, smP.z - 2.4f }, 0.22f, 3.6f, 0.22f, (Color){ 55, 42, 28, 255 });
+                        DrawCube({ smP.x + 3.2f, smP.y + 1.8f, smP.z - 2.4f }, 0.22f, 3.6f, 0.22f, Color{ 55, 42, 28, 255 });
 
-                        DrawCube({ smP.x - 3.2f, smP.y + 1.8f, smP.z + 2.4f }, 0.22f, 3.6f, 0.22f, (Color){ 55, 42, 28, 255 });
+                        DrawCube({ smP.x - 3.2f, smP.y + 1.8f, smP.z + 2.4f }, 0.22f, 3.6f, 0.22f, Color{ 55, 42, 28, 255 });
 
-                        DrawCube({ smP.x + 3.2f, smP.y + 1.8f, smP.z + 2.4f }, 0.22f, 3.6f, 0.22f, (Color){ 55, 42, 28, 255 });
+                        DrawCube({ smP.x + 3.2f, smP.y + 1.8f, smP.z + 2.4f }, 0.22f, 3.6f, 0.22f, Color{ 55, 42, 28, 255 });
 
                         // Sloping timber roof
 
-                        DrawCube({ smP.x, smP.y + 3.8f, smP.z }, 7.2f, 0.20f, 5.6f, (Color){ 36, 28, 20, 255 });
+                        DrawCube({ smP.x, smP.y + 3.8f, smP.z }, 7.2f, 0.20f, 5.6f, Color{ 36, 28, 20, 255 });
 
                         // Stone forge hearth
 
-                        DrawCube({ smP.x - 1.8f, smP.y + 0.75f, smP.z - 1.2f }, 1.4f, 1.5f, 1.4f, (Color){ 44, 46, 50, 255 });
+                        DrawCube({ smP.x - 1.8f, smP.y + 0.75f, smP.z - 1.2f }, 1.4f, 1.5f, 1.4f, Color{ 44, 46, 50, 255 });
 
-                        DrawCube({ smP.x - 1.8f, smP.y + 2.6f, smP.z - 1.2f }, 0.7f, 2.4f, 0.7f, (Color){ 36, 38, 42, 255 }); // Chimney
+                        DrawCube({ smP.x - 1.8f, smP.y + 2.6f, smP.z - 1.2f }, 0.7f, 2.4f, 0.7f, Color{ 36, 38, 42, 255 }); // Chimney
 
                         // Blacksmith's Anvil on wooden stump
 
-                        DrawCylinder({ smP.x + 0.6f, smP.y + 0.35f, smP.z }, 0.30f, 0.34f, 0.70f, 8, (Color){ 72, 54, 34, 255 }); // Stump
+                        DrawCylinder({ smP.x + 0.6f, smP.y + 0.35f, smP.z }, 0.30f, 0.34f, 0.70f, 8, Color{ 72, 54, 34, 255 }); // Stump
 
-                        DrawCube({ smP.x + 0.6f, smP.y + 0.85f, smP.z }, 0.55f, 0.24f, 0.28f, (Color){ 28, 30, 32, 255 });  // Anvil horn & body
+                        DrawCube({ smP.x + 0.6f, smP.y + 0.85f, smP.z }, 0.55f, 0.24f, 0.28f, Color{ 28, 30, 32, 255 });  // Anvil horn & body
 
                         // Quenching trough with murky stagnant water
 
-                        DrawCube({ smP.x + 1.8f, smP.y + 0.45f, smP.z - 1.0f }, 0.75f, 0.55f, 1.4f, (Color){ 52, 42, 30, 255 });
+                        DrawCube({ smP.x + 1.8f, smP.y + 0.45f, smP.z - 1.0f }, 0.75f, 0.55f, 1.4f, Color{ 52, 42, 30, 255 });
 
-                        DrawCircle3D((Vector3){ smP.x + 1.8f, smP.y + 0.68f, smP.z - 1.0f }, 0.55f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 35, 55, 65, 230 });
+                        DrawCircle3D(Vector3{ smP.x + 1.8f, smP.y + 0.68f, smP.z - 1.0f }, 0.55f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 35, 55, 65, 230 });
 
                     }
 
@@ -10691,13 +10678,13 @@ auto RunIntroCinematic = [&]() {
 
                         // Solitary standing fieldstone chimney
 
-                        DrawCube({ colP.x, colP.y + 2.8f, colP.z }, 1.1f, 5.6f, 1.1f, (Color){ 50, 52, 56, 255 });
+                        DrawCube({ colP.x, colP.y + 2.8f, colP.z }, 1.1f, 5.6f, 1.1f, Color{ 50, 52, 56, 255 });
 
                         // Charred tumbled wall logs & collapsed rafters
 
-                        DrawCube({ colP.x - 1.8f, colP.y + 0.4f, colP.z + 1.2f }, 3.8f, 0.24f, 2.4f, (Color){ 30, 24, 18, 255 });
+                        DrawCube({ colP.x - 1.8f, colP.y + 0.4f, colP.z + 1.2f }, 3.8f, 0.24f, 2.4f, Color{ 30, 24, 18, 255 });
 
-                        DrawCube({ colP.x + 1.2f, colP.y + 0.3f, colP.z - 1.4f }, 2.6f, 0.22f, 3.2f, (Color){ 24, 20, 16, 255 });
+                        DrawCube({ colP.x + 1.2f, colP.y + 0.3f, colP.z - 1.4f }, 2.6f, 0.22f, 3.2f, Color{ 24, 20, 16, 255 });
 
                     }
 
@@ -10711,13 +10698,13 @@ auto RunIntroCinematic = [&]() {
 
                         // Wagon bed
 
-                        DrawCube(wagP, 3.2f, 0.45f, 1.6f, (Color){ 62, 44, 28, 255 });
+                        DrawCube(wagP, 3.2f, 0.45f, 1.6f, Color{ 62, 44, 28, 255 });
 
                         // Broken spoked wheels tilted in the mud
 
-                        DrawCylinderEx({ wagP.x - 1.2f, -15.8f, wagP.z - 0.9f }, { wagP.x - 1.2f, -15.8f, wagP.z - 0.8f }, 0.55f, 0.55f, 12, (Color){ 48, 34, 20, 255 });
+                        DrawCylinderEx({ wagP.x - 1.2f, -15.8f, wagP.z - 0.9f }, { wagP.x - 1.2f, -15.8f, wagP.z - 0.8f }, 0.55f, 0.55f, 12, Color{ 48, 34, 20, 255 });
 
-                        DrawCylinderEx({ wagP.x + 1.2f, -15.8f, wagP.z + 0.8f }, { wagP.x + 1.2f, -15.8f, wagP.z + 0.9f }, 0.55f, 0.55f, 12, (Color){ 48, 34, 20, 255 });
+                        DrawCylinderEx({ wagP.x + 1.2f, -15.8f, wagP.z + 0.8f }, { wagP.x + 1.2f, -15.8f, wagP.z + 0.9f }, 0.55f, 0.55f, 12, Color{ 48, 34, 20, 255 });
 
                     }
 
@@ -10729,17 +10716,17 @@ auto RunIntroCinematic = [&]() {
 
                         float fx = 26.0f - (float)f * 7.5f;
 
-                        DrawCube({ fx, -15.35f, 137.4f }, 0.12f, 1.3f, 0.12f, (Color){ 58, 44, 28, 255 });
+                        DrawCube({ fx, -15.35f, 137.4f }, 0.12f, 1.3f, 0.12f, Color{ 58, 44, 28, 255 });
 
-                        DrawCube({ fx, -15.35f, 142.6f }, 0.12f, 1.3f, 0.12f, (Color){ 58, 44, 28, 255 });
+                        DrawCube({ fx, -15.35f, 142.6f }, 0.12f, 1.3f, 0.12f, Color{ 58, 44, 28, 255 });
 
-                        DrawLine3D({ fx, -15.1f, 137.4f }, { fx - 7.0f, -15.2f, 137.4f }, (Color){ 58, 44, 28, 255 });
+                        DrawLine3D({ fx, -15.1f, 137.4f }, { fx - 7.0f, -15.2f, 137.4f }, Color{ 58, 44, 28, 255 });
 
-                        DrawLine3D({ fx, -15.6f, 137.4f }, { fx - 7.0f, -15.7f, 137.4f }, (Color){ 58, 44, 28, 255 });
+                        DrawLine3D({ fx, -15.6f, 137.4f }, { fx - 7.0f, -15.7f, 137.4f }, Color{ 58, 44, 28, 255 });
 
-                        DrawLine3D({ fx, -15.1f, 142.6f }, { fx - 7.0f, -15.2f, 142.6f }, (Color){ 58, 44, 28, 255 });
+                        DrawLine3D({ fx, -15.1f, 142.6f }, { fx - 7.0f, -15.2f, 142.6f }, Color{ 58, 44, 28, 255 });
 
-                        DrawLine3D({ fx, -15.6f, 142.6f }, { fx - 7.0f, -15.7f, 142.6f }, (Color){ 58, 44, 28, 255 });
+                        DrawLine3D({ fx, -15.6f, 142.6f }, { fx - 7.0f, -15.7f, 142.6f }, Color{ 58, 44, 28, 255 });
 
                     }
 
@@ -10761,13 +10748,13 @@ auto RunIntroCinematic = [&]() {
 
                         // Gnarled gallow trunk
 
-                        DrawCylinderEx(trP, { trP.x + 0.4f, trP.y + 6.2f, trP.z - 0.3f }, 0.32f, 0.12f, 6, (Color){ 28, 24, 20, 255 });
+                        DrawCylinderEx(trP, { trP.x + 0.4f, trP.y + 6.2f, trP.z - 0.3f }, 0.32f, 0.12f, 6, Color{ 28, 24, 20, 255 });
 
                         // Claw-like branches
 
-                        DrawLine3D({ trP.x + 0.4f, trP.y + 4.8f, trP.z - 0.3f }, { trP.x + 2.2f, trP.y + 6.5f, trP.z + 1.2f }, (Color){ 28, 24, 20, 255 });
+                        DrawLine3D({ trP.x + 0.4f, trP.y + 4.8f, trP.z - 0.3f }, { trP.x + 2.2f, trP.y + 6.5f, trP.z + 1.2f }, Color{ 28, 24, 20, 255 });
 
-                        DrawLine3D({ trP.x + 0.4f, trP.y + 5.2f, trP.z - 0.3f }, { trP.x - 1.8f, trP.y + 6.8f, trP.z - 1.4f }, (Color){ 28, 24, 20, 255 });
+                        DrawLine3D({ trP.x + 0.4f, trP.y + 5.2f, trP.z - 0.3f }, { trP.x - 1.8f, trP.y + 6.8f, trP.z - 1.4f }, Color{ 28, 24, 20, 255 });
 
                     }
 
@@ -10779,46 +10766,35 @@ auto RunIntroCinematic = [&]() {
 
             DrawCube({ 97.0f, 12.6f, 125.85f }, 22.0f, 5.2f, 0.35f, wallExtCol);
 
-            // North Exterior Wall (Z = 154.15)
+            // North Exterior Wall (Z = 154.15) - Carved out for Haunted Washroom entrance doorway at X in [88.0, 90.5]
+            DrawCube({ 87.0f, 12.6f, 154.15f }, 2.0f, 5.2f, 0.35f, wallExtCol);   // Left Flank: X in [86.0 .. 88.0]
+            DrawCube({ 89.25f, 14.1f, 154.15f }, 2.5f, 2.2f, 0.35f, wallExtCol);  // Doorway Header: Y in [13.0 .. 15.2]
+            DrawCube({ 99.25f, 12.6f, 154.15f }, 17.5f, 5.2f, 0.35f, wallExtCol); // Right Flank: X in [90.5 .. 108.0]
 
-            DrawCube({ 97.0f, 12.6f, 154.15f }, 22.0f, 5.2f, 0.35f, wallExtCol);
+            // Haunted Washroom Annex Exterior Shell (X in [85.5 .. 93.0], Z in [154.0 .. 164.65])
+            DrawCube({ 85.85f, 12.6f, 159.25f }, 0.35f, 5.2f, 10.5f, wallExtCol); // West Exterior Wall
+            DrawCube({ 93.0f, 12.6f, 159.25f }, 0.35f, 5.2f, 10.5f, wallExtCol);  // East Exterior Wall
+            DrawCube({ 89.42f, 12.6f, 164.65f }, 7.5f, 5.2f, 0.35f, wallExtCol); // North Back Wall
+            DrawCube({ 89.42f, 15.15f, 159.25f }, 7.6f, 0.25f, 10.6f, { 28, 26, 24, 255 }); // Washroom Roof
 
             // East Exterior Facade Wall (X = 108.15, accurately cut out for 2.90m sliding glass entrance door)
-
             DrawCube({ 108.15f, 12.6f, 132.275f }, 0.35f, 5.2f, 12.55f, { 44, 40, 35, 255 });
-
             DrawCube({ 108.15f, 12.6f, 147.725f }, 0.35f, 5.2f, 12.55f, { 44, 40, 35, 255 });
-
             DrawCube({ 108.15f, 14.30f, 140.0f }, 0.35f, 1.80f, 2.90f, { 44, 40, 35, 255 }); // Door lintel header
 
-
-
             // Corner Pilaster Columns
-
             Color pillarCol = { 28, 26, 24, 255 };
-
             DrawCube({ 85.8f, 12.6f, 125.8f }, 0.55f, 5.2f, 0.55f, pillarCol);
-
             DrawCube({ 85.8f, 12.6f, 154.2f }, 0.55f, 5.2f, 0.55f, pillarCol);
-
             DrawCube({ 108.2f, 12.6f, 125.8f }, 0.55f, 5.2f, 0.55f, pillarCol);
-
             DrawCube({ 108.2f, 12.6f, 154.2f }, 0.55f, 5.2f, 0.55f, pillarCol);
 
-
-
             // Gutter Downspout Pipes
-
             DrawCylinder({ 108.35f, 10.0f, 126.1f }, 0.06f, 0.06f, 5.2f, 6, { 32, 32, 36, 255 });
-
             DrawCylinder({ 108.35f, 10.0f, 153.9f }, 0.06f, 0.06f, 5.2f, 6, { 32, 32, 36, 255 });
 
-
-
             // Commercial Parapet Roof Slab & Fascia Lip
-
             DrawCube({ 97.0f, 15.25f, 140.0f }, 22.8f, 0.35f, 28.8f, { 28, 26, 24, 255 });
-
             DrawCubeWires({ 97.0f, 15.25f, 140.0f }, 22.85f, 0.37f, 28.85f, { 45, 42, 38, 255 });
 
 
@@ -10873,7 +10849,7 @@ auto RunIntroCinematic = [&]() {
 
                     float f = Clamp(doorAmb * mult, 0.28f, 1.40f);
 
-                    return (Color){
+                    return Color{
 
                         (unsigned char)Clamp((int)(baseCol.r * f), 0, 255),
 
@@ -10889,21 +10865,21 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                Color frameAlum    = ModDoorCol((Color){ 175, 180, 190, 255 }, 1.15f); // Crisp satin commercial aluminum
+                Color frameAlum    = ModDoorCol(Color{ 175, 180, 190, 255 }, 1.15f); // Crisp satin commercial aluminum
 
-                Color frameTrim    = ModDoorCol((Color){ 215, 220, 230, 255 }, 1.25f); // Aluminum highlight edge wires
+                Color frameTrim    = ModDoorCol(Color{ 215, 220, 230, 255 }, 1.25f); // Aluminum highlight edge wires
 
-                Color trackCol     = ModDoorCol((Color){ 145, 150, 158, 255 }, 1.05f); // Recessed stainless steel floor track
+                Color trackCol     = ModDoorCol(Color{ 145, 150, 158, 255 }, 1.05f); // Recessed stainless steel floor track
 
-                Color glassTint    = (Color){ 175, 218, 248, 95 };                     // Realistic architectural glass tint
+                Color glassTint    = Color{ 175, 218, 248, 95 };                     // Realistic architectural glass tint
 
-                Color glassSheen   = (Color){ 235, 248, 255, 180 };                    // Vibrant specular reflection highlight
+                Color glassSheen   = Color{ 235, 248, 255, 180 };                    // Vibrant specular reflection highlight
 
-                Color safetyFrost  = (Color){ 248, 252, 255, 215 };                    // High-contrast white frosted safety stripe (never invisible!)
+                Color safetyFrost  = Color{ 248, 252, 255, 215 };                    // High-contrast white frosted safety stripe (never invisible!)
 
-                Color rubberGasket = (Color){ 32, 34, 38, 255 };                       // Black EPDM rubber perimeter seal
+                Color rubberGasket = Color{ 32, 34, 38, 255 };                       // Black EPDM rubber perimeter seal
 
-                Color handleCol    = ModDoorCol((Color){ 235, 240, 245, 255 }, 1.35f); // Polished chrome full-height grab handles
+                Color handleCol    = ModDoorCol(Color{ 235, 240, 245, 255 }, 1.35f); // Polished chrome full-height grab handles
 
 
 
@@ -10937,17 +10913,17 @@ auto RunIntroCinematic = [&]() {
 
                 // 2. Motion Sensor Pods (Overhead center, interior and exterior faces)
 
-                Color ledCol = doorSensorActive ? (Color){ 55, 255, 100, 255 } : (Color){ 245, 45, 35, 255 };
+                Color ledCol = doorSensorActive ? Color{ 55, 255, 100, 255 } : Color{ 245, 45, 35, 255 };
 
                 // Exterior sensor pod
 
-                DrawCube({ 108.21f, 13.24f, 140.0f }, 0.05f, 0.09f, 0.26f, (Color){ 30, 32, 35, 255 });
+                DrawCube({ 108.21f, 13.24f, 140.0f }, 0.05f, 0.09f, 0.26f, Color{ 30, 32, 35, 255 });
 
                 DrawSphere({ 108.24f, 13.24f, 140.0f }, 0.026f, ledCol);
 
                 // Interior sensor pod (Facing inside store: clearly visible to player approaching from inside!)
 
-                DrawCube({ 107.79f, 13.24f, 140.0f }, 0.05f, 0.09f, 0.26f, (Color){ 30, 32, 35, 255 });
+                DrawCube({ 107.79f, 13.24f, 140.0f }, 0.05f, 0.09f, 0.26f, Color{ 30, 32, 35, 255 });
 
                 DrawSphere({ 107.76f, 13.24f, 140.0f }, 0.026f, ledCol);
 
@@ -11095,9 +11071,9 @@ auto RunIntroCinematic = [&]() {
 
             // ---------------------------------------------------------------------
 
-            bool canSeeShopInterior = (camera.position.x <= 110.5f) || 
-
-                (camera.position.x <= 118.0f && camera.position.z >= 134.0f && camera.position.z <= 146.0f);
+            Vector3 camPosForShop = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson || isRoofCamActive) ? renderCam.position : camera.position;
+            bool canSeeShopInterior = (camPosForShop.x <= 135.0f && camPosForShop.x >= 70.0f &&
+                                       camPosForShop.z >= 110.0f && camPosForShop.z <= 175.0f);
 
             if (canSeeShopInterior) {
 
@@ -11156,9 +11132,9 @@ auto RunIntroCinematic = [&]() {
 
                 // Clean floor contact shadows: soft subtle contact discs beneath heavy fixtures without barrier polygons
 
-                DrawCircle3D((Vector3){ 104.5f, 10.016f, 133.5f }, 2.4f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 10, 12, 55 });
+                DrawCircle3D(Vector3{ 104.5f, 10.016f, 133.5f }, 2.4f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 10, 12, 55 });
 
-                DrawCircle3D((Vector3){ 94.5f, 10.016f, 133.5f }, 2.2f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 8, 10, 12, 55 });
+                DrawCircle3D(Vector3{ 94.5f, 10.016f, 133.5f }, 2.2f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 10, 12, 55 });
 
 
 
@@ -11166,17 +11142,17 @@ auto RunIntroCinematic = [&]() {
 
                 Vector3 frzFPos = { 94.5f, 10.022f, 133.5f };
 
-                DrawCircle3D(frzFPos, 4.5f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 70, 185, 255, 34 });
+                DrawCircle3D(frzFPos, 4.5f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 70, 185, 255, 34 });
 
-                DrawCircle3D(frzFPos, 2.4f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 120, 220, 255, 52 });
+                DrawCircle3D(frzFPos, 2.4f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 120, 220, 255, 52 });
 
 
 
                 // 4. Warm Task Spotlight Pool on Floor at Checkout Register & Counter
 
-                DrawCircle3D((Vector3){ 104.5f, 10.022f, 134.0f }, 3.2f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 255, 220, 140, 42 });
+                DrawCircle3D(Vector3{ 104.5f, 10.022f, 134.0f }, 3.2f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 255, 220, 140, 42 });
 
-                DrawCircle3D((Vector3){ 104.5f, 10.022f, 134.0f }, 1.6f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 255, 235, 170, 60 });
+                DrawCircle3D(Vector3{ 104.5f, 10.022f, 134.0f }, 1.6f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 255, 235, 170, 60 });
 
             }
 
@@ -11193,6 +11169,7 @@ auto RunIntroCinematic = [&]() {
             DrawShopAtmosphereDetails(ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawShopInteriorProps(ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawShopHauntedWashroom(renderCam, ApplyShopLighting, g_shopLightsOn, timeVal);
+            DrawATM3D(ApplyShopLighting, g_shopLightsOn, timeVal);
 
 
 
@@ -11204,37 +11181,37 @@ auto RunIntroCinematic = [&]() {
 
                 // EMT metallic conduit pipe from ceiling down to switch box
 
-                DrawCylinderEx((Vector3){ swP.x, swP.y + 0.08f, swP.z }, (Vector3){ swP.x, 15.18f, swP.z }, 0.012f, 0.012f, 8, (Color){ 140, 145, 150, 255 });
+                DrawCylinderEx(Vector3{ swP.x, swP.y + 0.08f, swP.z }, Vector3{ swP.x, 15.18f, swP.z }, 0.012f, 0.012f, 8, Color{ 140, 145, 150, 255 });
 
                 // Cast-aluminum 2-gang electrical junction box
 
-                DrawCube(swP, 0.06f, 0.16f, 0.12f, (Color){ 85, 90, 95, 255 });
+                DrawCube(swP, 0.06f, 0.16f, 0.12f, Color{ 85, 90, 95, 255 });
 
                 // Brushed stainless steel faceplate
 
-                DrawCube((Vector3){ swP.x - 0.015f, swP.y, swP.z }, 0.02f, 0.14f, 0.10f, (Color){ 195, 200, 205, 255 });
+                DrawCube(Vector3{ swP.x - 0.015f, swP.y, swP.z }, 0.02f, 0.14f, 0.10f, Color{ 195, 200, 205, 255 });
 
                 // Mechanical toggle switch lever (tilted up for ON, down for OFF)
 
                 float togOffY = g_shopLightsOn ? 0.025f : -0.025f;
 
-                DrawCube((Vector3){ swP.x - 0.035f, swP.y + togOffY, swP.z }, 0.04f, 0.025f, 0.018f, (Color){ 30, 32, 35, 255 });
+                DrawCube(Vector3{ swP.x - 0.035f, swP.y + togOffY, swP.z }, 0.04f, 0.025f, 0.018f, Color{ 30, 32, 35, 255 });
 
                 // Status Indicator LED
 
                 if (g_shopLightsOn) {
 
-                    DrawSphere((Vector3){ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.010f, (Color){ 35, 245, 80, 255 });
+                    DrawSphere(Vector3{ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.010f, Color{ 35, 245, 80, 255 });
 
-                    DrawSphere((Vector3){ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.025f, (Color){ 35, 245, 80, 60 });
+                    DrawSphere(Vector3{ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.025f, Color{ 35, 245, 80, 60 });
 
                 } else {
 
                     float pulse = 0.55f + 0.45f * sinf(timeVal * 3.8f);
 
-                    DrawSphere((Vector3){ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.012f, (Color){ 255, 35, 25, (unsigned char)(255 * pulse) });
+                    DrawSphere(Vector3{ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.012f, Color{ 255, 35, 25, (unsigned char)(255 * pulse) });
 
-                    DrawSphere((Vector3){ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.040f, (Color){ 255, 45, 30, (unsigned char)(80 * pulse) });
+                    DrawSphere(Vector3{ swP.x - 0.026f, swP.y + 0.045f, swP.z }, 0.040f, Color{ 255, 45, 30, (unsigned char)(80 * pulse) });
 
                 }
 
@@ -11316,9 +11293,9 @@ auto RunIntroCinematic = [&]() {
 
                 Color bulbCol = g_shopLightsOn ? 
 
-                    (Color){ (unsigned char)Clamp(255.0f * shopLightIntensity, 0.0f, 255.0f), (unsigned char)Clamp(230.0f * shopLightIntensity, 0.0f, 255.0f), (unsigned char)Clamp(140.0f * shopLightIntensity, 0.0f, 255.0f), 255 } :
+                    Color{ (unsigned char)Clamp(255.0f * shopLightIntensity, 0.0f, 255.0f), (unsigned char)Clamp(230.0f * shopLightIntensity, 0.0f, 255.0f), (unsigned char)Clamp(140.0f * shopLightIntensity, 0.0f, 255.0f), 255 } :
 
-                    (Color){ 30, 32, 36, 255 };
+                    Color{ 30, 32, 36, 255 };
 
                 DrawSphere({ lightHead.x, lightHead.y - 0.10f, lightHead.z }, 0.14f, bulbCol);
 
@@ -11386,25 +11363,25 @@ auto RunIntroCinematic = [&]() {
 
                 DrawCube(tPos, tLen, 0.08f, 0.32f, ApplyShopLighting(tPos, { 48, 50, 55, 255 }));
 
-                DrawCube((Vector3){ tPos.x, tPos.y - 0.02f, tPos.z }, tLen - 0.06f, 0.04f, 0.26f, (Color){ 180, 185, 190, 255 });
+                DrawCube(Vector3{ tPos.x, tPos.y - 0.02f, tPos.z }, tLen - 0.06f, 0.04f, 0.26f, Color{ 180, 185, 190, 255 });
 
 
 
-                Color actualTubeCol = g_shopLightsOn ? tTubeCol : (Color){ 28, 30, 34, 255 };
+                Color actualTubeCol = g_shopLightsOn ? tTubeCol : Color{ 28, 30, 34, 255 };
 
                 float halfL = (tLen - 0.24f) * 0.5f;
 
-                DrawCylinderEx((Vector3){ tPos.x - halfL, tPos.y - 0.04f, tPos.z - 0.07f }, (Vector3){ tPos.x + halfL, tPos.y - 0.04f, tPos.z - 0.07f }, 0.022f, 0.022f, 8, actualTubeCol);
+                DrawCylinderEx(Vector3{ tPos.x - halfL, tPos.y - 0.04f, tPos.z - 0.07f }, Vector3{ tPos.x + halfL, tPos.y - 0.04f, tPos.z - 0.07f }, 0.022f, 0.022f, 8, actualTubeCol);
 
-                DrawCylinderEx((Vector3){ tPos.x - halfL, tPos.y - 0.04f, tPos.z + 0.07f }, (Vector3){ tPos.x + halfL, tPos.y - 0.04f, tPos.z + 0.07f }, 0.022f, 0.022f, 8, actualTubeCol);
+                DrawCylinderEx(Vector3{ tPos.x - halfL, tPos.y - 0.04f, tPos.z + 0.07f }, Vector3{ tPos.x + halfL, tPos.y - 0.04f, tPos.z + 0.07f }, 0.022f, 0.022f, 8, actualTubeCol);
 
 
 
                 if (g_shopLightsOn && arcing) {
 
-                    DrawSphere((Vector3){ tPos.x - halfL, tPos.y - 0.04f, tPos.z }, 0.16f, (Color){ 245, 250, 255, 255 });
+                    DrawSphere(Vector3{ tPos.x - halfL, tPos.y - 0.04f, tPos.z }, 0.16f, Color{ 245, 250, 255, 255 });
 
-                    DrawSphere((Vector3){ tPos.x - halfL, tPos.y - 0.04f, tPos.z }, 0.40f, (Color){ 160, 210, 255, 160 });
+                    DrawSphere(Vector3{ tPos.x - halfL, tPos.y - 0.04f, tPos.z }, 0.40f, Color{ 160, 210, 255, 160 });
 
                 }
 
@@ -11414,37 +11391,37 @@ auto RunIntroCinematic = [&]() {
 
             // Troffer 1: North Aisle (Aisle 3, Z = 150.5, X = 95.0, Length = 3.4m)
 
-            DrawCeilingTroffer((Vector3){ 95.0f, 15.05f, 150.5f }, 3.4f, (Color){ 215, 235, 255, 255 }, tube1IsArcing);
+            DrawCeilingTroffer(Vector3{ 95.0f, 15.05f, 150.5f }, 3.4f, Color{ 215, 235, 255, 255 }, tube1IsArcing);
 
 
 
             // Troffer 2: Center Aisle (Aisle 2, Z = 143.5, X = 91.5, Length = 2.8m)
 
-            DrawCeilingTroffer((Vector3){ 91.5f, 15.05f, 143.5f }, 2.8f, (Color){ 220, 235, 250, 255 }, false);
+            DrawCeilingTroffer(Vector3{ 91.5f, 15.05f, 143.5f }, 2.8f, Color{ 220, 235, 250, 255 }, false);
 
 
 
             // Troffer 3: South Aisle (Aisle 1, Z = 136.5, X = 95.0, Length = 3.4m)
 
-            DrawCeilingTroffer((Vector3){ 95.0f, 15.05f, 136.5f }, 3.4f, (Color){ 225, 235, 245, 255 }, false);
+            DrawCeilingTroffer(Vector3{ 95.0f, 15.05f, 136.5f }, 3.4f, Color{ 225, 235, 245, 255 }, false);
 
 
 
             // Troffer 4: Checkout Counter Task Light (Z = 133.5, X = 104.5, Length = 2.8m)
 
-            DrawCeilingTroffer((Vector3){ 104.5f, 15.05f, 133.5f }, 2.8f, (Color){ 255, 220, 150, 255 }, false);
+            DrawCeilingTroffer(Vector3{ 104.5f, 15.05f, 133.5f }, 2.8f, Color{ 255, 220, 150, 255 }, false);
 
 
 
             // Troffer 5: Entrance Corridor & Shopping Cart Bay (Z = 143.5, X = 104.5, Length = 2.8m)
 
-            DrawCeilingTroffer((Vector3){ 104.5f, 15.05f, 143.5f }, 2.8f, (Color){ 220, 230, 240, 255 }, false);
+            DrawCeilingTroffer(Vector3{ 104.5f, 15.05f, 143.5f }, 2.8f, Color{ 220, 230, 240, 255 }, false);
 
 
 
             // Troffer 6: Rear Storage Corner (Z = 133.5, X = 89.0, Length = 2.4m)
 
-            DrawCeilingTroffer((Vector3){ 89.0f, 15.05f, 133.5f }, 2.4f, (Color){ 200, 225, 245, 255 }, false);
+            DrawCeilingTroffer(Vector3{ 89.0f, 15.05f, 133.5f }, 2.4f, Color{ 200, 225, 245, 255 }, false);
 
 
 
@@ -11808,11 +11785,11 @@ auto RunIntroCinematic = [&]() {
 
                             Vector3 pN = { bx, 12.0f, rz + 0.45f };
 
-                            Color shelfN = ApplyShopLighting(pN, { 210, 206, 198, 255 }, (Vector3){ 0, 1, 0 });
+                            Color shelfN = ApplyShopLighting(pN, { 210, 206, 198, 255 }, Vector3{ 0, 1, 0 });
 
-                            Color trimN  = ApplyShopLighting(pN, { 58, 62, 70, 255 }, (Vector3){ 0, 0, 1 });
+                            Color trimN  = ApplyShopLighting(pN, { 58, 62, 70, 255 }, Vector3{ 0, 0, 1 });
 
-                            Color dustN  = ApplyShopLighting(pN, { 145, 138, 125, 180 }, (Vector3){ 0, 1, 0 });
+                            Color dustN  = ApplyShopLighting(pN, { 145, 138, 125, 180 }, Vector3{ 0, 1, 0 });
 
                             DrawCube({ bx, 10.35f, rz + 0.45f }, 4.0f, 0.08f, 0.90f, shelfN);
 
@@ -11842,11 +11819,11 @@ auto RunIntroCinematic = [&]() {
 
                             Vector3 pS = { bx, 12.0f, rz - 0.45f };
 
-                            Color shelfS = ApplyShopLighting(pS, { 210, 206, 198, 255 }, (Vector3){ 0, 1, 0 }, 1);
+                            Color shelfS = ApplyShopLighting(pS, { 210, 206, 198, 255 }, Vector3{ 0, 1, 0 }, 1);
 
-                            Color trimS  = ApplyShopLighting(pS, { 58, 62, 70, 255 }, (Vector3){ 0, 0, -1 }, 1);
+                            Color trimS  = ApplyShopLighting(pS, { 58, 62, 70, 255 }, Vector3{ 0, 0, -1 }, 1);
 
-                            Color dustS  = ApplyShopLighting(pS, { 145, 138, 125, 180 }, (Vector3){ 0, 1, 0 }, 1);
+                            Color dustS  = ApplyShopLighting(pS, { 145, 138, 125, 180 }, Vector3{ 0, 1, 0 }, 1);
 
                             DrawCube({ bx, 10.35f, rz - 0.45f }, 4.0f, 0.08f, 0.90f, shelfS);
 
@@ -11926,11 +11903,11 @@ auto RunIntroCinematic = [&]() {
 
                             Vector3 pS = { bx, 12.0f, rz - 0.45f };
 
-                            Color shelfS = ApplyShopLighting(pS, { 210, 206, 198, 255 }, (Vector3){ 0, 1, 0 });
+                            Color shelfS = ApplyShopLighting(pS, { 210, 206, 198, 255 }, Vector3{ 0, 1, 0 });
 
-                            Color trimS  = ApplyShopLighting(pS, { 58, 62, 70, 255 }, (Vector3){ 0, 0, -1 });
+                            Color trimS  = ApplyShopLighting(pS, { 58, 62, 70, 255 }, Vector3{ 0, 0, -1 });
 
-                            Color dustS  = ApplyShopLighting(pS, { 145, 138, 125, 180 }, (Vector3){ 0, 1, 0 });
+                            Color dustS  = ApplyShopLighting(pS, { 145, 138, 125, 180 }, Vector3{ 0, 1, 0 });
 
                             DrawCube({ bx, 10.35f, rz - 0.45f }, 4.0f, 0.08f, 0.90f, shelfS);
 
@@ -11960,11 +11937,11 @@ auto RunIntroCinematic = [&]() {
 
                             Vector3 pN = { bx, 12.0f, rz + 0.45f };
 
-                            Color shelfN = ApplyShopLighting(pN, { 210, 206, 198, 255 }, (Vector3){ 0, 1, 0 }, 2);
+                            Color shelfN = ApplyShopLighting(pN, { 210, 206, 198, 255 }, Vector3{ 0, 1, 0 }, 2);
 
-                            Color trimN  = ApplyShopLighting(pN, { 58, 62, 70, 255 }, (Vector3){ 0, 0, 1 }, 2);
+                            Color trimN  = ApplyShopLighting(pN, { 58, 62, 70, 255 }, Vector3{ 0, 0, 1 }, 2);
 
-                            Color dustN  = ApplyShopLighting(pN, { 145, 138, 125, 180 }, (Vector3){ 0, 1, 0 }, 2);
+                            Color dustN  = ApplyShopLighting(pN, { 145, 138, 125, 180 }, Vector3{ 0, 1, 0 }, 2);
 
                             DrawCube({ bx, 10.35f, rz + 0.45f }, 4.0f, 0.08f, 0.90f, shelfN);
 
@@ -12012,7 +11989,7 @@ auto RunIntroCinematic = [&]() {
 
             // ---------------------------------------------------------------------
 
-            DrawHorizontalRefrigerator((Vector3){ 94.5f, 10.015f, 133.5f }, camera);
+            DrawHorizontalRefrigerator(Vector3{ 94.5f, 10.015f, 133.5f }, camera);
 
 
 
@@ -12076,9 +12053,9 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                // Mini CRT Surveillance Monitor with phosphor scanlines (Facing Right +Z)
+                // Midnight Security Monitor (CCTV CRT on Checkout Counter)
                 Vector3 crtPos = { 104.2f, 11.78f, 133.5f };
-                DrawMiniCRTSurveillanceMonitor(crtPos, timeVal, [](Vector3 p, Color c) { return ApplyShopLighting(p, c); });
+                DrawCounterSecurityMonitor(crtPos, ApplyShopLighting, g_shopLightsOn, timeVal);
 
 
 
@@ -12118,9 +12095,9 @@ auto RunIntroCinematic = [&]() {
 
                     // Eerie glowing phantom floor circles under cart
 
-                    DrawCircle3D(g_ghostCart.pos, 1.4f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 30, 220, 200, (unsigned char)(65 * g_ghostCart.alpha) });
+                    DrawCircle3D(g_ghostCart.pos, 1.4f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 30, 220, 200, (unsigned char)(65 * g_ghostCart.alpha) });
 
-                    DrawCircle3D(g_ghostCart.pos, 0.8f, (Vector3){ 1, 0, 0 }, 90.0f, (Color){ 90, 255, 235, (unsigned char)(95 * g_ghostCart.alpha) });
+                    DrawCircle3D(g_ghostCart.pos, 0.8f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 90, 255, 235, (unsigned char)(95 * g_ghostCart.alpha) });
 
 
 
@@ -12130,15 +12107,11 @@ auto RunIntroCinematic = [&]() {
 
                         float pTime = timeVal * 2.2f + (float)p * 1.35f;
 
-                        float px = g_ghostCart.pos.x + sinf(pTime * 2.8f) * 0.22f;
-
-                        float py = g_ghostCart.pos.y + 0.6f + fmodf(pTime * 0.8f, 0.9f);
-
-                        float pz = g_ghostCart.pos.z + cosf(pTime * 3.3f) * 0.22f;
-
+                        float spkX = g_ghostCart.pos.x + sinf(pTime * 2.8f) * 0.22f;
+                        float spkY = g_ghostCart.pos.y + 0.6f + fmodf(pTime * 0.8f, 0.9f);
+                        float spkZ = g_ghostCart.pos.z + cosf(pTime * 3.3f) * 0.22f;
                         float pAlpha = (1.0f - fmodf(pTime * 0.8f, 0.9f) / 0.9f) * g_ghostCart.alpha;
-
-                        DrawSphere((Vector3){ px, py, pz }, 0.032f, (Color){ 120, 255, 235, (unsigned char)(210 * pAlpha) });
+                        DrawSphere(Vector3{ spkX, spkY, spkZ }, 0.032f, Color{ 120, 255, 235, (unsigned char)(210 * pAlpha) });
 
                     }
 
@@ -12154,13 +12127,13 @@ auto RunIntroCinematic = [&]() {
 
                         if (g_ghostCart.itemsInCart >= 1) {
 
-                            DrawCube((Vector3){ -0.10f, 0.62f, 0.0f }, 0.18f, 0.12f, 0.22f, (Color){ 100, 255, 220, (unsigned char)(200 * g_ghostCart.alpha) });
+                            DrawCube(Vector3{ -0.10f, 0.62f, 0.0f }, 0.18f, 0.12f, 0.22f, Color{ 100, 255, 220, (unsigned char)(200 * g_ghostCart.alpha) });
 
                         }
 
                         if (g_ghostCart.itemsInCart >= 2) {
 
-                            DrawCube((Vector3){  0.10f, 0.62f, 0.05f }, 0.12f, 0.22f, 0.12f, (Color){ 80, 220, 255, (unsigned char)(200 * g_ghostCart.alpha) });
+                            DrawCube(Vector3{  0.10f, 0.62f, 0.05f }, 0.12f, 0.22f, 0.12f, Color{ 80, 220, 255, (unsigned char)(200 * g_ghostCart.alpha) });
 
                         }
 
@@ -12294,9 +12267,9 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    Color eyeballCol = isBloody ? (Color){ 255, 18, 22, 255 } : (Color){ 225, 225, 220, 255 };
+                    Color eyeballCol = isBloody ? Color{ 255, 18, 22, 255 } : Color{ 225, 225, 220, 255 };
 
-                    Color pupilCol   = isBloody ? (Color){ 20, 0, 0, 255 }    : (Color){ 22, 24, 28, 255 };
+                    Color pupilCol   = isBloody ? Color{ 20, 0, 0, 255 }    : Color{ 22, 24, 28, 255 };
 
 
 
@@ -12457,7 +12430,7 @@ auto RunIntroCinematic = [&]() {
 
                 // Lighting direction
 
-                Vector3 lDir = g_flashlightActive ? fwd : (g_curExtDayFactor > 0.2f ? g_curSunDir : (Vector3){ -0.3f, -1.0f, -0.2f });
+                Vector3 lDir = g_flashlightActive ? fwd : (g_curExtDayFactor > 0.2f ? g_curSunDir : Vector3{ -0.3f, -1.0f, -0.2f });
 
                 DrawShovel(g_shovelRig, shovelWorld, camera.position, lDir);
 
@@ -12485,7 +12458,7 @@ auto RunIntroCinematic = [&]() {
 
                         g_camLandingDip = -0.16f; // Solid tactile crunch kick
 
-                        for (int c = 0; c < 10; c++) SpawnDirtClod(tipWorld, (Vector3){ 0, -0.4f, 0 });
+                        for (int c = 0; c < 10; c++) SpawnDirtClod(tipWorld, Vector3{ 0, -0.4f, 0 });
 
                     }
 
@@ -12495,9 +12468,9 @@ auto RunIntroCinematic = [&]() {
 
                         g_shovelDigThrowDone = true;
 
-                        Vector3 tossDir = Vector3Normalize((Vector3){ fwd.x * 0.45f, 0.85f, fwd.z * 0.45f });
+                        Vector3 tossDir = Vector3Normalize(Vector3{ fwd.x * 0.45f, 0.85f, fwd.z * 0.45f });
 
-                        for (int c = 0; c < 12; c++) SpawnDirtClod(Vector3Add(tipWorld, (Vector3){0, 0.15f, 0}), tossDir);
+                        for (int c = 0; c < 12; c++) SpawnDirtClod(Vector3Add(tipWorld, Vector3{0, 0.15f, 0}), tossDir);
 
                     }
 
@@ -12519,7 +12492,7 @@ auto RunIntroCinematic = [&]() {
 
                             g_camLandingDip = -0.10f;
 
-                            for (int c = 0; c < 8; c++) SpawnDirtClod(tipWorld, (Vector3){ 0, 0.8f, 0 });
+                            for (int c = 0; c < 8; c++) SpawnDirtClod(tipWorld, Vector3{ 0, 0.8f, 0 });
 
                         }
 
@@ -12546,6 +12519,11 @@ auto RunIntroCinematic = [&]() {
         matRoad.maps[MATERIAL_MAP_ALBEDO].color = { 0, 0, 0, 255 }; // Pure pitch black asphalt road
 
         DrawMesh(mRoad, matRoad, MatrixTranslate(128.0f, 10.01f, 250.0f));
+
+        // 3D Cloud Ground Shadows on Highway, Apron, and Terrain
+        if (!isUnderwaterScene) {
+            DrawCloudGroundShadows(renderCam, sunDir, sunElev, timeVal);
+        }
 
         // Draw dual-lane stripes (Left Lane at X=119.5, Right Lane at X=136.5)
 
@@ -12575,13 +12553,13 @@ auto RunIntroCinematic = [&]() {
 
         {
 
-            Color boneCol = ApplyExteriorDaylight((Color){ 210, 205, 185, 255 }, 1.0f);
+            Color boneCol = ApplyExteriorDaylight(Color{ 210, 205, 185, 255 }, 1.0f);
 
-            Color hornCol = ApplyExteriorDaylight((Color){  45,  40,  35, 255 }, 1.0f);
+            Color hornCol = ApplyExteriorDaylight(Color{  45,  40,  35, 255 }, 1.0f);
 
             // Nocturnal glowing crimson void eye sockets during night, dark void during day
 
-            Color voidCol = (sunElev < 0.0f) ? (Color){ 220, 35, 25, 255 } : (Color){ 10, 8, 8, 255 };
+            Color voidCol = (sunElev < 0.0f) ? Color{ 220, 35, 25, 255 } : Color{ 10, 8, 8, 255 };
 
 
 
@@ -12653,7 +12631,7 @@ auto RunIntroCinematic = [&]() {
 
                 // Dynamic Atmospheric Horizon Fog
 
-                Color fogColC = ApplyExteriorDaylight((Color){ 20, 22, 28, 255 }, 0.5f);
+                Color fogColC = ApplyExteriorDaylight(Color{ 20, 22, 28, 255 }, 0.5f);
 
                 float fogColArr[4] = { fogColC.r / 255.0f, fogColC.g / 255.0f, fogColC.b / 255.0f, 1.0f };
 
@@ -12669,7 +12647,7 @@ auto RunIntroCinematic = [&]() {
 
                 Vector3 l0Pos = Vector3Add(g_houndNPC.pos, Vector3Scale(sunDir, 40.0f));
 
-                Color l0Col = (nightFactor > 0.4f) ? (Color){ 110, 130, 185, 255 } : (Color){ 255, 245, 220, 255 };
+                Color l0Col = (nightFactor > 0.4f) ? Color{ 110, 130, 185, 255 } : Color{ 255, 245, 220, 255 };
 
                 HoundUpdateLight(0, 1, 0, l0Pos, g_houndNPC.pos, l0Col);
 
@@ -12679,7 +12657,7 @@ auto RunIntroCinematic = [&]() {
 
                 Vector3 l1Pos = { 128.0f, 14.2f, 140.0f };
 
-                Color l1Col = fluorLightOn ? (Color){ 200, 235, 210, 255 } : (Color){ 0, 0, 0, 0 };
+                Color l1Col = fluorLightOn ? Color{ 200, 235, 210, 255 } : Color{ 0, 0, 0, 0 };
 
                 HoundUpdateLight(1, fluorLightOn ? 1 : 0, 1, l1Pos, g_houndNPC.pos, l1Col);
 
@@ -12687,9 +12665,9 @@ auto RunIntroCinematic = [&]() {
 
                 // Light 2 & 3: Disabled by default
 
-                HoundUpdateLight(2, 0, 0, (Vector3){0,0,0}, (Vector3){0,0,0}, (Color){0,0,0,0});
+                HoundUpdateLight(2, 0, 0, Vector3{0,0,0}, Vector3{0,0,0}, Color{0,0,0,0});
 
-                HoundUpdateLight(3, 0, 0, (Vector3){0,0,0}, (Vector3){0,0,0}, (Color){0,0,0,0});
+                HoundUpdateLight(3, 0, 0, Vector3{0,0,0}, Vector3{0,0,0}, Color{0,0,0,0});
 
 
 
@@ -12713,9 +12691,9 @@ auto RunIntroCinematic = [&]() {
 
                     HoundSkeletonUpdateLight(1, fluorLightOn ? 1 : 0, 1, l1Pos, g_houndNPC.pos, l1Col);
 
-                    HoundSkeletonUpdateLight(2, 0, 0, (Vector3){0,0,0}, (Vector3){0,0,0}, (Color){0,0,0,0});
+                    HoundSkeletonUpdateLight(2, 0, 0, Vector3{0,0,0}, Vector3{0,0,0}, Color{0,0,0,0});
 
-                    HoundSkeletonUpdateLight(3, 0, 0, (Vector3){0,0,0}, (Vector3){0,0,0}, (Color){0,0,0,0});
+                    HoundSkeletonUpdateLight(3, 0, 0, Vector3{0,0,0}, Vector3{0,0,0}, Color{0,0,0,0});
 
 
 
@@ -12751,9 +12729,9 @@ auto RunIntroCinematic = [&]() {
 
         if (grethnarState == GRETHNAR_JUMPSCARE) {
 
-            Vector3 pFwdH = Vector3Normalize((Vector3){ forwardBob.x, 0.0f, forwardBob.z });
+            Vector3 pFwdH = Vector3Normalize(Vector3{ forwardBob.x, 0.0f, forwardBob.z });
 
-            if (Vector3Length(pFwdH) < 0.1f) pFwdH = (Vector3){ 0.0f, 0.0f, 1.0f };
+            if (Vector3Length(pFwdH) < 0.1f) pFwdH = Vector3{ 0.0f, 0.0f, 1.0f };
 
 
 
@@ -12866,14 +12844,14 @@ auto RunIntroCinematic = [&]() {
             // 1. Supernatural tall silhouette entity standing under the portico archway
             float stepFwd = (1.0f - g_menuAwakeIntensity) * 0.95f;
             Vector3 colFigure = { 152.6f - stepFwd, 11.75f, 140.0f };
-            DrawCube(colFigure, 0.44f, 2.35f, 0.50f, (Color){ 2, 3, 5, 250 });
-            DrawSphere((Vector3){ colFigure.x, 12.85f, colFigure.z }, 0.20f, (Color){ 2, 3, 5, 250 });
+            DrawCube(colFigure, 0.44f, 2.35f, 0.50f, Color{ 2, 3, 5, 250 });
+            DrawSphere(Vector3{ colFigure.x, 12.85f, colFigure.z }, 0.20f, Color{ 2, 3, 5, 250 });
 
             // Glowing tapetum-lucidum predator eyes in deep darkness
             float colEyeAlpha = Clamp((1.0f - g_menuAwakeIntensity) * 255.0f, 0.0f, 255.0f);
             if (colEyeAlpha > 8.0f) {
-                DrawSphere((Vector3){ colFigure.x - 0.14f, 12.88f, colFigure.z - 0.06f }, 0.018f, (Color){ 245, 190, 45, (unsigned char)colEyeAlpha });
-                DrawSphere((Vector3){ colFigure.x - 0.14f, 12.88f, colFigure.z + 0.06f }, 0.018f, (Color){ 245, 190, 45, (unsigned char)colEyeAlpha });
+                DrawSphere(Vector3{ colFigure.x - 0.14f, 12.88f, colFigure.z - 0.06f }, 0.018f, Color{ 245, 190, 45, (unsigned char)colEyeAlpha });
+                DrawSphere(Vector3{ colFigure.x - 0.14f, 12.88f, colFigure.z + 0.06f }, 0.018f, Color{ 245, 190, 45, (unsigned char)colEyeAlpha });
             }
 
             // 2. Swirling ground mist caught in the portico lantern's light
@@ -12884,7 +12862,7 @@ auto RunIntroCinematic = [&]() {
                 float mz = 140.0f + cosf(timeVal * 0.32f + mSeed * 1.4f) * 4.0f;
                 float mistAlpha = sinf((my - 10.3f) / 3.2f * PI) * 110.0f * g_menuAwakeIntensity;
                 if (mistAlpha > 0.0f) {
-                    DrawSphere((Vector3){ mx, my, mz }, 0.040f, (Color){ 185, 200, 220, (unsigned char)mistAlpha });
+                    DrawSphere(Vector3{ mx, my, mz }, 0.040f, Color{ 185, 200, 220, (unsigned char)mistAlpha });
                 }
             }
 
@@ -12896,20 +12874,20 @@ auto RunIntroCinematic = [&]() {
             Color postWood   = { 52, 45, 38, 255 };
             Color postRing   = { 30, 26, 22, 255 };
             Color rustWire   = { 95, 55, 35, 240 };
-            DrawCylinder((Vector3){ skullPos.x, 11.5f, skullPos.z }, 0.10f, 0.11f, 1.70f, 8, postWood);
-            DrawCubeWires((Vector3){ skullPos.x, 13.18f, skullPos.z }, 0.22f, 0.14f, 0.22f, postRing);
+            DrawCylinder(Vector3{ skullPos.x, 11.5f, skullPos.z }, 0.10f, 0.11f, 1.70f, 8, postWood);
+            DrawCubeWires(Vector3{ skullPos.x, 13.18f, skullPos.z }, 0.22f, 0.14f, 0.22f, postRing);
             // Wrapped rusted bailing wire
-            DrawCircle3D((Vector3){ skullPos.x, 13.12f, skullPos.z }, 0.115f, (Vector3){ 1, 0, 0 }, 90.0f, rustWire);
-            DrawCircle3D((Vector3){ skullPos.x, 13.15f, skullPos.z }, 0.115f, (Vector3){ 1, 0, 0 }, 90.0f, rustWire);
+            DrawCircle3D(Vector3{ skullPos.x, 13.12f, skullPos.z }, 0.115f, Vector3{ 1, 0, 0 }, 90.0f, rustWire);
+            DrawCircle3D(Vector3{ skullPos.x, 13.15f, skullPos.z }, 0.115f, Vector3{ 1, 0, 0 }, 90.0f, rustWire);
 
             // Ritual tallow candle / sconce lighting the skull from below
             Vector3 sconcePos = { skullPos.x - 0.14f, 13.02f, skullPos.z - 0.12f };
             DrawCube(sconcePos, 0.05f, 0.025f, 0.08f, postRing);
-            DrawCylinder((Vector3){ sconcePos.x, 13.03f, sconcePos.z }, 0.022f, 0.020f, 0.08f, 6, (Color){ 215, 205, 185, 255 }); // Tallow candle stub
+            DrawCylinder(Vector3{ sconcePos.x, 13.03f, sconcePos.z }, 0.022f, 0.020f, 0.08f, 6, Color{ 215, 205, 185, 255 }); // Tallow candle stub
             float candleFlicker = sinf(timeVal * 11.0f) * 0.06f + cosf(timeVal * 17.0f) * 0.04f;
             Vector3 candleFlame = { sconcePos.x, 13.12f, sconcePos.z };
-            DrawSphere(candleFlame, 0.032f + candleFlicker * 0.008f, (Color){ 255, 225, 95, 255 });
-            DrawSphere(candleFlame, 0.16f + candleFlicker * 0.025f, (Color){ 255, 150, 40, (unsigned char)(65 + (int)(candleFlicker * 20.0f)) });
+            DrawSphere(candleFlame, 0.032f + candleFlicker * 0.008f, Color{ 255, 225, 95, 255 });
+            DrawSphere(candleFlame, 0.16f + candleFlicker * 0.025f, Color{ 255, 150, 40, (unsigned char)(65 + (int)(candleFlicker * 20.0f)) });
 
             // Organic micro-head tilt tracking the player's cursor
             float headYaw   = -132.0f - g_skullEyeSmoothX * 12.0f;
@@ -12930,39 +12908,39 @@ auto RunIntroCinematic = [&]() {
             Color hornPale   = { 170, 160, 145, 255 };
 
             // A. Braincase / Cranium (Imposing scale)
-            DrawSphere((Vector3){ 0.0f, 0.08f, -0.05f }, 0.22f, boneIvory);
-            DrawCube((Vector3){ 0.0f, 0.12f, 0.03f }, 0.36f, 0.055f, 0.10f, boneIvory); // Supraorbital brow ridge
+            DrawSphere(Vector3{ 0.0f, 0.08f, -0.05f }, 0.22f, boneIvory);
+            DrawCube(Vector3{ 0.0f, 0.12f, 0.03f }, 0.36f, 0.055f, 0.10f, boneIvory); // Supraorbital brow ridge
 
             // B. Snout & Nasal Bridge (Tapering forward towards viewer)
-            DrawCylinderEx((Vector3){ 0.0f, 0.07f, -0.02f }, (Vector3){ 0.0f, -0.08f, 0.36f }, 0.13f, 0.08f, 8, boneIvory);
-            DrawCube((Vector3){ 0.0f, -0.09f, 0.36f }, 0.13f, 0.07f, 0.12f, boneIvory); // Maxilla tip
-            DrawCube((Vector3){ 0.0f, -0.07f, 0.34f }, 0.045f, 0.055f, 0.10f, socketHole); // Nasal cavity aperture
-            DrawCube((Vector3){ 0.0f, -0.13f, 0.30f }, 0.11f, 0.03f, 0.18f, boneDark); // Upper jaw teeth ridge
+            DrawCylinderEx(Vector3{ 0.0f, 0.07f, -0.02f }, Vector3{ 0.0f, -0.08f, 0.36f }, 0.13f, 0.08f, 8, boneIvory);
+            DrawCube(Vector3{ 0.0f, -0.09f, 0.36f }, 0.13f, 0.07f, 0.12f, boneIvory); // Maxilla tip
+            DrawCube(Vector3{ 0.0f, -0.07f, 0.34f }, 0.045f, 0.055f, 0.10f, socketHole); // Nasal cavity aperture
+            DrawCube(Vector3{ 0.0f, -0.13f, 0.30f }, 0.11f, 0.03f, 0.18f, boneDark); // Upper jaw teeth ridge
 
             // C. Deep Hollow Eye Sockets
             Vector3 leftEyeSocket  = { -0.13f, 0.06f, 0.08f };
             Vector3 rightEyeSocket = {  0.13f, 0.06f, 0.08f };
             DrawSphere(leftEyeSocket, 0.058f, socketHole);
             DrawSphere(rightEyeSocket, 0.058f, socketHole);
-            DrawCircle3D(leftEyeSocket, 0.064f, (Vector3){ 0, 0, 1 }, 0.0f, boneDark);
-            DrawCircle3D(rightEyeSocket, 0.064f, (Vector3){ 0, 0, 1 }, 0.0f, boneDark);
+            DrawCircle3D(leftEyeSocket, 0.064f, Vector3{ 0, 0, 1 }, 0.0f, boneDark);
+            DrawCircle3D(rightEyeSocket, 0.064f, Vector3{ 0, 0, 1 }, 0.0f, boneDark);
 
             // D. Majestic Sweeping Curved Horns (1.4m span, arching out, up, curling forward)
             // Left Horn
-            DrawCylinderEx((Vector3){ -0.15f, 0.13f, -0.07f }, (Vector3){ -0.34f, 0.20f, -0.08f }, 0.065f, 0.052f, 8, hornDark);
-            DrawCylinderEx((Vector3){ -0.34f, 0.20f, -0.08f }, (Vector3){ -0.52f, 0.32f, -0.04f }, 0.052f, 0.038f, 8, hornMid);
-            DrawCylinderEx((Vector3){ -0.52f, 0.32f, -0.04f }, (Vector3){ -0.56f, 0.48f,  0.06f }, 0.038f, 0.024f, 8, hornPale);
-            DrawCylinderEx((Vector3){ -0.56f, 0.48f,  0.06f }, (Vector3){ -0.48f, 0.58f,  0.14f }, 0.024f, 0.006f, 7, boneIvory);
+            DrawCylinderEx(Vector3{ -0.15f, 0.13f, -0.07f }, Vector3{ -0.34f, 0.20f, -0.08f }, 0.065f, 0.052f, 8, hornDark);
+            DrawCylinderEx(Vector3{ -0.34f, 0.20f, -0.08f }, Vector3{ -0.52f, 0.32f, -0.04f }, 0.052f, 0.038f, 8, hornMid);
+            DrawCylinderEx(Vector3{ -0.52f, 0.32f, -0.04f }, Vector3{ -0.56f, 0.48f,  0.06f }, 0.038f, 0.024f, 8, hornPale);
+            DrawCylinderEx(Vector3{ -0.56f, 0.48f,  0.06f }, Vector3{ -0.48f, 0.58f,  0.14f }, 0.024f, 0.006f, 7, boneIvory);
 
             // Right Horn
-            DrawCylinderEx((Vector3){  0.15f, 0.13f, -0.07f }, (Vector3){  0.34f, 0.20f, -0.08f }, 0.065f, 0.052f, 8, hornDark);
-            DrawCylinderEx((Vector3){  0.34f, 0.20f, -0.08f }, (Vector3){  0.52f, 0.32f, -0.04f }, 0.052f, 0.038f, 8, hornMid);
-            DrawCylinderEx((Vector3){  0.52f, 0.32f, -0.04f }, (Vector3){  0.56f, 0.48f,  0.06f }, 0.038f, 0.024f, 8, hornPale);
-            DrawCylinderEx((Vector3){  0.56f, 0.48f,  0.06f }, (Vector3){  0.48f, 0.58f,  0.14f }, 0.024f, 0.006f, 7, boneIvory);
+            DrawCylinderEx(Vector3{  0.15f, 0.13f, -0.07f }, Vector3{  0.34f, 0.20f, -0.08f }, 0.065f, 0.052f, 8, hornDark);
+            DrawCylinderEx(Vector3{  0.34f, 0.20f, -0.08f }, Vector3{  0.52f, 0.32f, -0.04f }, 0.052f, 0.038f, 8, hornMid);
+            DrawCylinderEx(Vector3{  0.52f, 0.32f, -0.04f }, Vector3{  0.56f, 0.48f,  0.06f }, 0.038f, 0.024f, 8, hornPale);
+            DrawCylinderEx(Vector3{  0.56f, 0.48f,  0.06f }, Vector3{  0.48f, 0.58f,  0.14f }, 0.024f, 0.006f, 7, boneIvory);
 
             // Occult carved rune on the forehead
-            DrawLine3D((Vector3){  0.0f,  0.04f, 0.11f }, (Vector3){ 0.0f, 0.16f, 0.03f }, (Color){ 85, 25, 20, 230 });
-            DrawLine3D((Vector3){ -0.04f, 0.11f, 0.07f }, (Vector3){ 0.04f, 0.11f, 0.07f }, (Color){ 85, 25, 20, 230 });
+            DrawLine3D(Vector3{  0.0f,  0.04f, 0.11f }, Vector3{ 0.0f, 0.16f, 0.03f }, Color{ 85, 25, 20, 230 });
+            DrawLine3D(Vector3{ -0.04f, 0.11f, 0.07f }, Vector3{ 0.04f, 0.11f, 0.07f }, Color{ 85, 25, 20, 230 });
 
             // E. THE GAZE-TRACKING GLOWING EYES
             float pupilOffX = -g_skullEyeSmoothX * 0.028f;
@@ -12976,15 +12954,15 @@ auto RunIntroCinematic = [&]() {
             float eyeR     = (0.020f + g_skullGazeFlare * 0.007f) * eyePulse;
 
             Color eyeCoreCol  = { 255, 250, 210, 255 };
-            Color eyeAmberCol = g_skullGazeFlare > 0.3f ? (Color){ 255, 120, 35, 255 } : (Color){ 255, 195, 45, 255 };
+            Color eyeAmberCol = g_skullGazeFlare > 0.3f ? Color{ 255, 120, 35, 255 } : Color{ 255, 195, 45, 255 };
             Color eyeHaloCol  = { 255, 160, 35, (unsigned char)(55 + (int)(g_skullGazeFlare * 75.0f)) };
 
             // Glowing tapetum-lucidum predatory pupils
             DrawSphere(leftPupil, eyeR, eyeAmberCol);
             DrawSphere(rightPupil, eyeR, eyeAmberCol);
             // Pinpoint white-hot core retinas
-            DrawSphere((Vector3){ leftPupil.x, leftPupil.y, leftPupil.z + 0.006f }, eyeR * 0.45f, eyeCoreCol);
-            DrawSphere((Vector3){ rightPupil.x, rightPupil.y, rightPupil.z + 0.006f }, eyeR * 0.45f, eyeCoreCol);
+            DrawSphere(Vector3{ leftPupil.x, leftPupil.y, leftPupil.z + 0.006f }, eyeR * 0.45f, eyeCoreCol);
+            DrawSphere(Vector3{ rightPupil.x, rightPupil.y, rightPupil.z + 0.006f }, eyeR * 0.45f, eyeCoreCol);
             // Volumetric micro-halo
             DrawSphere(leftPupil, eyeR * 2.8f, eyeHaloCol);
             DrawSphere(rightPupil, eyeR * 2.8f, eyeHaloCol);
@@ -13012,7 +12990,7 @@ auto RunIntroCinematic = [&]() {
 
         uiCamera.zoom = uiScale;
 
-        uiCamera.offset = (Vector2){
+        uiCamera.offset = Vector2{
 
             ((float)target.texture.width - (float)LOGICAL_W * uiScale) * 0.5f,
 
@@ -13029,9 +13007,9 @@ auto RunIntroCinematic = [&]() {
 
         if (g_flashlightActive && g_gameState == STATE_GAMEPLAY && !isRoofCamActive) {
 
-            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 340.0f, (Color){ 255, 245, 210, 22 }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 340.0f, Color{ 255, 245, 210, 22 }, Color{ 0, 0, 0, 0 });
 
-            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 170.0f, (Color){ 255, 250, 230, 18 }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient(LOGICAL_W / 2, LOGICAL_H / 2 + 25, 170.0f, Color{ 255, 250, 230, 18 }, Color{ 0, 0, 0, 0 });
 
         }
 
@@ -13096,10 +13074,39 @@ auto RunIntroCinematic = [&]() {
         DrawShopkeeperStoreUI(isShopOpen, shopFeedbackMsg);
 
         // =========================================================================
+        // AAA DIEBOLD/NCR 24-HR CASHPOINT ATM TERMINAL INTERFACE OVERLAY
+        // =========================================================================
+        DrawATMOverlay2D();
+
+        // =========================================================================
         // AAA TACTICAL CROSSHAIR RETICLE
         // =========================================================================
         if (g_gameState == STATE_GAMEPLAY && !isShopOpen && !isRoofCamActive) {
             DrawTacticalCrosshair(hudFocusIdx, nearCounter, g_heldProductIndex);
+            if (IsPlayerNearWashroomSink(camera.position)) {
+                const char* faucetPrompt = IsWashroomSinkRunning() ? "[E] TURN FAUCET OFF" : "[E] TURN FAUCET ON";
+                int textW = MeasureText(faucetPrompt, 16);
+                DrawRectangle(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 15, 18, 22, 210 });
+                DrawRectangleLines(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 85, 165, 235, 240 });
+                DrawText(faucetPrompt, LOGICAL_W / 2 - textW / 2, LOGICAL_H / 2 + 36, 16, Color{ 225, 240, 255, 255 });
+            }
+            if (IsPlayerNearWashroomDoor(camera.position)) {
+                const char* doorPrompt = IsWashroomDoorOpen() ? "[E] CLOSE WASHROOM DOOR" : "[E] OPEN WASHROOM DOOR";
+                int textW = MeasureText(doorPrompt, 16);
+                DrawRectangle(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 15, 18, 22, 210 });
+                DrawRectangleLines(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 180, 145, 55, 240 });
+                DrawText(doorPrompt, LOGICAL_W / 2 - textW / 2, LOGICAL_H / 2 + 36, 16, Color{ 245, 230, 195, 255 });
+            }
+            if (g_ghostCart.active && g_ghostCart.alpha > 0.35f && g_ghostCart.itemsInCart > 0 && !g_isHoldingCart) {
+                float dGhost = Vector3Distance(camera.position, g_ghostCart.pos);
+                if (dGhost < 2.4f && g_heldProductIndex == -1) {
+                    const char* ghostPrompt = "[E] TAKE PHANTOM ITEM FROM CART";
+                    int textW = MeasureText(ghostPrompt, 16);
+                    DrawRectangle(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 60, textW + 16, 24, Color{ 24, 10, 10, 215 });
+                    DrawRectangleLines(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 60, textW + 16, 24, Color{ 220, 65, 50, 240 });
+                    DrawText(ghostPrompt, LOGICAL_W / 2 - textW / 2, LOGICAL_H / 2 + 64, 16, Color{ 255, 185, 175, 255 });
+                }
+            }
         }
 
         // HYPER-REALISTIC SMARTPHONE & LIVE "MIRE-NAV" GPS MAP SYSTEM
@@ -13128,27 +13135,27 @@ auto RunIntroCinematic = [&]() {
 
             // 1. Soft Physical Ambient Drop Shadow
 
-            DrawRectangleRounded((Rectangle){ pX + 8, pY + 12, pW, pH }, 0.08f, 16, (Color){ 0, 0, 0, (unsigned char)(110 * g_phoneAnim) });
+            DrawRectangleRounded(Rectangle{ pX + 8, pY + 12, pW, pH }, 0.08f, 16, Color{ 0, 0, 0, (unsigned char)(110 * g_phoneAnim) });
 
-            DrawRectangleRounded((Rectangle){ pX + 4, pY + 6, pW, pH }, 0.08f, 16, (Color){ 0, 0, 0, (unsigned char)(150 * g_phoneAnim) });
+            DrawRectangleRounded(Rectangle{ pX + 4, pY + 6, pW, pH }, 0.08f, 16, Color{ 0, 0, 0, (unsigned char)(150 * g_phoneAnim) });
 
 
 
             // 2. Titanium / Matte Metal Smartphone Chassis
 
-            DrawRectangleRounded((Rectangle){ pX, pY, pW, pH }, 0.08f, 16, (Color){ 34, 37, 42, 255 });
+            DrawRectangleRounded(Rectangle{ pX, pY, pW, pH }, 0.08f, 16, Color{ 34, 37, 42, 255 });
 
-            DrawRectangleRoundedLinesEx((Rectangle){ pX, pY, pW, pH }, 0.08f, 16, 2.0f, (Color){ 72, 78, 86, 255 });
+            DrawRectangleRoundedLinesEx(Rectangle{ pX, pY, pW, pH }, 0.08f, 16, 2.0f, Color{ 72, 78, 86, 255 });
 
 
 
             // Physical Hardware Buttons on Outer Rim
 
-            DrawRectangle((int)(pX - 3), (int)(pY + 115), 3, 26, (Color){ 48, 52, 58, 255 }); // Vol Up
+            DrawRectangle((int)(pX - 3), (int)(pY + 115), 3, 26, Color{ 48, 52, 58, 255 }); // Vol Up
 
-            DrawRectangle((int)(pX - 3), (int)(pY + 152), 3, 26, (Color){ 48, 52, 58, 255 }); // Vol Down
+            DrawRectangle((int)(pX - 3), (int)(pY + 152), 3, 26, Color{ 48, 52, 58, 255 }); // Vol Down
 
-            DrawRectangle((int)(pX + pW), (int)(pY + 130), 3, 38, (Color){ 48, 52, 58, 255 }); // Power
+            DrawRectangle((int)(pX + pW), (int)(pY + 130), 3, 38, Color{ 48, 52, 58, 255 }); // Power
 
 
 
@@ -13162,17 +13169,17 @@ auto RunIntroCinematic = [&]() {
 
             float scrH = pH - 24.0f; // 546px
 
-            DrawRectangleRounded((Rectangle){ scrX, scrY, scrW, scrH }, 0.06f, 12, (Color){ 12, 14, 18, 255 });
+            DrawRectangleRounded(Rectangle{ scrX, scrY, scrW, scrH }, 0.06f, 12, Color{ 12, 14, 18, 255 });
 
 
 
             // 4. Dynamic Island / Front Camera Pill Notch
 
-            DrawRectangleRounded((Rectangle){ pX + pW/2 - 28, scrY + 5, 56, 13 }, 0.5f, 8, (Color){ 6, 7, 9, 255 });
+            DrawRectangleRounded(Rectangle{ pX + pW/2 - 28, scrY + 5, 56, 13 }, 0.5f, 8, Color{ 6, 7, 9, 255 });
 
-            DrawCircle((int)(pX + pW/2 + 14), (int)(scrY + 11), 3, (Color){ 22, 38, 62, 255 }); // Lens reflection dot
+            DrawCircle((int)(pX + pW/2 + 14), (int)(scrY + 11), 3, Color{ 22, 38, 62, 255 }); // Lens reflection dot
 
-            DrawRectangle((int)(pX + pW/2 - 14), (int)(scrY + 1), 28, 2, (Color){ 28, 30, 35, 255 }); // Ear speaker slit
+            DrawRectangle((int)(pX + pW/2 - 14), (int)(scrY + 1), 28, 2, Color{ 28, 30, 35, 255 }); // Ear speaker slit
 
 
 
@@ -13196,7 +13203,7 @@ auto RunIntroCinematic = [&]() {
 
             snprintf(clockBuf, sizeof(clockBuf), "%02d:%02d %s", displayHourPhone, phoneMin, (phoneHour >= 12) ? "PM" : "AM");
 
-            DrawTextSharp(g_fontSmall, clockBuf, scrX + 10, scrY + 6, 11.0f, (Color){ 230, 235, 240, 255 });
+            DrawTextSharp(g_fontSmall, clockBuf, scrX + 10, scrY + 6, 11.0f, Color{ 230, 235, 240, 255 });
 
 
 
@@ -13204,25 +13211,25 @@ auto RunIntroCinematic = [&]() {
 
             bool signalFlicker = (fmodf(g_phoneSignalFlicker, 4.2f) > 3.6f);
 
-            DrawTextSharp(g_fontSmall, signalFlicker ? "NO SERVICE" : "1 BAR [E]", scrX + scrW - 105, scrY + 6, 10.0f, signalFlicker ? (Color){ 225, 65, 55, 255 } : (Color){ 160, 165, 175, 220 });
+            DrawTextSharp(g_fontSmall, signalFlicker ? "NO SERVICE" : "1 BAR [E]", scrX + scrW - 105, scrY + 6, 10.0f, signalFlicker ? Color{ 225, 65, 55, 255 } : Color{ 160, 165, 175, 220 });
 
             // Battery icon & percentage
 
-            DrawRectangleLines((int)(scrX + scrW - 28), (int)(scrY + 7), 16, 9, (Color){ 175, 180, 190, 240 });
+            DrawRectangleLines((int)(scrX + scrW - 28), (int)(scrY + 7), 16, 9, Color{ 175, 180, 190, 240 });
 
-            DrawRectangle((int)(scrX + scrW - 12), (int)(scrY + 9), 2, 5, (Color){ 175, 180, 190, 240 });
+            DrawRectangle((int)(scrX + scrW - 12), (int)(scrY + 9), 2, 5, Color{ 175, 180, 190, 240 });
 
-            DrawRectangle((int)(scrX + scrW - 26), (int)(scrY + 9), 4, 5, (Color){ 230, 65, 55, 255 }); // Low 18% battery in red
+            DrawRectangle((int)(scrX + scrW - 26), (int)(scrY + 9), 4, 5, Color{ 230, 65, 55, 255 }); // Low 18% battery in red
 
 
 
             // 6. "MIRE-NAV" APP BANNER
 
-            DrawRectangle((int)scrX, (int)(scrY + 22), (int)scrW, 28, (Color){ 18, 22, 28, 255 });
+            DrawRectangle((int)scrX, (int)(scrY + 22), (int)scrW, 28, Color{ 18, 22, 28, 255 });
 
-            DrawLine((int)scrX, (int)(scrY + 50), (int)(scrX + scrW), (int)(scrY + 50), (Color){ 45, 55, 68, 255 });
+            DrawLine((int)scrX, (int)(scrY + 50), (int)(scrX + scrW), (int)(scrY + 50), Color{ 45, 55, 68, 255 });
 
-            DrawTextSharp(g_fontSmall, "MIRE-NAV // GPS SATELLITE (OFFLINE)", scrX + 8, scrY + 26, 10.0f, (Color){ 85, 195, 245, 255 });
+            DrawTextSharp(g_fontSmall, "MIRE-NAV // GPS SATELLITE (OFFLINE)", scrX + 8, scrY + 26, 10.0f, Color{ 85, 195, 245, 255 });
 
 
 
@@ -13256,7 +13263,7 @@ auto RunIntroCinematic = [&]() {
 
             }
 
-            DrawTextSharp(g_fontSmall, sectorStr, scrX + 8, scrY + 38, 9.0f, (Color){ 215, 205, 180, 220 });
+            DrawTextSharp(g_fontSmall, sectorStr, scrX + 8, scrY + 38, 9.0f, Color{ 215, 205, 180, 220 });
 
 
 
@@ -13274,9 +13281,9 @@ auto RunIntroCinematic = [&]() {
 
             // Dark satellite topographical background
 
-            DrawRectangle((int)mapX, (int)mapY, (int)mapW, (int)mapH, (Color){ 15, 18, 22, 255 });
+            DrawRectangle((int)mapX, (int)mapY, (int)mapW, (int)mapH, Color{ 15, 18, 22, 255 });
 
-            DrawRectangleLines((int)mapX, (int)mapY, (int)mapW, (int)mapH, (Color){ 35, 42, 52, 255 });
+            DrawRectangleLines((int)mapX, (int)mapY, (int)mapW, (int)mapH, Color{ 35, 42, 52, 255 });
 
 
 
@@ -13296,7 +13303,7 @@ auto RunIntroCinematic = [&]() {
 
                 float my = mapY + mapH * 0.5f + (wz - viewCenterZ) * mapScale;
 
-                return (Vector2){ mx, my };
+                return Vector2{ mx, my };
 
             };
 
@@ -13322,7 +13329,7 @@ auto RunIntroCinematic = [&]() {
 
                     float clx = Clamp(g1.x, mapX, mapX + mapW);
 
-                    DrawLine((int)clx, (int)fmaxf(g1.y, mapY), (int)clx, (int)fminf(g2.y, mapY + mapH), (Color){ 28, 34, 42, 160 });
+                    DrawLine((int)clx, (int)fmaxf(g1.y, mapY), (int)clx, (int)fminf(g2.y, mapY + mapH), Color{ 28, 34, 42, 160 });
 
                 }
 
@@ -13338,7 +13345,7 @@ auto RunIntroCinematic = [&]() {
 
                     float cly = Clamp(g1.y, mapY, mapY + mapH);
 
-                    DrawLine((int)fmaxf(g1.x, mapX), (int)cly, (int)fminf(g2.x, mapX + mapW), (int)cly, (Color){ 28, 34, 42, 160 });
+                    DrawLine((int)fmaxf(g1.x, mapX), (int)cly, (int)fminf(g2.x, mapX + mapW), (int)cly, Color{ 28, 34, 42, 160 });
 
                 }
 
@@ -13358,7 +13365,7 @@ auto RunIntroCinematic = [&]() {
 
             if (fwW > 0.0f) {
 
-                DrawRectangle((int)fwX, (int)fmaxf(fWestTop.y, mapY), (int)fwW, (int)fminf(fWestBot.y - fWestTop.y, mapH), (Color){ 12, 18, 14, 210 });
+                DrawRectangle((int)fwX, (int)fmaxf(fWestTop.y, mapY), (int)fwW, (int)fminf(fWestBot.y - fWestTop.y, mapH), Color{ 12, 18, 14, 210 });
 
             }
 
@@ -13370,13 +13377,13 @@ auto RunIntroCinematic = [&]() {
             float ocX = Clamp(ocTop.x, mapX, mapX + mapW);
             float ocW = Clamp(ocBot.x - ocX, 0.0f, mapX + mapW - ocX);
             if (ocW > 0.0f) {
-                DrawRectangle((int)ocX, (int)mapY, (int)ocW, (int)mapH, (Color){ 10, 26, 38, 235 });
-                DrawLine((int)(ocX + ocW), (int)mapY, (int)(ocX + ocW), (int)(mapY + mapH), (Color){ 45, 120, 160, 240 });
+                DrawRectangle((int)ocX, (int)mapY, (int)ocW, (int)mapH, Color{ 10, 26, 38, 235 });
+                DrawLine((int)(ocX + ocW), (int)mapY, (int)(ocX + ocW), (int)(mapY + mapH), Color{ 45, 120, 160, 240 });
                 Vector2 pierStart = WorldToMap(36.0f, 138.0f);
                 Vector2 pierEnd   = WorldToMap(16.0f, 138.0f);
-                DrawLineEx(pierStart, pierEnd, 3.0f, (Color){ 140, 115, 75, 255 });
+                DrawLineEx(pierStart, pierEnd, 3.0f, Color{ 140, 115, 75, 255 });
                 if (InMapBounds(ocX + 4, mapY + 20)) {
-                    DrawTextSharp(g_fontSmall, "BLACKWATER SEA", ocX + 6, mapY + 12, 9.0f, (Color){ 65, 185, 215, 230 });
+                    DrawTextSharp(g_fontSmall, "BLACKWATER SEA", ocX + 6, mapY + 12, 9.0f, Color{ 65, 185, 215, 230 });
                 }
             }
 
@@ -13396,13 +13403,13 @@ auto RunIntroCinematic = [&]() {
 
             if (mW > 0.0f && mH > 0.0f) {
 
-                DrawRectangle((int)mX, (int)mY, (int)mW, (int)mH, (Color){ 16, 26, 24, 230 });
+                DrawRectangle((int)mX, (int)mY, (int)mW, (int)mH, Color{ 16, 26, 24, 230 });
 
-                DrawRectangleLines((int)mX, (int)mY, (int)mW, (int)mH, (Color){ 28, 48, 42, 240 });
+                DrawRectangleLines((int)mX, (int)mY, (int)mW, (int)mH, Color{ 28, 48, 42, 240 });
 
                 if (InMapBounds(mX + 6, mY + 12)) {
 
-                    DrawTextSharp(g_fontSmall, "PEAT MIRE [HAZARD]", mX + 6, mY + 8, 9.0f, (Color){ 55, 125, 95, 220 });
+                    DrawTextSharp(g_fontSmall, "PEAT MIRE [HAZARD]", mX + 6, mY + 8, 9.0f, Color{ 55, 125, 95, 220 });
 
                 }
 
@@ -13428,13 +13435,13 @@ auto RunIntroCinematic = [&]() {
 
                 // Asphalt Road Bed
 
-                DrawRectangle((int)rx, (int)ry, (int)rw, (int)rh, (Color){ 38, 42, 48, 255 });
+                DrawRectangle((int)rx, (int)ry, (int)rw, (int)rh, Color{ 38, 42, 48, 255 });
 
                 // White outer shoulder lines
 
-                DrawLine((int)rx, (int)ry, (int)rx, (int)(ry + rh), (Color){ 160, 165, 175, 220 });
+                DrawLine((int)rx, (int)ry, (int)rx, (int)(ry + rh), Color{ 160, 165, 175, 220 });
 
-                DrawLine((int)(rx + rw), (int)ry, (int)(rx + rw), (int)(ry + rh), (Color){ 160, 165, 175, 220 });
+                DrawLine((int)(rx + rw), (int)ry, (int)(rx + rw), (int)(ry + rh), Color{ 160, 165, 175, 220 });
 
                 // Broken Yellow Center Line
 
@@ -13450,7 +13457,7 @@ auto RunIntroCinematic = [&]() {
 
                         if (d1.y >= mapY && d2.y <= mapY + mapH) {
 
-                            DrawLine((int)d1.x, (int)d1.y, (int)d2.x, (int)d2.y, (Color){ 220, 185, 45, 240 });
+                            DrawLine((int)d1.x, (int)d1.y, (int)d2.x, (int)d2.y, Color{ 220, 185, 45, 240 });
 
                         }
 
@@ -13478,9 +13485,9 @@ auto RunIntroCinematic = [&]() {
 
             if (lw > 0.0f && lh > 0.0f) {
 
-                DrawRectangle((int)lx, (int)ly, (int)lw, (int)lh, (Color){ 28, 30, 35, 255 });
+                DrawRectangle((int)lx, (int)ly, (int)lw, (int)lh, Color{ 28, 30, 35, 255 });
 
-                DrawRectangleLines((int)lx, (int)ly, (int)lw, (int)lh, (Color){ 52, 58, 68, 255 });
+                DrawRectangleLines((int)lx, (int)ly, (int)lw, (int)lh, Color{ 52, 58, 68, 255 });
 
             }
 
@@ -13502,9 +13509,9 @@ auto RunIntroCinematic = [&]() {
 
             if (sw > 0.0f && sh > 0.0f) {
 
-                DrawRectangle((int)sx, (int)sy, (int)sw, (int)sh, (Color){ 44, 48, 56, 255 });
+                DrawRectangle((int)sx, (int)sy, (int)sw, (int)sh, Color{ 44, 48, 56, 255 });
 
-                DrawRectangleLines((int)sx, (int)sy, (int)sw, (int)sh, (Color){ 165, 175, 190, 255 });
+                DrawRectangleLines((int)sx, (int)sy, (int)sw, (int)sh, Color{ 165, 175, 190, 255 });
 
                 // East Door Entrance Line (cyan)
 
@@ -13514,7 +13521,7 @@ auto RunIntroCinematic = [&]() {
 
                 if (InMapBounds(doorP1.x, doorP1.y)) {
 
-                    DrawLine((int)doorP1.x, (int)doorP1.y, (int)doorP2.x, (int)doorP2.y, (Color){ 65, 215, 245, 255 });
+                    DrawLine((int)doorP1.x, (int)doorP1.y, (int)doorP2.x, (int)doorP2.y, Color{ 65, 215, 245, 255 });
 
                 }
 
@@ -13522,7 +13529,7 @@ auto RunIntroCinematic = [&]() {
 
                 if (InMapBounds(sx + 6, sy + sh/2)) {
 
-                    DrawTextSharp(g_fontSmall, "SUPERMARKET", sx + 6, sy + sh/2 - 6, 9.0f, (Color){ 220, 225, 235, 240 });
+                    DrawTextSharp(g_fontSmall, "SUPERMARKET", sx + 6, sy + sh/2 - 6, 9.0f, Color{ 220, 225, 235, 240 });
 
                 }
 
@@ -13538,11 +13545,11 @@ auto RunIntroCinematic = [&]() {
 
             if (canP1.x >= mapX && canP2.x <= mapX + mapW && canP1.y >= mapY && canP2.y <= mapY + mapH) {
 
-                DrawRectangle((int)canP1.x, (int)canP1.y, (int)(canP2.x - canP1.x), (int)(canP2.y - canP1.y), (Color){ 36, 40, 48, 220 });
+                DrawRectangle((int)canP1.x, (int)canP1.y, (int)(canP2.x - canP1.x), (int)(canP2.y - canP1.y), Color{ 36, 40, 48, 220 });
 
-                DrawRectangleLines((int)canP1.x, (int)canP1.y, (int)(canP2.x - canP1.x), (int)(canP2.y - canP1.y), (Color){ 230, 110, 45, 255 });
+                DrawRectangleLines((int)canP1.x, (int)canP1.y, (int)(canP2.x - canP1.x), (int)(canP2.y - canP1.y), Color{ 230, 110, 45, 255 });
 
-                DrawTextSharp(g_fontSmall, "PUMPS", canP1.x + 4, canP1.y + 4, 8.0f, (Color){ 245, 140, 70, 255 });
+                DrawTextSharp(g_fontSmall, "PUMPS", canP1.x + 4, canP1.y + 4, 8.0f, Color{ 245, 140, 70, 255 });
 
             }
 
@@ -13554,11 +13561,11 @@ auto RunIntroCinematic = [&]() {
 
             if (InMapBounds(carMap.x, carMap.y, 10.0f)) {
 
-                DrawRectangle((int)(carMap.x - 4), (int)(carMap.y - 7), 8, 14, (Color){ 180, 185, 195, 255 });
+                DrawRectangle((int)(carMap.x - 4), (int)(carMap.y - 7), 8, 14, Color{ 180, 185, 195, 255 });
 
                 DrawCircle((int)carMap.x, (int)carMap.y, 2, RED);
 
-                DrawTextSharp(g_fontSmall, "CAR #14", carMap.x + 6, carMap.y - 5, 8.0f, (Color){ 235, 80, 70, 255 });
+                DrawTextSharp(g_fontSmall, "CAR #14", carMap.x + 6, carMap.y - 5, 8.0f, Color{ 235, 80, 70, 255 });
 
             }
 
@@ -13570,11 +13577,11 @@ auto RunIntroCinematic = [&]() {
 
             if (InMapBounds(hatchMap.x, hatchMap.y, 12.0f)) {
 
-                DrawRectangle((int)(hatchMap.x - 3), (int)(hatchMap.y - 3), 6, 6, (Color){ 195, 45, 40, 255 });
+                DrawRectangle((int)(hatchMap.x - 3), (int)(hatchMap.y - 3), 6, 6, Color{ 195, 45, 40, 255 });
 
-                DrawRectangleLines((int)(hatchMap.x - 4), (int)(hatchMap.y - 4), 8, 8, (Color){ 235, 185, 65, 255 });
+                DrawRectangleLines((int)(hatchMap.x - 4), (int)(hatchMap.y - 4), 8, 8, Color{ 235, 185, 65, 255 });
 
-                DrawTextSharp(g_fontSmall, "HATCH", hatchMap.x - 32, hatchMap.y - 5, 8.0f, (Color){ 235, 185, 65, 240 });
+                DrawTextSharp(g_fontSmall, "HATCH", hatchMap.x - 32, hatchMap.y - 5, 8.0f, Color{ 235, 185, 65, 240 });
 
             }
 
@@ -13594,13 +13601,13 @@ auto RunIntroCinematic = [&]() {
 
                 if (InMapBounds(cor1.x, cor1.y, 20.0f)) {
 
-                    DrawRectangleLines((int)cor1.x, (int)cor1.y, (int)(cor2.x - cor1.x), (int)(cor2.y - cor1.y), (Color){ 65, 210, 180, 180 });
+                    DrawRectangleLines((int)cor1.x, (int)cor1.y, (int)(cor2.x - cor1.x), (int)(cor2.y - cor1.y), Color{ 65, 210, 180, 180 });
 
-                    DrawRectangleLines((int)ch1.x, (int)ch1.y, (int)(ch2.x - ch1.x), (int)(ch2.y - ch1.y), (Color){ 65, 210, 180, 220 });
+                    DrawRectangleLines((int)ch1.x, (int)ch1.y, (int)(ch2.x - ch1.x), (int)(ch2.y - ch1.y), Color{ 65, 210, 180, 220 });
 
                     if (camera.position.y < 8.5f) {
 
-                        DrawTextSharp(g_fontSmall, "BUNKER (-18 FT)", ch1.x + 4, ch1.y + 6, 8.0f, (Color){ 65, 240, 200, 255 });
+                        DrawTextSharp(g_fontSmall, "BUNKER (-18 FT)", ch1.x + 4, ch1.y + 6, 8.0f, Color{ 65, 240, 200, 255 });
 
                     }
 
@@ -13622,7 +13629,7 @@ auto RunIntroCinematic = [&]() {
 
                 unsigned char rAlpha = (unsigned char)(210.0f * (1.0f - g_phoneRadarPulse));
 
-                DrawCircleLines((int)pMap.x, (int)pMap.y, rRadius, (Color){ 45, 185, 255, rAlpha });
+                DrawCircleLines((int)pMap.x, (int)pMap.y, rRadius, Color{ 45, 185, 255, rAlpha });
 
 
 
@@ -13644,7 +13651,7 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawTriangle(tipPos, leftWing, rightWing, (Color){ 45, 195, 255, 240 });
+                DrawTriangle(tipPos, leftWing, rightWing, Color{ 45, 195, 255, 240 });
 
                 DrawTriangleLines(tipPos, leftWing, rightWing, WHITE);
 
@@ -13652,7 +13659,7 @@ auto RunIntroCinematic = [&]() {
 
                 // Central GPS Blue Beacon Dot
 
-                DrawCircle((int)pMap.x, (int)pMap.y, 4, (Color){ 0, 140, 255, 255 });
+                DrawCircle((int)pMap.x, (int)pMap.y, 4, Color{ 0, 140, 255, 255 });
 
                 DrawCircle((int)pMap.x, (int)pMap.y, 2, WHITE);
 
@@ -13666,13 +13673,13 @@ auto RunIntroCinematic = [&]() {
 
             int compY = (int)(mapY + 20);
 
-            DrawCircle(compX, compY, 11, (Color){ 18, 22, 28, 220 });
+            DrawCircle(compX, compY, 11, Color{ 18, 22, 28, 220 });
 
-            DrawCircleLines(compX, compY, 11, (Color){ 55, 65, 80, 220 });
+            DrawCircleLines(compX, compY, 11, Color{ 55, 65, 80, 220 });
 
-            DrawTriangle((Vector2){ (float)compX, (float)(compY - 9) }, (Vector2){ (float)(compX - 4), (float)compY }, (Vector2){ (float)(compX + 4), (float)compY }, RED);
+            DrawTriangle(Vector2{ (float)compX, (float)(compY - 9) }, Vector2{ (float)(compX - 4), (float)compY }, Vector2{ (float)(compX + 4), (float)compY }, RED);
 
-            DrawTriangle((Vector2){ (float)compX, (float)(compY + 9) }, (Vector2){ (float)(compX + 4), (float)compY }, (Vector2){ (float)(compX - 4), (float)compY }, (Color){ 180, 185, 195, 220 });
+            DrawTriangle(Vector2{ (float)compX, (float)(compY + 9) }, Vector2{ (float)(compX + 4), (float)compY }, Vector2{ (float)(compX - 4), (float)compY }, Color{ 180, 185, 195, 220 });
 
             DrawTextSharp(g_fontSmall, "N", compX - 3, compY - 8, 8.0f, WHITE);
 
@@ -13682,9 +13689,9 @@ auto RunIntroCinematic = [&]() {
 
             float footY = mapY + mapH + 4.0f;
 
-            DrawRectangle((int)scrX, (int)footY, (int)scrW, 44, (Color){ 16, 18, 24, 255 });
+            DrawRectangle((int)scrX, (int)footY, (int)scrW, 44, Color{ 16, 18, 24, 255 });
 
-            DrawLine((int)scrX, (int)footY, (int)(scrX + scrW), (int)footY, (Color){ 45, 55, 65, 255 });
+            DrawLine((int)scrX, (int)footY, (int)(scrX + scrW), (int)footY, Color{ 45, 55, 65, 255 });
 
 
 
@@ -13696,7 +13703,7 @@ auto RunIntroCinematic = [&]() {
 
             snprintf(coordBuf, sizeof(coordBuf), "LAT 44.829 N  LON 71.304 W  |  ALT: %.0fm", altVal);
 
-            DrawTextSharp(g_fontSmall, coordBuf, scrX + 8, footY + 5, 9.0f, (Color){ 175, 185, 195, 220 });
+            DrawTextSharp(g_fontSmall, coordBuf, scrX + 8, footY + 5, 9.0f, Color{ 175, 185, 195, 220 });
 
 
 
@@ -13704,9 +13711,9 @@ auto RunIntroCinematic = [&]() {
 
             const char* zoomStr = (g_phoneZoomMode == 0) ? "[Z] ZOOM: LOCAL (1x)" : "[Z] ZOOM: REGION (2x)";
 
-            DrawTextSharp(g_fontSmall, zoomStr, scrX + 8, footY + 22, 10.0f, (Color){ 75, 215, 245, 255 });
+            DrawTextSharp(g_fontSmall, zoomStr, scrX + 8, footY + 22, 10.0f, Color{ 75, 215, 245, 255 });
 
-            DrawTextSharp(g_fontSmall, "[M] POCKET", scrX + scrW - 68, footY + 22, 10.0f, (Color){ 230, 205, 140, 240 });
+            DrawTextSharp(g_fontSmall, "[M] POCKET", scrX + scrW - 68, footY + 22, 10.0f, Color{ 230, 205, 140, 240 });
 
 
 
@@ -13714,15 +13721,15 @@ auto RunIntroCinematic = [&]() {
 
             // Diagonal specular glass reflection streak
 
-            DrawTriangle((Vector2){ scrX + 15, scrY + 2 }, (Vector2){ scrX + 75, scrY + 2 }, (Vector2){ scrX + scrW - 15, scrY + scrH - 10 }, (Color){ 255, 255, 255, 10 });
+            DrawTriangle(Vector2{ scrX + 15, scrY + 2 }, Vector2{ scrX + 75, scrY + 2 }, Vector2{ scrX + scrW - 15, scrY + scrH - 10 }, Color{ 255, 255, 255, 10 });
 
             // Micro hairline glass crack in top-right corner (horror tactile atmosphere)
 
-            DrawLine((int)(scrX + scrW - 18), (int)(scrY + 12), (int)(scrX + scrW - 48), (int)(scrY + 52), (Color){ 215, 225, 235, 80 });
+            DrawLine((int)(scrX + scrW - 18), (int)(scrY + 12), (int)(scrX + scrW - 48), (int)(scrY + 52), Color{ 215, 225, 235, 80 });
 
-            DrawLine((int)(scrX + scrW - 48), (int)(scrY + 52), (int)(scrX + scrW - 32), (int)(scrY + 84), (Color){ 215, 225, 235, 60 });
+            DrawLine((int)(scrX + scrW - 48), (int)(scrY + 52), (int)(scrX + scrW - 32), (int)(scrY + 84), Color{ 215, 225, 235, 60 });
 
-            DrawLine((int)(scrX + scrW - 48), (int)(scrY + 52), (int)(scrX + scrW - 74), (int)(scrY + 68), (Color){ 215, 225, 235, 50 });
+            DrawLine((int)(scrX + scrW - 48), (int)(scrY + 52), (int)(scrX + scrW - 74), (int)(scrY + 68), Color{ 215, 225, 235, 50 });
 
         }
 
@@ -13760,11 +13767,11 @@ auto RunIntroCinematic = [&]() {
 
         DrawTexturePro(target.texture, 
 
-            (Rectangle){ 0.0f, 0.0f, (float)target.texture.width, (float)-target.texture.height },
+            Rectangle{ 0.0f, 0.0f, (float)target.texture.width, (float)-target.texture.height },
 
-            (Rectangle){ 0.0f, 0.0f, (float)screenW, (float)screenH },
+            Rectangle{ 0.0f, 0.0f, (float)screenW, (float)screenH },
 
-            (Vector2){ 0, 0 }, 0.0f, WHITE);
+            Vector2{ 0, 0 }, 0.0f, WHITE);
 
             
 
@@ -13778,7 +13785,7 @@ auto RunIntroCinematic = [&]() {
 
             float flashAlpha = Clamp(grethnarJumpscareTimer / 0.45f, 0.0f, 1.0f) * 115.0f;
 
-            DrawRectangle(0, 0, screenW, screenH, (Color){ 180, 0, 0, (unsigned char)flashAlpha });
+            DrawRectangle(0, 0, screenW, screenH, Color{ 180, 0, 0, (unsigned char)flashAlpha });
 
             
 
@@ -13788,7 +13795,7 @@ auto RunIntroCinematic = [&]() {
 
                 unsigned char vigA = (unsigned char)(130 * (1.0f - (float)b / 24.0f) * (grethnarJumpscareTimer / 0.45f));
 
-                DrawRectangleLines(b, b, screenW - b*2, screenH - b*2, (Color){ 120, 0, 0, vigA });
+                DrawRectangleLines(b, b, screenW - b*2, screenH - b*2, Color{ 120, 0, 0, vigA });
 
             }
 
@@ -13801,16 +13808,16 @@ auto RunIntroCinematic = [&]() {
         // QUIT GAME CONFIRMATION MODAL DIALOG (Screen Pass)
         // =========================================================================
         if (showQuitConfirm) {
-            DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 195 });
+            DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 195 });
 
             float qbw = 500.0f, qbh = 220.0f;
             float qbx = ((float)screenW - qbw) * 0.5f;
             float qby = ((float)screenH - qbh) * 0.5f;
 
-            DrawAAAPanel((Rectangle){ qbx, qby, qbw, qbh }, (Color){ 14, 16, 20, 252 }, (Color){ 215, 55, 55, 230 }, 8.0f, true);
+            DrawAAAPanel(Rectangle{ qbx, qby, qbw, qbh }, Color{ 14, 16, 20, 252 }, Color{ 215, 55, 55, 230 }, 8.0f, true);
 
-            DrawTextSharpCentered(g_fontHeadSub, "QUIT GAME?", (float)screenW * 0.5f, qby + 28.0f, 26.0f, (Color){ 255, 225, 225, 255 });
-            DrawTextSharpCentered(g_fontBody, "Are you sure you want to exit to desktop?", (float)screenW * 0.5f, qby + 68.0f, 15.0f, (Color){ 185, 190, 195, 240 });
+            DrawTextSharpCentered(g_fontHeadSub, "QUIT GAME?", (float)screenW * 0.5f, qby + 28.0f, 26.0f, Color{ 255, 225, 225, 255 });
+            DrawTextSharpCentered(g_fontBody, "Are you sure you want to exit to desktop?", (float)screenW * 0.5f, qby + 68.0f, 15.0f, Color{ 185, 190, 195, 240 });
 
             Vector2 mPos = GetMousePosition();
             Rectangle btnQuitRec   = { qbx + 35.0f, qby + 130.0f, 125.0f, 46.0f };
@@ -13822,15 +13829,15 @@ auto RunIntroCinematic = [&]() {
             bool hoverResume = CheckCollisionPointRec(mPos, btnResumeRec);
 
             // Button [QUIT]
-            DrawAAAPanel(btnQuitRec, hoverQuit ? (Color){ 195, 40, 40, 255 } : (Color){ 135, 28, 28, 230 }, hoverQuit ? WHITE : (Color){ 245, 80, 80, 255 }, 5.0f, false);
+            DrawAAAPanel(btnQuitRec, hoverQuit ? Color{ 195, 40, 40, 255 } : Color{ 135, 28, 28, 230 }, hoverQuit ? WHITE : Color{ 245, 80, 80, 255 }, 5.0f, false);
             DrawTextSharpCentered(g_fontMenu, "QUIT", btnQuitRec.x + btnQuitRec.width * 0.5f, btnQuitRec.y + 14.0f, 16.0f, WHITE);
 
             // Button [MAIN MENU]
-            DrawAAAPanel(btnMenuRec, hoverMenu ? (Color){ 55, 85, 125, 255 } : (Color){ 32, 50, 75, 230 }, hoverMenu ? WHITE : (Color){ 95, 155, 235, 255 }, 5.0f, false);
+            DrawAAAPanel(btnMenuRec, hoverMenu ? Color{ 55, 85, 125, 255 } : Color{ 32, 50, 75, 230 }, hoverMenu ? WHITE : Color{ 95, 155, 235, 255 }, 5.0f, false);
             DrawTextSharpCentered(g_fontMenu, "MAIN MENU", btnMenuRec.x + btnMenuRec.width * 0.5f, btnMenuRec.y + 14.0f, 15.0f, WHITE);
 
             // Button [RESUME]
-            DrawAAAPanel(btnResumeRec, hoverResume ? (Color){ 45, 125, 65, 255 } : (Color){ 28, 75, 42, 230 }, hoverResume ? WHITE : (Color){ 80, 195, 105, 255 }, 5.0f, false);
+            DrawAAAPanel(btnResumeRec, hoverResume ? Color{ 45, 125, 65, 255 } : Color{ 28, 75, 42, 230 }, hoverResume ? WHITE : Color{ 80, 195, 105, 255 }, 5.0f, false);
             DrawTextSharpCentered(g_fontMenu, "RESUME", btnResumeRec.x + btnResumeRec.width * 0.5f, btnResumeRec.y + 14.0f, 16.0f, WHITE);
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -13858,8 +13865,8 @@ auto RunIntroCinematic = [&]() {
         if (g_gameState == STATE_MAIN_MENU) {
 
             Vector2 mPos = GetMousePosition();
-            Vector2 mDelta = GetMouseDelta();
-            float mouseMoveDist = sqrtf(mDelta.x * mDelta.x + mDelta.y * mDelta.y);
+            Vector2 menuMDelta = GetMouseDelta();
+            float mouseMoveDist = sqrtf(menuMDelta.x * menuMDelta.x + menuMDelta.y * menuMDelta.y);
             float wheelMove = GetMouseWheelMove();
             bool anyUserInput = (mouseMoveDist > 0.6f) || (fabsf(wheelMove) > 0.05f) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || (GetKeyPressed() != 0);
 
@@ -13897,10 +13904,10 @@ auto RunIntroCinematic = [&]() {
 
             // Organic Left Horizon Shadow (providing sharp contrast for typography while keeping center, top, and right open)
             int leftShadW = (int)(screenW * 0.44f);
-            DrawRectangleGradientH(0, 0, leftShadW, screenH, (Color){ 3, 4, 6, 210 }, BLANK);
+            DrawRectangleGradientH(0, 0, leftShadW, screenH, Color{ 3, 4, 6, 210 }, BLANK);
 
             // Subtle Ground Shadow for Bottom Telemetry & Vista Selectors
-            DrawRectangleGradientV(0, screenH - 60, screenW, 60, BLANK, (Color){ 2, 3, 5, 175 });
+            DrawRectangleGradientV(0, screenH - 60, screenW, 60, BLANK, Color{ 2, 3, 5, 175 });
 
             // Distant Appalachian Lightning Flash across Blackwood College
             static float s_menuLightningTimer = 14.0f;
@@ -13915,29 +13922,29 @@ auto RunIntroCinematic = [&]() {
             if (s_menuFlashAlpha > 0.0f) {
                 s_menuFlashAlpha -= dt * 2.6f;
                 if (s_menuFlashAlpha < 0.0f) s_menuFlashAlpha = 0.0f;
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 200, 220, 250, (unsigned char)(s_menuFlashAlpha * 95.0f) });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 200, 220, 250, (unsigned char)(s_menuFlashAlpha * 95.0f) });
             }
 
             // Darkness veil when dormant
             float slumberAlpha = (1.0f - g_menuAwakeIntensity) * 235.0f;
             if (slumberAlpha > 2.0f) {
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 2, 3, 5, (unsigned char)slumberAlpha });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 2, 3, 5, (unsigned char)slumberAlpha });
             }
 
             // Volumetric Flashlight Radial Beam (multi-tier luminous cone)
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 480.0f, (Color){ 210, 195, 160, (unsigned char)(22 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 250.0f, (Color){ 235, 215, 180, (unsigned char)(40 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
-            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 95.0f,  (Color){ 255, 245, 220, (unsigned char)(72 * g_menuAwakeIntensity) }, (Color){ 0, 0, 0, 0 });
+            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 480.0f, Color{ 210, 195, 160, (unsigned char)(22 * g_menuAwakeIntensity) }, Color{ 0, 0, 0, 0 });
+            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 250.0f, Color{ 235, 215, 180, (unsigned char)(40 * g_menuAwakeIntensity) }, Color{ 0, 0, 0, 0 });
+            DrawCircleGradient((int)g_menuLightPos.x, (int)g_menuLightPos.y, 95.0f,  Color{ 255, 245, 220, (unsigned char)(72 * g_menuAwakeIntensity) }, Color{ 0, 0, 0, 0 });
 
             // Floating dust motes catching the flashlight beam
             for (int d = 0; d < 22; d++) {
                 float seed = (float)d * 137.5f;
                 float dx = fmodf(seed * 43.0f + timeVal * 16.0f * (1.0f + fmodf(seed, 0.4f)), (float)screenW);
                 float dy = fmodf(seed * 67.0f + sinf(timeVal * 0.7f + seed) * 35.0f, (float)screenH);
-                float dDist = Vector2Distance((Vector2){ dx, dy }, g_menuLightPos);
+                float dDist = Vector2Distance(Vector2{ dx, dy }, g_menuLightPos);
                 if (dDist < 250.0f) {
                     float alpha = (1.0f - dDist / 250.0f) * 190.0f * g_menuAwakeIntensity;
-                    DrawCircle((int)dx, (int)dy, 1.2f + fmodf(seed, 1.8f), (Color){ 255, 235, 195, (unsigned char)alpha });
+                    DrawCircle((int)dx, (int)dy, 1.2f + fmodf(seed, 1.8f), Color{ 255, 235, 195, (unsigned char)alpha });
                 }
             }
 
@@ -13971,21 +13978,21 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 215 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 215 });
 
-                DrawRectangle(dx, dy, dw, dh, (Color){ 10, 11, 14, 252 });
+                DrawRectangle(dx, dy, dw, dh, Color{ 10, 11, 14, 252 });
 
-                DrawRectangleLines(dx, dy, dw, dh, (Color){ 140, 35, 25, 255 });
+                DrawRectangleLines(dx, dy, dw, dh, Color{ 140, 35, 25, 255 });
 
 
 
                 // Header (Distinct Gothic Horror Heading Font)
 
-                DrawTextSharp(g_fontHeadSub, "STATE POLICE // CLASSIFIED EVIDENCE DOSSIER", dx + 28, dy + 18, 25.0f, (Color){ 235, 225, 215, 255 });
+                DrawTextSharp(g_fontHeadSub, "STATE POLICE // CLASSIFIED EVIDENCE DOSSIER", dx + 28, dy + 18, 25.0f, Color{ 235, 225, 215, 255 });
 
-                DrawTextSharp(g_fontSmall, "CASE #89-094 // ROUTE 9 SERVICE STATION & BORDER MIRE", dx + 28, dy + 48, 14.0f, (Color){ 180, 60, 50, 240 });
+                DrawTextSharp(g_fontSmall, "CASE #89-094 // ROUTE 9 SERVICE STATION & BORDER MIRE", dx + 28, dy + 48, 14.0f, Color{ 180, 60, 50, 240 });
 
-                DrawLine(dx + 25, dy + 70, dx + dw - 25, dy + 70, (Color){ 90, 30, 25, 220 });
+                DrawLine(dx + 25, dy + 70, dx + dw - 25, dy + 70, Color{ 90, 30, 25, 220 });
 
 
 
@@ -14017,11 +14024,11 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawRectangleRec(fRec, fActive ? (Color){ 65, 26, 22, 255 } : (fHover ? (Color){ 30, 22, 20, 220 } : (Color){ 16, 17, 21, 210 }));
+                    DrawRectangleRec(fRec, fActive ? Color{ 65, 26, 22, 255 } : (fHover ? Color{ 30, 22, 20, 220 } : Color{ 16, 17, 21, 210 }));
 
-                    DrawRectangleLinesEx(fRec, 1.0f, fActive ? (Color){ 230, 65, 55, 255 } : (fHover ? WHITE : (Color){ 75, 50, 45, 190 }));
+                    DrawRectangleLinesEx(fRec, 1.0f, fActive ? Color{ 230, 65, 55, 255 } : (fHover ? WHITE : Color{ 75, 50, 45, 190 }));
 
-                    DrawTextSharp(g_fontMenu, caseTitles[f], (int)fRec.x + 14, (int)fRec.y + 12, 16.0f, fActive ? WHITE : (Color){ 195, 190, 180, 230 });
+                    DrawTextSharp(g_fontMenu, caseTitles[f], (int)fRec.x + 14, (int)fRec.y + 12, 16.0f, fActive ? WHITE : Color{ 195, 190, 180, 230 });
 
 
 
@@ -14049,9 +14056,9 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(docX, docY, docW, docH, (Color){ 14, 16, 20, 255 });
+                DrawRectangle(docX, docY, docW, docH, Color{ 14, 16, 20, 255 });
 
-                DrawRectangleLines(docX, docY, docW, docH, (Color){ 55, 42, 38, 220 });
+                DrawRectangleLines(docX, docY, docW, docH, Color{ 55, 42, 38, 220 });
 
 
 
@@ -14059,11 +14066,11 @@ auto RunIntroCinematic = [&]() {
 
                 if (g_caseFileSelected == 0) {
 
-                    DrawTextSharp(g_fontHeadSub, "TRANSCRIPT: 911 LOG // CALL REC 22:14:08", docX + 20, docY + 16, 19.0f, (Color){ 235, 70, 60, 255 });
+                    DrawTextSharp(g_fontHeadSub, "TRANSCRIPT: 911 LOG // CALL REC 22:14:08", docX + 20, docY + 16, 19.0f, Color{ 235, 70, 60, 255 });
 
-                    DrawTextSharp(g_fontSmall, "LOCATION: Mile Marker 14, Route 9 Northern Pass", docX + 20, docY + 42, 14.0f, (Color){ 160, 155, 150, 220 });
+                    DrawTextSharp(g_fontSmall, "LOCATION: Mile Marker 14, Route 9 Northern Pass", docX + 20, docY + 42, 14.0f, Color{ 160, 155, 150, 220 });
 
-                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, (Color){ 70, 35, 30, 220 });
+                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, Color{ 70, 35, 30, 220 });
 
 
 
@@ -14081,25 +14088,25 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 228, 17.0f, (Color){ 235, 60, 50, 255 });
+                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 228, 17.0f, Color{ 235, 60, 50, 255 });
 
                 } else if (g_caseFileSelected == 1) {
 
-                    DrawTextSharp(g_fontHeadSub, "INCIDENT LOG: MISSING PERSON // SIBLING DOSSIER", docX + 20, docY + 16, 19.0f, (Color){ 235, 70, 60, 255 });
+                    DrawTextSharp(g_fontHeadSub, "INCIDENT LOG: MISSING PERSON // SIBLING DOSSIER", docX + 20, docY + 16, 19.0f, Color{ 235, 70, 60, 255 });
 
-                    DrawTextSharp(g_fontSmall, "STATUS: Unresolved / Active Search Warrant", docX + 20, docY + 42, 14.0f, (Color){ 160, 155, 150, 220 });
+                    DrawTextSharp(g_fontSmall, "STATUS: Unresolved / Active Search Warrant", docX + 20, docY + 42, 14.0f, Color{ 160, 155, 150, 220 });
 
-                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, (Color){ 70, 35, 30, 220 });
+                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, Color{ 70, 35, 30, 220 });
 
 
 
@@ -14117,25 +14124,25 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 17.0f, Color{ 215, 210, 200, 245 });
 
                 } else if (g_caseFileSelected == 2) {
 
-                    DrawTextSharp(g_fontHeadSub, "ANOMALOUS ENTITY // CLASSIFICATION: SKELETON HOUND", docX + 20, docY + 16, 19.0f, (Color){ 235, 70, 60, 255 });
+                    DrawTextSharp(g_fontHeadSub, "ANOMALOUS ENTITY // CLASSIFICATION: SKELETON HOUND", docX + 20, docY + 16, 19.0f, Color{ 235, 70, 60, 255 });
 
-                    DrawTextSharp(g_fontSmall, "OBSERVER: Station Attendant Security Cam #02", docX + 20, docY + 42, 14.0f, (Color){ 160, 155, 150, 220 });
+                    DrawTextSharp(g_fontSmall, "OBSERVER: Station Attendant Security Cam #02", docX + 20, docY + 42, 14.0f, Color{ 160, 155, 150, 220 });
 
-                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, (Color){ 70, 35, 30, 220 });
+                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, Color{ 70, 35, 30, 220 });
 
 
 
@@ -14153,25 +14160,25 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 160, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l5, docX + 20, docY + 188, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 17.0f, Color{ 215, 210, 200, 245 });
 
                 } else {
 
-                    DrawTextSharp(g_fontHeadSub, "FORENSIC GEOLOGY // ANOMALOUS MIRE PRESERVATION", docX + 20, docY + 16, 19.0f, (Color){ 235, 70, 60, 255 });
+                    DrawTextSharp(g_fontHeadSub, "FORENSIC GEOLOGY // ANOMALOUS MIRE PRESERVATION", docX + 20, docY + 16, 19.0f, Color{ 235, 70, 60, 255 });
 
-                    DrawTextSharp(g_fontSmall, "SAMPLE ANALYSIS: Route 9 Bog Core 12-F", docX + 20, docY + 42, 14.0f, (Color){ 160, 155, 150, 220 });
+                    DrawTextSharp(g_fontSmall, "SAMPLE ANALYSIS: Route 9 Bog Core 12-F", docX + 20, docY + 42, 14.0f, Color{ 160, 155, 150, 220 });
 
-                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, (Color){ 70, 35, 30, 220 });
+                    DrawLine(docX + 20, docY + 62, docX + docW - 20, docY + 62, Color{ 70, 35, 30, 220 });
 
 
 
@@ -14189,17 +14196,17 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l1, docX + 20, docY + 76, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l2, docX + 20, docY + 104, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, (Color){ 215, 210, 200, 245 });
+                    DrawTextSharp(g_fontBody, l3, docX + 20, docY + 132, 17.0f, Color{ 215, 210, 200, 245 });
 
-                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 162, 15.0f, (Color){ 175, 170, 165, 210 });
+                    DrawTextSharp(g_fontBody, l4, docX + 20, docY + 162, 15.0f, Color{ 175, 170, 165, 210 });
 
-                    DrawTextSharp(g_fontHeadSub, l5, docX + 20, docY + 186, 17.0f, (Color){ 240, 60, 50, 255 });
+                    DrawTextSharp(g_fontHeadSub, l5, docX + 20, docY + 186, 17.0f, Color{ 240, 60, 50, 255 });
 
-                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 15.0f, (Color){ 195, 190, 180, 230 });
+                    DrawTextSharp(g_fontBody, l6, docX + 20, docY + 224, 15.0f, Color{ 195, 190, 180, 230 });
 
                 }
 
@@ -14211,9 +14218,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hClose = CheckCollisionPointRec(mPos, btnCloseDossier);
 
-                DrawRectangleRec(btnCloseDossier, hClose ? (Color){ 95, 30, 25, 255 } : (Color){ 35, 18, 16, 240 });
+                DrawRectangleRec(btnCloseDossier, hClose ? Color{ 95, 30, 25, 255 } : Color{ 35, 18, 16, 240 });
 
-                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : (Color){ 160, 50, 40, 255 });
+                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : Color{ 160, 50, 40, 255 });
 
                 DrawTextSharpCentered(g_fontMenu, "CLOSE [ESC]", dx + dw/2, dy + dh - 40, 16.0f, WHITE);
 
@@ -14251,19 +14258,19 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 225 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 225 });
 
-                DrawRectangle(dx, dy, dw, dh, (Color){ 12, 14, 18, 252 });
+                DrawRectangle(dx, dy, dw, dh, Color{ 12, 14, 18, 252 });
 
-                DrawRectangleLines(dx, dy, dw, dh, (Color){ 175, 145, 65, 255 });
+                DrawRectangleLines(dx, dy, dw, dh, Color{ 175, 145, 65, 255 });
 
 
 
-                DrawTextSharp(g_fontHeadSub, "TOP SECRET // CIVIL DEFENSE & DEEP MONITORING DOSSIER", dx + 28, dy + 22, 17.0f, (Color){ 240, 220, 180, 255 });
+                DrawTextSharp(g_fontHeadSub, "TOP SECRET // CIVIL DEFENSE & DEEP MONITORING DOSSIER", dx + 28, dy + 22, 17.0f, Color{ 240, 220, 180, 255 });
 
-                DrawTextSharp(g_fontSmall, "LOCATION: ROUTE 9 SERVICE STATION SUB-TERRAIN // AUTH: LEVEL-4 DISPATCH", dx + 28, dy + 46, 12.0f, (Color){ 200, 75, 60, 255 });
+                DrawTextSharp(g_fontSmall, "LOCATION: ROUTE 9 SERVICE STATION SUB-TERRAIN // AUTH: LEVEL-4 DISPATCH", dx + 28, dy + 46, 12.0f, Color{ 200, 75, 60, 255 });
 
-                DrawLine(dx + 25, dy + 68, dx + dw - 25, dy + 68, (Color){ 120, 95, 45, 200 });
+                DrawLine(dx + 25, dy + 68, dx + dw - 25, dy + 68, Color{ 120, 95, 45, 200 });
 
 
 
@@ -14291,11 +14298,11 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawRectangleRec(tRec, tActive ? (Color){ 55, 42, 22, 255 } : (tHover ? (Color){ 28, 24, 18, 220 } : (Color){ 16, 17, 20, 200 }));
+                    DrawRectangleRec(tRec, tActive ? Color{ 55, 42, 22, 255 } : (tHover ? Color{ 28, 24, 18, 220 } : Color{ 16, 17, 20, 200 }));
 
-                    DrawRectangleLinesEx(tRec, 1.0f, tActive ? (Color){ 225, 180, 70, 255 } : (tHover ? WHITE : (Color){ 80, 65, 45, 180 }));
+                    DrawRectangleLinesEx(tRec, 1.0f, tActive ? Color{ 225, 180, 70, 255 } : (tHover ? WHITE : Color{ 80, 65, 45, 180 }));
 
-                    DrawTextSharp(g_fontBody, dTitles[t], (int)tRec.x + 12, (int)tRec.y + 13, 13.0f, tActive ? WHITE : (Color){ 200, 190, 175, 220 });
+                    DrawTextSharp(g_fontBody, dTitles[t], (int)tRec.x + 12, (int)tRec.y + 13, 13.0f, tActive ? WHITE : Color{ 200, 190, 175, 220 });
 
 
 
@@ -14313,85 +14320,85 @@ auto RunIntroCinematic = [&]() {
 
                 int docX = dx + 275, docY = dy + 82, docW = dw - 300, docH = dh - 150;
 
-                DrawRectangle(docX, docY, docW, docH, (Color){ 16, 18, 22, 255 });
+                DrawRectangle(docX, docY, docW, docH, Color{ 16, 18, 22, 255 });
 
-                DrawRectangleLines(docX, docY, docW, docH, (Color){ 65, 55, 42, 220 });
+                DrawRectangleLines(docX, docY, docW, docH, Color{ 65, 55, 42, 220 });
 
 
 
                 if (g_dossierFileSelected == 0) {
 
-                    DrawTextSharp(g_fontMenu, "OPERATION SUB-STRATA: COLD WAR EXCAVATION LOG", docX + 20, docY + 16, 14.0f, (Color){ 230, 180, 70, 255 });
+                    DrawTextSharp(g_fontMenu, "OPERATION SUB-STRATA: COLD WAR EXCAVATION LOG", docX + 20, docY + 16, 14.0f, Color{ 230, 180, 70, 255 });
 
-                    DrawTextSharp(g_fontSmall, "ARCHIVE: Station Foundation Survey (August 1984)", docX + 20, docY + 38, 11.0f, (Color){ 160, 155, 145, 220 });
+                    DrawTextSharp(g_fontSmall, "ARCHIVE: Station Foundation Survey (August 1984)", docX + 20, docY + 38, 11.0f, Color{ 160, 155, 145, 220 });
 
-                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, (Color){ 80, 65, 40, 200 });
+                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, Color{ 80, 65, 40, 200 });
 
-                    DrawTextSharp(g_fontBody, "The secret underground corridor was initially excavated", docX + 20, docY + 68, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "The secret underground corridor was initially excavated", docX + 20, docY + 68, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "during the Cold War as a civilian fallout monitor bunker.", docX + 20, docY + 90, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "during the Cold War as a civilian fallout monitor bunker.", docX + 20, docY + 90, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "However, miners struck hollow fissures 18 feet below.", docX + 20, docY + 112, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "However, miners struck hollow fissures 18 feet below.", docX + 20, docY + 112, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "The limestone walls bore massive parallel scrape furrows", docX + 20, docY + 134, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "The limestone walls bore massive parallel scrape furrows", docX + 20, docY + 134, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "resembling claw paths. Work was halted indefinitely.", docX + 20, docY + 156, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "resembling claw paths. Work was halted indefinitely.", docX + 20, docY + 156, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "Access was sealed beneath the exterior worn rug.", docX + 20, docY + 188, 13.0f, (Color){ 200, 150, 60, 255 });
+                    DrawTextSharp(g_fontBody, "Access was sealed beneath the exterior worn rug.", docX + 20, docY + 188, 13.0f, Color{ 200, 150, 60, 255 });
 
                 } else if (g_dossierFileSelected == 1) {
 
-                    DrawTextSharp(g_fontMenu, "ANOMALOUS SPECIMEN 07-B: FORMALIN SUSPENSION", docX + 20, docY + 16, 14.0f, (Color){ 230, 180, 70, 255 });
+                    DrawTextSharp(g_fontMenu, "ANOMALOUS SPECIMEN 07-B: FORMALIN SUSPENSION", docX + 20, docY + 16, 14.0f, Color{ 230, 180, 70, 255 });
 
-                    DrawTextSharp(g_fontSmall, "CONTAINMENT: Hermetic Glass Jar on Chamber Worktable", docX + 20, docY + 38, 11.0f, (Color){ 160, 155, 145, 220 });
+                    DrawTextSharp(g_fontSmall, "CONTAINMENT: Hermetic Glass Jar on Chamber Worktable", docX + 20, docY + 38, 11.0f, Color{ 160, 155, 145, 220 });
 
-                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, (Color){ 80, 65, 40, 200 });
+                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, Color{ 80, 65, 40, 200 });
 
-                    DrawTextSharp(g_fontBody, "A severed juvenile forelimb was recovered from the bog", docX + 20, docY + 68, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "A severed juvenile forelimb was recovered from the bog", docX + 20, docY + 68, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "culvert and preserved in formalin. The tissue exhibits", docX + 20, docY + 90, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "culvert and preserved in formalin. The tissue exhibits", docX + 20, docY + 90, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "external calcified plating and bioluminescent nodes.", docX + 20, docY + 112, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "external calcified plating and bioluminescent nodes.", docX + 20, docY + 112, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "Microscopic twitching persists even when submerged.", docX + 20, docY + 134, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "Microscopic twitching persists even when submerged.", docX + 20, docY + 134, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "Do not break the glass under any circumstance.", docX + 20, docY + 164, 13.0f, (Color){ 220, 50, 45, 255 });
+                    DrawTextSharp(g_fontBody, "Do not break the glass under any circumstance.", docX + 20, docY + 164, 13.0f, Color{ 220, 50, 45, 255 });
 
                 } else if (g_dossierFileSelected == 2) {
 
-                    DrawTextSharp(g_fontMenu, "COLD STORAGE INTERFACE: OVERHEAD VENTILATION GRATE", docX + 20, docY + 16, 14.0f, (Color){ 230, 180, 70, 255 });
+                    DrawTextSharp(g_fontMenu, "COLD STORAGE INTERFACE: OVERHEAD VENTILATION GRATE", docX + 20, docY + 16, 14.0f, Color{ 230, 180, 70, 255 });
 
-                    DrawTextSharp(g_fontSmall, "CORRELATION: Supermarket Meat Room & Underground Pit", docX + 20, docY + 38, 11.0f, (Color){ 160, 155, 145, 220 });
+                    DrawTextSharp(g_fontSmall, "CORRELATION: Supermarket Meat Room & Underground Pit", docX + 20, docY + 38, 11.0f, Color{ 160, 155, 145, 220 });
 
-                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, (Color){ 80, 65, 40, 200 });
+                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, Color{ 80, 65, 40, 200 });
 
-                    DrawTextSharp(g_fontBody, "The overhead ceiling grate connects directly to the floor", docX + 20, docY + 68, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "The overhead ceiling grate connects directly to the floor", docX + 20, docY + 68, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "of the superstore's cold-storage walk-in meat locker.", docX + 20, docY + 90, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "of the superstore's cold-storage walk-in meat locker.", docX + 20, docY + 90, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "Condensed brine and blood drip into the floor pail.", docX + 20, docY + 112, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "Condensed brine and blood drip into the floor pail.", docX + 20, docY + 112, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "The scent carries deep into subterranean strata.", docX + 20, docY + 134, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "The scent carries deep into subterranean strata.", docX + 20, docY + 134, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "It acts as a scent lure. They gather beneath us at night.", docX + 20, docY + 164, 13.0f, (Color){ 225, 45, 40, 255 });
+                    DrawTextSharp(g_fontBody, "It acts as a scent lure. They gather beneath us at night.", docX + 20, docY + 164, 13.0f, Color{ 225, 45, 40, 255 });
 
                 } else {
 
-                    DrawTextSharp(g_fontMenu, "EMERGENCY SUPPLY CACHE: COMBINATION CODE RECORD", docX + 20, docY + 16, 14.0f, (Color){ 230, 180, 70, 255 });
+                    DrawTextSharp(g_fontMenu, "EMERGENCY SUPPLY CACHE: COMBINATION CODE RECORD", docX + 20, docY + 16, 14.0f, Color{ 230, 180, 70, 255 });
 
-                    DrawTextSharp(g_fontSmall, "CONTAINER: Heavy Cast-Iron Padlocked Crate in Corner", docX + 20, docY + 38, 11.0f, (Color){ 160, 155, 145, 220 });
+                    DrawTextSharp(g_fontSmall, "CONTAINER: Heavy Cast-Iron Padlocked Crate in Corner", docX + 20, docY + 38, 11.0f, Color{ 160, 155, 145, 220 });
 
-                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, (Color){ 80, 65, 40, 200 });
+                    DrawLine(docX + 20, docY + 54, docX + docW - 20, docY + 54, Color{ 80, 65, 40, 200 });
 
-                    DrawTextSharp(g_fontBody, "Under the exterior carpet lies a deep mining descent", docX + 20, docY + 68, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "Under the exterior carpet lies a deep mining descent", docX + 20, docY + 68, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "leading to the forgotten 19th-century abandoned village.", docX + 20, docY + 90, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "leading to the forgotten 19th-century abandoned village.", docX + 20, docY + 90, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontBody, "The midsection is blocked by a massive cave-in.", docX + 20, docY + 112, 13.0f, (Color){ 215, 210, 200, 240 });
+                    DrawTextSharp(g_fontBody, "The midsection is blocked by a massive cave-in.", docX + 20, docY + 112, 13.0f, Color{ 215, 210, 200, 240 });
 
-                    DrawTextSharp(g_fontTitle, "[ TRENCH SHOVEL REQUIRED ]", docX + 20, docY + 138, 17.0f, (Color){ 245, 195, 60, 255 });
+                    DrawTextSharp(g_fontTitle, "[ TRENCH SHOVEL REQUIRED ]", docX + 20, docY + 138, 17.0f, Color{ 245, 195, 60, 255 });
 
-                    DrawTextSharp(g_fontBody, "Recover the shovel from the supermarket shelves to dig through.", docX + 20, docY + 185, 13.0f, (Color){ 200, 195, 180, 240 });
+                    DrawTextSharp(g_fontBody, "Recover the shovel from the supermarket shelves to dig through.", docX + 20, docY + 185, 13.0f, Color{ 200, 195, 180, 240 });
 
                 }
 
@@ -14401,9 +14408,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hClose = CheckCollisionPointRec(mPos, btnCloseDossier);
 
-                DrawRectangleRec(btnCloseDossier, hClose ? (Color){ 95, 35, 25, 255 } : (Color){ 36, 22, 18, 240 });
+                DrawRectangleRec(btnCloseDossier, hClose ? Color{ 95, 35, 25, 255 } : Color{ 36, 22, 18, 240 });
 
-                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : (Color){ 175, 140, 65, 255 });
+                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : Color{ 175, 140, 65, 255 });
 
                 DrawTextSharpCentered(g_fontMenu, "CLOSE DOSSIER [ESC]", dx + dw/2, dy + dh - 40, 13.0f, WHITE);
 
@@ -14437,47 +14444,47 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 215 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 215 });
 
-                DrawRectangle(sx, sy, sw, sh, (Color){ 10, 11, 14, 252 });
+                DrawRectangle(sx, sy, sw, sh, Color{ 10, 11, 14, 252 });
 
-                DrawRectangleLines(sx, sy, sw, sh, (Color){ 140, 35, 25, 255 });
-
-
-
-                DrawTextSharpCentered(g_fontHeadSub, "S U R V I V A L   R E C O R D", sx + sw/2, sy + 18, 26.0f, (Color){ 245, 235, 225, 255 }, 2.0f);
-
-                DrawLine(sx + 35, sy + 50, sx + sw - 35, sy + 50, (Color){ 90, 30, 25, 220 });
+                DrawRectangleLines(sx, sy, sw, sh, Color{ 140, 35, 25, 255 });
 
 
 
-                DrawTextSharp(g_fontSmall, "ROUTE 9 SERVICE STATION // ATTENDANT SHIFT DOSSIER", sx + 45, sy + 66, 14.0f, (Color){ 190, 65, 55, 240 });
+                DrawTextSharpCentered(g_fontHeadSub, "S U R V I V A L   R E C O R D", sx + sw/2, sy + 18, 26.0f, Color{ 245, 235, 225, 255 }, 2.0f);
+
+                DrawLine(sx + 35, sy + 50, sx + sw - 35, sy + 50, Color{ 90, 30, 25, 220 });
 
 
 
-                DrawTextSharp(g_fontBody, "SURVEILLANCE ENGINE: ROCK-SOLID 144+ FPS ACTIVE", sx + 45, sy + 98, 16.0f, (Color){ 215, 210, 200, 245 });
-
-                DrawTextSharp(g_fontBody, "LOCATION: 44.9184° N, 71.3820° W (MILE 14)", sx + 45, sy + 126, 16.0f, (Color){ 195, 190, 185, 230 });
-
-                DrawTextSharp(g_fontBody, "WEATHER TELEMETRY: NIGHT TIME PRECIPITATION (TORRENTIAL)", sx + 45, sy + 154, 16.0f, (Color){ 195, 190, 185, 230 });
-
-                DrawTextSharp(g_fontBody, "ANOMALY THREAT LEVEL: HIGH (NOCTURNAL ENTITY ACTIVE)", sx + 45, sy + 182, 16.0f, (Color){ 240, 60, 50, 255 });
+                DrawTextSharp(g_fontSmall, "ROUTE 9 SERVICE STATION // ATTENDANT SHIFT DOSSIER", sx + 45, sy + 66, 14.0f, Color{ 190, 65, 55, 240 });
 
 
 
-                DrawLine(sx + 35, sy + 216, sx + sw - 35, sy + 216, (Color){ 70, 25, 22, 190 });
+                DrawTextSharp(g_fontBody, "SURVEILLANCE ENGINE: ROCK-SOLID 144+ FPS ACTIVE", sx + 45, sy + 98, 16.0f, Color{ 215, 210, 200, 245 });
+
+                DrawTextSharp(g_fontBody, "LOCATION: 44.9184° N, 71.3820° W (MILE 14)", sx + 45, sy + 126, 16.0f, Color{ 195, 190, 185, 230 });
+
+                DrawTextSharp(g_fontBody, "WEATHER TELEMETRY: NIGHT TIME PRECIPITATION (TORRENTIAL)", sx + 45, sy + 154, 16.0f, Color{ 195, 190, 185, 230 });
+
+                DrawTextSharp(g_fontBody, "ANOMALY THREAT LEVEL: HIGH (NOCTURNAL ENTITY ACTIVE)", sx + 45, sy + 182, 16.0f, Color{ 240, 60, 50, 255 });
 
 
 
-                DrawTextSharp(g_fontHeadSub, "INVESTIGATION MILESTONES:", sx + 45, sy + 232, 19.0f, (Color){ 235, 225, 215, 255 });
+                DrawLine(sx + 35, sy + 216, sx + sw - 35, sy + 216, Color{ 70, 25, 22, 190 });
 
-                DrawTextSharp(g_fontBody, "[+] STALLED SEDAN LOCATED ON HIGHWAY", sx + 55, sy + 262, 16.0f, (Color){ 150, 215, 160, 245 });
 
-                DrawTextSharp(g_fontBody, "[+] GRETHNAR'S 24/7 STATION ACCESSED", sx + 55, sy + 290, 16.0f, (Color){ 150, 215, 160, 245 });
 
-                DrawTextSharp(g_fontBody, "[+] ROOF SURVEILLANCE OPTICS CALIBRATED", sx + 55, sy + 318, 16.0f, (Color){ 150, 215, 160, 245 });
+                DrawTextSharp(g_fontHeadSub, "INVESTIGATION MILESTONES:", sx + 45, sy + 232, 19.0f, Color{ 235, 225, 215, 255 });
 
-                DrawTextSharp(g_fontBody, "[!] MEAT LOCKER BLOOD ANOMALY UNRESOLVED", sx + 55, sy + 346, 16.0f, (Color){ 245, 75, 65, 255 });
+                DrawTextSharp(g_fontBody, "[+] STALLED SEDAN LOCATED ON HIGHWAY", sx + 55, sy + 262, 16.0f, Color{ 150, 215, 160, 245 });
+
+                DrawTextSharp(g_fontBody, "[+] GRETHNAR'S 24/7 STATION ACCESSED", sx + 55, sy + 290, 16.0f, Color{ 150, 215, 160, 245 });
+
+                DrawTextSharp(g_fontBody, "[+] ROOF SURVEILLANCE OPTICS CALIBRATED", sx + 55, sy + 318, 16.0f, Color{ 150, 215, 160, 245 });
+
+                DrawTextSharp(g_fontBody, "[!] MEAT LOCKER BLOOD ANOMALY UNRESOLVED", sx + 55, sy + 346, 16.0f, Color{ 245, 75, 65, 255 });
 
 
 
@@ -14487,9 +14494,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hBackS = CheckCollisionPointRec(mPos, btnBackSurv);
 
-                DrawRectangleRec(btnBackSurv, hBackS ? (Color){ 95, 30, 25, 255 } : (Color){ 35, 18, 16, 240 });
+                DrawRectangleRec(btnBackSurv, hBackS ? Color{ 95, 30, 25, 255 } : Color{ 35, 18, 16, 240 });
 
-                DrawRectangleLinesEx(btnBackSurv, 1.0f, hBackS ? WHITE : (Color){ 160, 50, 40, 255 });
+                DrawRectangleLinesEx(btnBackSurv, 1.0f, hBackS ? WHITE : Color{ 160, 50, 40, 255 });
 
                 DrawTextSharpCentered(g_fontMenu, "BACK [ESC]", sx + sw/2, sy + sh - 40, 16.0f, WHITE);
 
@@ -14517,39 +14524,39 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 200 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 200 });
 
-                DrawRectangle(sx, sy, sw, sh, (Color){ 8, 10, 12, 252 });
+                DrawRectangle(sx, sy, sw, sh, Color{ 8, 10, 12, 252 });
 
-                DrawRectangleLines(sx, sy, sw, sh, (Color){ 140, 35, 25, 255 });
+                DrawRectangleLines(sx, sy, sw, sh, Color{ 140, 35, 25, 255 });
 
 
 
-                DrawTextSharpCentered(g_fontHeadSub, "O P T I O N S", sx + sw/2, sy + 18, 26.0f, (Color){ 245, 235, 225, 255 }, 2.0f);
+                DrawTextSharpCentered(g_fontHeadSub, "O P T I O N S", sx + sw/2, sy + 18, 26.0f, Color{ 245, 235, 225, 255 }, 2.0f);
 
-                DrawLine(sx + 35, sy + 48, sx + sw - 35, sy + 48, (Color){ 90, 30, 25, 220 });
+                DrawLine(sx + 35, sy + 48, sx + sw - 35, sy + 48, Color{ 90, 30, 25, 220 });
 
 
 
                 // 1. Audio Volume
 
-                DrawTextSharp(g_fontBody, "MASTER AUDIO", sx + 45, sy + 60, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "MASTER AUDIO", sx + 45, sy + 60, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle volTrack = { (float)(sx + 45), (float)(sy + 84), 280.0f, 14.0f };
 
-                DrawRectangleRec(volTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(volTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(volTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(volTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
-                DrawRectangle((int)volTrack.x, (int)volTrack.y, (int)(volTrack.width * g_userMasterVolume), (int)volTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)volTrack.x, (int)volTrack.y, (int)(volTrack.width * g_userMasterVolume), (int)volTrack.height, Color{ 220, 55, 45, 255 });
 
                 char volStr[32]; snprintf(volStr, sizeof(volStr), "%d%%", (int)(g_userMasterVolume * 100.0f));
 
-                DrawTextSharp(g_fontBody, volStr, sx + 340, sy + 80, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, volStr, sx + 340, sy + 80, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ volTrack.x - 10, volTrack.y - 6, volTrack.width + 20, volTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ volTrack.x - 10, volTrack.y - 6, volTrack.width + 20, volTrack.height + 16 })) {
 
                     g_userMasterVolume = Clamp((mPos.x - volTrack.x) / volTrack.width, 0.0f, 1.0f);
 
@@ -14561,25 +14568,25 @@ auto RunIntroCinematic = [&]() {
 
                 // 2. Mouse Sensitivity
 
-                DrawTextSharp(g_fontBody, "MOUSE SENSITIVITY", sx + 45, sy + 110, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "MOUSE SENSITIVITY", sx + 45, sy + 110, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle sensTrack = { (float)(sx + 45), (float)(sy + 134), 280.0f, 14.0f };
 
-                DrawRectangleRec(sensTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(sensTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(sensTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(sensTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
                 float sensNorm = Clamp((g_userMouseSensitivity - 0.5f) / 2.0f, 0.0f, 1.0f);
 
-                DrawRectangle((int)sensTrack.x, (int)sensTrack.y, (int)(sensTrack.width * sensNorm), (int)sensTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)sensTrack.x, (int)sensTrack.y, (int)(sensTrack.width * sensNorm), (int)sensTrack.height, Color{ 220, 55, 45, 255 });
 
                 char sensStr[32]; snprintf(sensStr, sizeof(sensStr), "%.1fx", g_userMouseSensitivity);
 
-                DrawTextSharp(g_fontBody, sensStr, sx + 340, sy + 130, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, sensStr, sx + 340, sy + 130, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ sensTrack.x - 10, sensTrack.y - 6, sensTrack.width + 20, sensTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ sensTrack.x - 10, sensTrack.y - 6, sensTrack.width + 20, sensTrack.height + 16 })) {
 
                     g_userMouseSensitivity = 0.5f + Clamp((mPos.x - sensTrack.x) / sensTrack.width, 0.0f, 1.0f) * 2.0f;
 
@@ -14589,25 +14596,25 @@ auto RunIntroCinematic = [&]() {
 
                 // 3. FOV Slider
 
-                DrawTextSharp(g_fontBody, "FIELD OF VIEW", sx + 45, sy + 160, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "FIELD OF VIEW", sx + 45, sy + 160, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle fovTrack = { (float)(sx + 45), (float)(sy + 184), 280.0f, 14.0f };
 
-                DrawRectangleRec(fovTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(fovTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(fovTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(fovTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
                 float fovNorm = Clamp((g_userFov - 50.0f) / 40.0f, 0.0f, 1.0f);
 
-                DrawRectangle((int)fovTrack.x, (int)fovTrack.y, (int)(fovTrack.width * fovNorm), (int)fovTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)fovTrack.x, (int)fovTrack.y, (int)(fovTrack.width * fovNorm), (int)fovTrack.height, Color{ 220, 55, 45, 255 });
 
                 char fovStr[32]; snprintf(fovStr, sizeof(fovStr), "%d°", (int)g_userFov);
 
-                DrawTextSharp(g_fontBody, fovStr, sx + 340, sy + 180, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, fovStr, sx + 340, sy + 180, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ fovTrack.x - 10, fovTrack.y - 6, fovTrack.width + 20, fovTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ fovTrack.x - 10, fovTrack.y - 6, fovTrack.width + 20, fovTrack.height + 16 })) {
 
                     g_userFov = 50.0f + Clamp((mPos.x - fovTrack.x) / fovTrack.width, 0.0f, 1.0f) * 40.0f;
 
@@ -14619,23 +14626,23 @@ auto RunIntroCinematic = [&]() {
 
                 Rectangle calibBox = { (float)(sx + 420), (float)(sy + 60), 200.0f, 142.0f };
 
-                DrawRectangleRec(calibBox, (Color){ 4, 5, 7, 255 });
+                DrawRectangleRec(calibBox, Color{ 4, 5, 7, 255 });
 
-                DrawRectangleLinesEx(calibBox, 1.0f, (Color){ 65, 40, 35, 210 });
+                DrawRectangleLinesEx(calibBox, 1.0f, Color{ 65, 40, 35, 210 });
 
                 Color faceCol = { (unsigned char)(28 * g_userHorrorGamma), (unsigned char)(28 * g_userHorrorGamma), (unsigned char)(34 * g_userHorrorGamma), 255 };
 
                 DrawCircle((int)calibBox.x + 100, (int)calibBox.y + 48, 26.0f, faceCol);
 
-                DrawCircle((int)calibBox.x + 91, (int)calibBox.y + 43, 3.5f, (Color){ 0, 0, 0, 255 });
+                DrawCircle((int)calibBox.x + 91, (int)calibBox.y + 43, 3.5f, Color{ 0, 0, 0, 255 });
 
-                DrawCircle((int)calibBox.x + 109, (int)calibBox.y + 43, 3.5f, (Color){ 0, 0, 0, 255 });
+                DrawCircle((int)calibBox.x + 109, (int)calibBox.y + 43, 3.5f, Color{ 0, 0, 0, 255 });
 
-                DrawTextSharp(g_fontSmall, "CALIBRATION:", (int)calibBox.x + 14, (int)calibBox.y + 88, 13.0f, (Color){ 170, 165, 160, 230 });
+                DrawTextSharp(g_fontSmall, "CALIBRATION:", (int)calibBox.x + 14, (int)calibBox.y + 88, 13.0f, Color{ 170, 165, 160, 230 });
 
-                DrawTextSharp(g_fontSmall, "Adjust display so", (int)calibBox.x + 14, (int)calibBox.y + 104, 12.0f, (Color){ 140, 135, 130, 200 });
+                DrawTextSharp(g_fontSmall, "Adjust display so", (int)calibBox.x + 14, (int)calibBox.y + 104, 12.0f, Color{ 140, 135, 130, 200 });
 
-                DrawTextSharp(g_fontSmall, "entity is barely visible.", (int)calibBox.x + 14, (int)calibBox.y + 120, 12.0f, (Color){ 140, 135, 130, 200 });
+                DrawTextSharp(g_fontSmall, "entity is barely visible.", (int)calibBox.x + 14, (int)calibBox.y + 120, 12.0f, Color{ 140, 135, 130, 200 });
 
 
 
@@ -14645,9 +14652,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hFs = CheckCollisionPointRec(mPos, btnFs);
 
-                DrawRectangleRec(btnFs, hFs ? (Color){ 70, 28, 22, 255 } : (Color){ 28, 20, 18, 240 });
+                DrawRectangleRec(btnFs, hFs ? Color{ 70, 28, 22, 255 } : Color{ 28, 20, 18, 240 });
 
-                DrawRectangleLinesEx(btnFs, 1.0f, hFs ? (Color){ 230, 75, 55, 255 } : (Color){ 110, 45, 35, 220 });
+                DrawRectangleLinesEx(btnFs, 1.0f, hFs ? Color{ 230, 75, 55, 255 } : Color{ 110, 45, 35, 220 });
 
                 DrawTextSharp(g_fontBody, IsWindowFullscreen() ? "[ F11 ] FULLSCREEN: ON" : "[ F11 ] FULLSCREEN: OFF", sx + 55, sy + 221, 15.0f, WHITE);
 
@@ -14663,13 +14670,13 @@ auto RunIntroCinematic = [&]() {
 
                 // Divider
 
-                DrawLine(sx + 35, sy + 258, sx + sw - 35, sy + 258, (Color){ 70, 25, 22, 190 });
+                DrawLine(sx + 35, sy + 258, sx + sw - 35, sy + 258, Color{ 70, 25, 22, 190 });
 
 
 
                 // Keybindings Cheatsheet
 
-                DrawTextSharp(g_fontHeadSub, "C O N T R O L S", sx + 45, sy + 270, 17.0f, (Color){ 215, 90, 80, 255 });
+                DrawTextSharp(g_fontHeadSub, "C O N T R O L S", sx + 45, sy + 270, 17.0f, Color{ 215, 90, 80, 255 });
 
                 const char* ctrlList[7] = {
 
@@ -14693,7 +14700,7 @@ auto RunIntroCinematic = [&]() {
 
                     int cy = sy + 294 + c * 22;
 
-                    DrawTextSharp(g_fontBody, ctrlList[c], sx + 55, cy, 14.0f, (Color){ 180, 175, 170, 240 });
+                    DrawTextSharp(g_fontBody, ctrlList[c], sx + 55, cy, 14.0f, Color{ 180, 175, 170, 240 });
 
                 }
 
@@ -14705,9 +14712,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hBack = CheckCollisionPointRec(mPos, btnBack);
 
-                DrawRectangleRec(btnBack, hBack ? (Color){ 95, 30, 25, 255 } : (Color){ 35, 18, 16, 240 });
+                DrawRectangleRec(btnBack, hBack ? Color{ 95, 30, 25, 255 } : Color{ 35, 18, 16, 240 });
 
-                DrawRectangleLinesEx(btnBack, 1.0f, hBack ? WHITE : (Color){ 160, 50, 40, 255 });
+                DrawRectangleLinesEx(btnBack, 1.0f, hBack ? WHITE : Color{ 160, 50, 40, 255 });
 
                 DrawTextSharpCentered(g_fontMenu, "BACK [ESC]", sx + sw/2, sy + sh - 38, 16.0f, WHITE);
 
@@ -14742,7 +14749,7 @@ auto RunIntroCinematic = [&]() {
                     }
 
                     // Proximity of beam to title for incandescent gleam
-                    float titleDist = Vector2Distance((Vector2){ (float)menuX, (float)titleY }, g_menuLightPos);
+                    float titleDist = Vector2Distance(Vector2{ (float)menuX, (float)titleY }, g_menuLightPos);
                     float titleGleam = Clamp(1.0f - titleDist / 400.0f, 0.0f, 1.0f) * g_menuAwakeIntensity;
 
                     const char* mainTitle = "WHAT THE GROUND KEEPS";
@@ -14753,8 +14760,8 @@ auto RunIntroCinematic = [&]() {
                     DrawTextSharp(g_fontTitle, mainTitle, menuX + jx, titleY + jy, 46.0f, textCol, 2.5f);
 
                     // Delicate crimson accent line & poetic atmospheric tagline
-                    DrawLine(menuX, titleY + 54, menuX + 360, titleY + 54, (Color){ 180, 40, 32, (unsigned char)(200 * menuDormancyAlpha) });
-                    DrawTextSharp(g_fontHeadSub, "Some graves were never meant to be opened.", menuX, titleY + 64, 16.0f, (Color){ 190, 75, 65, (unsigned char)(210 * menuDormancyAlpha) }, 1.2f);
+                    DrawLine(menuX, titleY + 54, menuX + 360, titleY + 54, Color{ 180, 40, 32, (unsigned char)(200 * menuDormancyAlpha) });
+                    DrawTextSharp(g_fontHeadSub, "Some graves were never meant to be opened.", menuX, titleY + 64, 16.0f, Color{ 190, 75, 65, (unsigned char)(210 * menuDormancyAlpha) }, 1.2f);
 
                     // 5 Prestige Cinematic Survival Horror Menu Options
                     static int s_menuSelection = 0;
@@ -14770,8 +14777,8 @@ auto RunIntroCinematic = [&]() {
                     int menuStartY = (int)(screenH * 0.38f);
                     int itemSpacing = 54;
 
-                    Vector2 mDelta = GetMouseDelta();
-                    bool mouseMoved = (fabsf(mDelta.x) > 0.2f || fabsf(mDelta.y) > 0.2f);
+                    Vector2 navMDelta = GetMouseDelta();
+                    bool mouseMoved = (fabsf(navMDelta.x) > 0.2f || fabsf(navMDelta.y) > 0.2f);
 
                     if (!g_isMenuStartingGame) {
                         if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
@@ -14802,21 +14809,21 @@ auto RunIntroCinematic = [&]() {
                         float slideX = g_menuOptionHover[i] * 14.0f;
 
                         // Refined gothic horror font
-                        Color labelCol = isSelected ? (Color){ 255, 250, 242, (unsigned char)(255 * menuDormancyAlpha) } : (Color){ 150, 155, 165, (unsigned char)(190 * menuDormancyAlpha) };
+                        Color labelCol = isSelected ? Color{ 255, 250, 242, (unsigned char)(255 * menuDormancyAlpha) } : Color{ 150, 155, 165, (unsigned char)(190 * menuDormancyAlpha) };
                         if (isSelected) {
                             // Vertical blood-crimson needle
-                            DrawRectangle(menuX - 14 + (int)slideX, itemY + 10, 3, 24, (Color){ 235, 45, 35, (unsigned char)(255 * menuDormancyAlpha) });
+                            DrawRectangle(menuX - 14 + (int)slideX, itemY + 10, 3, 24, Color{ 235, 45, 35, (unsigned char)(255 * menuDormancyAlpha) });
                             // Crimson pointer caret >
-                            DrawTextSharp(g_fontTitle, ">", menuX - 4 + (int)slideX, itemY + 6, 28.0f, (Color){ 235, 45, 35, (unsigned char)(255 * menuDormancyAlpha) });
+                            DrawTextSharp(g_fontTitle, ">", menuX - 4 + (int)slideX, itemY + 6, 28.0f, Color{ 235, 45, 35, (unsigned char)(255 * menuDormancyAlpha) });
                             // Subtle red drop shadow for selected item
-                            DrawTextSharp(g_fontTitle, kMenuLabels[i], menuX + 18 + (int)slideX, itemY + 2, 36.0f, (Color){ 160, 30, 25, (unsigned char)(170 * menuDormancyAlpha) }, 1.5f);
+                            DrawTextSharp(g_fontTitle, kMenuLabels[i], menuX + 18 + (int)slideX, itemY + 2, 36.0f, Color{ 160, 30, 25, (unsigned char)(170 * menuDormancyAlpha) }, 1.5f);
                             // Underline trace in blood-crimson
-                            DrawLine(menuX + 16 + (int)slideX, itemY + 40, menuX + 16 + (int)slideX + (int)textLen, itemY + 40, (Color){ 235, 45, 35, (unsigned char)(180 * menuDormancyAlpha) });
+                            DrawLine(menuX + 16 + (int)slideX, itemY + 40, menuX + 16 + (int)slideX + (int)textLen, itemY + 40, Color{ 235, 45, 35, (unsigned char)(180 * menuDormancyAlpha) });
                             
                             // Add some eerie randomized symbols that jitter on hover
                             if (!g_isMenuStartingGame && GetRandomValue(0, 100) > 90) {
                                 const char* glitched[] = { "+", "x", "-", "|", ".", ":" };
-                                DrawTextSharp(g_fontSmall, glitched[GetRandomValue(0, 5)], menuX + 20 + (int)slideX + textLen + GetRandomValue(-4, 4), itemY + 12 + GetRandomValue(-4, 4), 16.0f, (Color){ 220, 50, 40, (unsigned char)(120 * menuDormancyAlpha) });
+                                DrawTextSharp(g_fontSmall, glitched[GetRandomValue(0, 5)], menuX + 20 + (int)slideX + textLen + GetRandomValue(-4, 4), itemY + 12 + GetRandomValue(-4, 4), 16.0f, Color{ 220, 50, 40, (unsigned char)(120 * menuDormancyAlpha) });
                             }
                         }
                         DrawTextSharp(g_fontTitle, kMenuLabels[i], menuX + 16 + (int)slideX, itemY, 36.0f, labelCol, 1.5f);
@@ -14938,7 +14945,7 @@ auto RunIntroCinematic = [&]() {
 
             // Dark horror dimming overlay
 
-            DrawRectangle(0, 0, screenW, screenH, (Color){ 6, 8, 12, 215 });
+            DrawRectangle(0, 0, screenW, screenH, Color{ 6, 8, 12, 215 });
 
 
 
@@ -14946,7 +14953,7 @@ auto RunIntroCinematic = [&]() {
 
             for (int y = 0; y < screenH; y += 4) {
 
-                DrawLine(0, y, screenW, y, (Color){ 0, 0, 0, 24 });
+                DrawLine(0, y, screenW, y, Color{ 0, 0, 0, 24 });
 
             }
 
@@ -14958,13 +14965,13 @@ auto RunIntroCinematic = [&]() {
 
             int vW = screenW / 4;
 
-            DrawRectangleGradientV(0, 0, screenW, vH, (Color){ 0, 0, 0, 240 }, BLANK);
+            DrawRectangleGradientV(0, 0, screenW, vH, Color{ 0, 0, 0, 240 }, BLANK);
 
-            DrawRectangleGradientV(0, screenH - vH, screenW, vH, BLANK, (Color){ 0, 0, 0, 255 });
+            DrawRectangleGradientV(0, screenH - vH, screenW, vH, BLANK, Color{ 0, 0, 0, 255 });
 
-            DrawRectangleGradientH(0, 0, vW, screenH, (Color){ 0, 0, 0, 230 }, BLANK);
+            DrawRectangleGradientH(0, 0, vW, screenH, Color{ 0, 0, 0, 230 }, BLANK);
 
-            DrawRectangleGradientH(screenW - vW, 0, vW, screenH, BLANK, (Color){ 0, 0, 0, 230 });
+            DrawRectangleGradientH(screenW - vW, 0, vW, screenH, BLANK, Color{ 0, 0, 0, 230 });
 
 
 
@@ -14978,39 +14985,39 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 200 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 200 });
 
-                DrawRectangle(sx, sy, sw, sh, (Color){ 8, 10, 12, 252 });
+                DrawRectangle(sx, sy, sw, sh, Color{ 8, 10, 12, 252 });
 
-                DrawRectangleLines(sx, sy, sw, sh, (Color){ 140, 35, 25, 255 });
+                DrawRectangleLines(sx, sy, sw, sh, Color{ 140, 35, 25, 255 });
 
 
 
-                DrawTextSharpCentered(g_fontHeadSub, "O P T I O N S", sx + sw/2, sy + 18, 26.0f, (Color){ 245, 235, 225, 255 }, 2.0f);
+                DrawTextSharpCentered(g_fontHeadSub, "O P T I O N S", sx + sw/2, sy + 18, 26.0f, Color{ 245, 235, 225, 255 }, 2.0f);
 
-                DrawLine(sx + 35, sy + 48, sx + sw - 35, sy + 48, (Color){ 90, 30, 25, 220 });
+                DrawLine(sx + 35, sy + 48, sx + sw - 35, sy + 48, Color{ 90, 30, 25, 220 });
 
 
 
                 // 1. Audio Volume
 
-                DrawTextSharp(g_fontBody, "MASTER AUDIO", sx + 45, sy + 60, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "MASTER AUDIO", sx + 45, sy + 60, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle volTrack = { (float)(sx + 45), (float)(sy + 84), 280.0f, 14.0f };
 
-                DrawRectangleRec(volTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(volTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(volTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(volTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
-                DrawRectangle((int)volTrack.x, (int)volTrack.y, (int)(volTrack.width * g_userMasterVolume), (int)volTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)volTrack.x, (int)volTrack.y, (int)(volTrack.width * g_userMasterVolume), (int)volTrack.height, Color{ 220, 55, 45, 255 });
 
                 char volStr[32]; snprintf(volStr, sizeof(volStr), "%d%%", (int)(g_userMasterVolume * 100.0f));
 
-                DrawTextSharp(g_fontBody, volStr, sx + 340, sy + 80, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, volStr, sx + 340, sy + 80, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ volTrack.x - 10, volTrack.y - 6, volTrack.width + 20, volTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ volTrack.x - 10, volTrack.y - 6, volTrack.width + 20, volTrack.height + 16 })) {
 
                     g_userMasterVolume = Clamp((mPos.x - volTrack.x) / volTrack.width, 0.0f, 1.0f);
 
@@ -15022,25 +15029,25 @@ auto RunIntroCinematic = [&]() {
 
                 // 2. Mouse Sensitivity
 
-                DrawTextSharp(g_fontBody, "MOUSE SENSITIVITY", sx + 45, sy + 110, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "MOUSE SENSITIVITY", sx + 45, sy + 110, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle sensTrack = { (float)(sx + 45), (float)(sy + 134), 280.0f, 14.0f };
 
-                DrawRectangleRec(sensTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(sensTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(sensTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(sensTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
                 float sensNorm = Clamp((g_userMouseSensitivity - 0.5f) / 2.0f, 0.0f, 1.0f);
 
-                DrawRectangle((int)sensTrack.x, (int)sensTrack.y, (int)(sensTrack.width * sensNorm), (int)sensTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)sensTrack.x, (int)sensTrack.y, (int)(sensTrack.width * sensNorm), (int)sensTrack.height, Color{ 220, 55, 45, 255 });
 
                 char sensStr[32]; snprintf(sensStr, sizeof(sensStr), "%.1fx", g_userMouseSensitivity);
 
-                DrawTextSharp(g_fontBody, sensStr, sx + 340, sy + 130, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, sensStr, sx + 340, sy + 130, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ sensTrack.x - 10, sensTrack.y - 6, sensTrack.width + 20, sensTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ sensTrack.x - 10, sensTrack.y - 6, sensTrack.width + 20, sensTrack.height + 16 })) {
 
                     g_userMouseSensitivity = 0.5f + Clamp((mPos.x - sensTrack.x) / sensTrack.width, 0.0f, 1.0f) * 2.0f;
 
@@ -15050,25 +15057,25 @@ auto RunIntroCinematic = [&]() {
 
                 // 3. FOV Slider
 
-                DrawTextSharp(g_fontBody, "FIELD OF VIEW", sx + 45, sy + 160, 16.0f, (Color){ 215, 210, 205, 255 });
+                DrawTextSharp(g_fontBody, "FIELD OF VIEW", sx + 45, sy + 160, 16.0f, Color{ 215, 210, 205, 255 });
 
                 Rectangle fovTrack = { (float)(sx + 45), (float)(sy + 184), 280.0f, 14.0f };
 
-                DrawRectangleRec(fovTrack, (Color){ 20, 22, 25, 255 });
+                DrawRectangleRec(fovTrack, Color{ 20, 22, 25, 255 });
 
-                DrawRectangleLinesEx(fovTrack, 1.0f, (Color){ 75, 38, 32, 240 });
+                DrawRectangleLinesEx(fovTrack, 1.0f, Color{ 75, 38, 32, 240 });
 
                 float fovNorm = Clamp((g_userFov - 50.0f) / 40.0f, 0.0f, 1.0f);
 
-                DrawRectangle((int)fovTrack.x, (int)fovTrack.y, (int)(fovTrack.width * fovNorm), (int)fovTrack.height, (Color){ 220, 55, 45, 255 });
+                DrawRectangle((int)fovTrack.x, (int)fovTrack.y, (int)(fovTrack.width * fovNorm), (int)fovTrack.height, Color{ 220, 55, 45, 255 });
 
                 char fovStr[32]; snprintf(fovStr, sizeof(fovStr), "%d°", (int)g_userFov);
 
-                DrawTextSharp(g_fontBody, fovStr, sx + 340, sy + 180, 16.0f, (Color){ 235, 230, 225, 255 });
+                DrawTextSharp(g_fontBody, fovStr, sx + 340, sy + 180, 16.0f, Color{ 235, 230, 225, 255 });
 
 
 
-                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, (Rectangle){ fovTrack.x - 10, fovTrack.y - 6, fovTrack.width + 20, fovTrack.height + 16 })) {
+                if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mPos, Rectangle{ fovTrack.x - 10, fovTrack.y - 6, fovTrack.width + 20, fovTrack.height + 16 })) {
 
                     g_userFov = 50.0f + Clamp((mPos.x - fovTrack.x) / fovTrack.width, 0.0f, 1.0f) * 40.0f;
 
@@ -15082,9 +15089,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hFs = CheckCollisionPointRec(mPos, btnFs);
 
-                DrawRectangleRec(btnFs, hFs ? (Color){ 70, 28, 22, 255 } : (Color){ 28, 20, 18, 240 });
+                DrawRectangleRec(btnFs, hFs ? Color{ 70, 28, 22, 255 } : Color{ 28, 20, 18, 240 });
 
-                DrawRectangleLinesEx(btnFs, 1.0f, hFs ? (Color){ 230, 75, 55, 255 } : (Color){ 110, 45, 35, 220 });
+                DrawRectangleLinesEx(btnFs, 1.0f, hFs ? Color{ 230, 75, 55, 255 } : Color{ 110, 45, 35, 220 });
 
                 DrawTextSharp(g_fontBody, IsWindowFullscreen() ? "[ F11 ] FULLSCREEN: ON" : "[ F11 ] FULLSCREEN: OFF", sx + 55, sy + 221, 15.0f, WHITE);
 
@@ -15100,13 +15107,13 @@ auto RunIntroCinematic = [&]() {
 
                 // Divider
 
-                DrawLine(sx + 35, sy + 258, sx + sw - 35, sy + 258, (Color){ 70, 25, 22, 190 });
+                DrawLine(sx + 35, sy + 258, sx + sw - 35, sy + 258, Color{ 70, 25, 22, 190 });
 
 
 
                 // Keybindings Cheatsheet
 
-                DrawTextSharp(g_fontHeadSub, "C O N T R O L S", sx + 45, sy + 270, 17.0f, (Color){ 215, 90, 80, 255 });
+                DrawTextSharp(g_fontHeadSub, "C O N T R O L S", sx + 45, sy + 270, 17.0f, Color{ 215, 90, 80, 255 });
 
                 const char* ctrlList[7] = {
 
@@ -15130,7 +15137,7 @@ auto RunIntroCinematic = [&]() {
 
                     int cy = sy + 294 + c * 22;
 
-                    DrawTextSharp(g_fontBody, ctrlList[c], sx + 55, cy, 14.0f, (Color){ 180, 175, 170, 240 });
+                    DrawTextSharp(g_fontBody, ctrlList[c], sx + 55, cy, 14.0f, Color{ 180, 175, 170, 240 });
 
                 }
 
@@ -15142,9 +15149,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hBack = CheckCollisionPointRec(mPos, btnBack);
 
-                DrawRectangleRec(btnBack, hBack ? (Color){ 95, 30, 25, 255 } : (Color){ 35, 18, 16, 240 });
+                DrawRectangleRec(btnBack, hBack ? Color{ 95, 30, 25, 255 } : Color{ 35, 18, 16, 240 });
 
-                DrawRectangleLinesEx(btnBack, 1.0f, hBack ? WHITE : (Color){ 160, 50, 40, 255 });
+                DrawRectangleLinesEx(btnBack, 1.0f, hBack ? WHITE : Color{ 160, 50, 40, 255 });
 
                 DrawTextSharpCentered(g_fontMenu, "BACK [ESC]", sx + sw/2, sy + sh - 38, 16.0f, WHITE);
 
@@ -15176,19 +15183,19 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                DrawRectangle(0, 0, screenW, screenH, (Color){ 0, 0, 0, 215 });
+                DrawRectangle(0, 0, screenW, screenH, Color{ 0, 0, 0, 215 });
 
-                DrawRectangle(dx, dy, dw, dh, (Color){ 10, 11, 14, 252 });
+                DrawRectangle(dx, dy, dw, dh, Color{ 10, 11, 14, 252 });
 
-                DrawRectangleLines(dx, dy, dw, dh, (Color){ 140, 35, 25, 255 });
+                DrawRectangleLines(dx, dy, dw, dh, Color{ 140, 35, 25, 255 });
 
 
 
-                DrawTextSharp(g_fontMenu, "STATE POLICE DEPARTMENT // CLASSIFIED EVIDENCE DOSSIER", dx + 28, dy + 20, 16.0f, (Color){ 220, 215, 205, 255 });
+                DrawTextSharp(g_fontMenu, "STATE POLICE DEPARTMENT // CLASSIFIED EVIDENCE DOSSIER", dx + 28, dy + 20, 16.0f, Color{ 220, 215, 205, 255 });
 
-                DrawTextSharp(g_fontSmall, "CASE #89-094 // ROUTE 9 SERVICE STATION & BORDER MIRE", dx + 28, dy + 42, 12.0f, (Color){ 160, 50, 45, 240 });
+                DrawTextSharp(g_fontSmall, "CASE #89-094 // ROUTE 9 SERVICE STATION & BORDER MIRE", dx + 28, dy + 42, 12.0f, Color{ 160, 50, 45, 240 });
 
-                DrawLine(dx + 25, dy + 62, dx + dw - 25, dy + 62, (Color){ 80, 25, 20, 200 });
+                DrawLine(dx + 25, dy + 62, dx + dw - 25, dy + 62, Color{ 80, 25, 20, 200 });
 
 
 
@@ -15206,11 +15213,11 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    DrawRectangleRec(fRec, fActive ? (Color){ 50, 22, 18, 255 } : (fHover ? (Color){ 24, 18, 16, 220 } : (Color){ 14, 15, 18, 200 }));
+                    DrawRectangleRec(fRec, fActive ? Color{ 50, 22, 18, 255 } : (fHover ? Color{ 24, 18, 16, 220 } : Color{ 14, 15, 18, 200 }));
 
-                    DrawRectangleLinesEx(fRec, 1.0f, fActive ? (Color){ 200, 50, 40, 255 } : (fHover ? WHITE : (Color){ 60, 40, 35, 180 }));
+                    DrawRectangleLinesEx(fRec, 1.0f, fActive ? Color{ 200, 50, 40, 255 } : (fHover ? WHITE : Color{ 60, 40, 35, 180 }));
 
-                    DrawTextSharp(g_fontBody, caseTitles[f], (int)fRec.x + 12, (int)fRec.y + 12, 13.0f, fActive ? WHITE : (Color){ 180, 175, 170, 220 });
+                    DrawTextSharp(g_fontBody, caseTitles[f], (int)fRec.x + 12, (int)fRec.y + 12, 13.0f, fActive ? WHITE : Color{ 180, 175, 170, 220 });
 
 
 
@@ -15228,91 +15235,91 @@ auto RunIntroCinematic = [&]() {
 
                 int docX = dx + 255, docY = dy + 76, docW = dw - 280, docH = dh - 140;
 
-                DrawRectangle(docX, docY, docW, docH, (Color){ 14, 16, 20, 255 });
+                DrawRectangle(docX, docY, docW, docH, Color{ 14, 16, 20, 255 });
 
-                DrawRectangleLines(docX, docY, docW, docH, (Color){ 45, 35, 32, 220 });
+                DrawRectangleLines(docX, docY, docW, docH, Color{ 45, 35, 32, 220 });
 
 
 
                 if (g_caseFileSelected == 0) {
 
-                    DrawTextSharp(g_fontMenu, "TRANSCRIPT: 911 LOG // CALL REC 22:14:08", docX + 18, docY + 16, 14.0f, (Color){ 220, 60, 50, 255 });
+                    DrawTextSharp(g_fontMenu, "TRANSCRIPT: 911 LOG // CALL REC 22:14:08", docX + 18, docY + 16, 14.0f, Color{ 220, 60, 50, 255 });
 
-                    DrawTextSharp(g_fontSmall, "LOCATION: Mile Marker 14, Route 9 Northern Pass", docX + 18, docY + 38, 11.0f, (Color){ 150, 145, 140, 220 });
+                    DrawTextSharp(g_fontSmall, "LOCATION: Mile Marker 14, Route 9 Northern Pass", docX + 18, docY + 38, 11.0f, Color{ 150, 145, 140, 220 });
 
-                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, (Color){ 55, 30, 25, 200 });
+                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, Color{ 55, 30, 25, 200 });
 
-                    DrawTextSharp(g_fontBody, "\"Patrol, our vehicle radiator blew near the abandoned", docX + 18, docY + 68, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "\"Patrol, our vehicle radiator blew near the abandoned", docX + 18, docY + 68, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "gas stop. It's pouring rain. There are no lights out here", docX + 18, docY + 90, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "gas stop. It's pouring rain. There are no lights out here", docX + 18, docY + 90, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "except the pumps. My sister says she heard clicking sounds", docX + 18, docY + 112, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "except the pumps. My sister says she heard clicking sounds", docX + 18, docY + 112, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "in the drainage ditch... Wait, something is watching us", docX + 18, docY + 134, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "in the drainage ditch... Wait, something is watching us", docX + 18, docY + 134, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "from the spruce tree line. Send someone out here now--\"", docX + 18, docY + 156, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "from the spruce tree line. Send someone out here now--\"", docX + 18, docY + 156, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "[TRANSMISSION CUT - SIGNAL LOST // 00:01:24 RECORDED]", docX + 18, docY + 192, 13.0f, (Color){ 210, 45, 40, 255 });
+                    DrawTextSharp(g_fontBody, "[TRANSMISSION CUT - SIGNAL LOST // 00:01:24 RECORDED]", docX + 18, docY + 192, 13.0f, Color{ 210, 45, 40, 255 });
 
                 } else if (g_caseFileSelected == 1) {
 
-                    DrawTextSharp(g_fontMenu, "INCIDENT LOG: MISSING PERSON // SIBLING DOSSIER", docX + 18, docY + 16, 14.0f, (Color){ 220, 60, 50, 255 });
+                    DrawTextSharp(g_fontMenu, "INCIDENT LOG: MISSING PERSON // SIBLING DOSSIER", docX + 18, docY + 16, 14.0f, Color{ 220, 60, 50, 255 });
 
-                    DrawTextSharp(g_fontSmall, "STATUS: Unresolved / Active Search Warrant", docX + 18, docY + 38, 11.0f, (Color){ 150, 145, 140, 220 });
+                    DrawTextSharp(g_fontSmall, "STATUS: Unresolved / Active Search Warrant", docX + 18, docY + 38, 11.0f, Color{ 150, 145, 140, 220 });
 
-                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, (Color){ 55, 30, 25, 200 });
+                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, Color{ 55, 30, 25, 200 });
 
-                    DrawTextSharp(g_fontBody, "When state troopers inspected the stalled sedan at dawn,", docX + 18, docY + 68, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "When state troopers inspected the stalled sedan at dawn,", docX + 18, docY + 68, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "the driver's door was swung open into the mud.", docX + 18, docY + 90, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "the driver's door was swung open into the mud.", docX + 18, docY + 90, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "The passenger side was empty. A pair of footprints led", docX + 18, docY + 112, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "The passenger side was empty. A pair of footprints led", docX + 18, docY + 112, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "from the road toward the mire. The footprints stopped", docX + 18, docY + 134, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "from the road toward the mire. The footprints stopped", docX + 18, docY + 134, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "abruptly 40 feet into the dark mud with no return trail.", docX + 18, docY + 156, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "abruptly 40 feet into the dark mud with no return trail.", docX + 18, docY + 156, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "Only deep claw indentations were pressed into the peat.", docX + 18, docY + 184, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Only deep claw indentations were pressed into the peat.", docX + 18, docY + 184, 13.0f, Color{ 200, 195, 185, 240 });
 
                 } else if (g_caseFileSelected == 2) {
 
-                    DrawTextSharp(g_fontMenu, "ANOMALOUS ENTITY // CLASSIFICATION: SKELETON HOUND", docX + 18, docY + 16, 14.0f, (Color){ 220, 60, 50, 255 });
+                    DrawTextSharp(g_fontMenu, "ANOMALOUS ENTITY // CLASSIFICATION: SKELETON HOUND", docX + 18, docY + 16, 14.0f, Color{ 220, 60, 50, 255 });
 
-                    DrawTextSharp(g_fontSmall, "OBSERVER: Station Attendant Security Cam #02", docX + 18, docY + 38, 11.0f, (Color){ 150, 145, 140, 220 });
+                    DrawTextSharp(g_fontSmall, "OBSERVER: Station Attendant Security Cam #02", docX + 18, docY + 38, 11.0f, Color{ 150, 145, 140, 220 });
 
-                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, (Color){ 55, 30, 25, 200 });
+                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, Color{ 55, 30, 25, 200 });
 
-                    DrawTextSharp(g_fontBody, "Entity displays the anatomy of a massive canine, but with", docX + 18, docY + 68, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Entity displays the anatomy of a massive canine, but with", docX + 18, docY + 68, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "externalized skeletal structure and exposed vertebral ribs.", docX + 18, docY + 90, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "externalized skeletal structure and exposed vertebral ribs.", docX + 18, docY + 90, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "Exhibits luminescence in ocular cavities when in shadows.", docX + 18, docY + 112, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Exhibits luminescence in ocular cavities when in shadows.", docX + 18, docY + 112, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "Does not consume flesh conventionally; appears drawn to", docX + 18, docY + 134, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Does not consume flesh conventionally; appears drawn to", docX + 18, docY + 134, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "sub-surface mineral deposits and fresh blood pooling", docX + 18, docY + 156, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "sub-surface mineral deposits and fresh blood pooling", docX + 18, docY + 156, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "around the store's cold storage meat hook.", docX + 18, docY + 184, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "around the store's cold storage meat hook.", docX + 18, docY + 184, 13.0f, Color{ 200, 195, 185, 240 });
 
                 } else {
 
-                    DrawTextSharp(g_fontMenu, "FORENSIC GEOLOGY // ANOMALOUS MIRE PRESERVATION", docX + 18, docY + 16, 14.0f, (Color){ 220, 60, 50, 255 });
+                    DrawTextSharp(g_fontMenu, "FORENSIC GEOLOGY // ANOMALOUS MIRE PRESERVATION", docX + 18, docY + 16, 14.0f, Color{ 220, 60, 50, 255 });
 
-                    DrawTextSharp(g_fontSmall, "SAMPLE ANALYSIS: Route 9 Bog Core 12-F", docX + 18, docY + 38, 11.0f, (Color){ 150, 145, 140, 220 });
+                    DrawTextSharp(g_fontSmall, "SAMPLE ANALYSIS: Route 9 Bog Core 12-F", docX + 18, docY + 38, 11.0f, Color{ 150, 145, 140, 220 });
 
-                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, (Color){ 55, 30, 25, 200 });
+                    DrawLine(docX + 18, docY + 54, docX + docW - 18, docY + 54, Color{ 55, 30, 25, 200 });
 
-                    DrawTextSharp(g_fontBody, "Core drilling 8 meters into the mire revealed biological", docX + 18, docY + 68, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Core drilling 8 meters into the mire revealed biological", docX + 18, docY + 68, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "specimens buried decades ago with zero cellular decay.", docX + 18, docY + 90, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "specimens buried decades ago with zero cellular decay.", docX + 18, docY + 90, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "Tissues retain hydration and microscopic muscle twitching.", docX + 18, docY + 112, 13.0f, (Color){ 200, 195, 185, 240 });
+                    DrawTextSharp(g_fontBody, "Tissues retain hydration and microscopic muscle twitching.", docX + 18, docY + 112, 13.0f, Color{ 200, 195, 185, 240 });
 
-                    DrawTextSharp(g_fontBody, "Local saying carved into the gas station counter:", docX + 18, docY + 140, 12.0f, (Color){ 160, 155, 150, 200 });
+                    DrawTextSharp(g_fontBody, "Local saying carved into the gas station counter:", docX + 18, docY + 140, 12.0f, Color{ 160, 155, 150, 200 });
 
-                    DrawTextSharp(g_fontMenu, "\"WHAT THE GROUND KEEPS, IT NEVER RELEASES.\"", docX + 18, docY + 160, 13.0f, (Color){ 230, 45, 40, 255 });
+                    DrawTextSharp(g_fontMenu, "\"WHAT THE GROUND KEEPS, IT NEVER RELEASES.\"", docX + 18, docY + 160, 13.0f, Color{ 230, 45, 40, 255 });
 
-                    DrawTextSharp(g_fontBody, "Excavation without proper protective tools is lethal.", docX + 18, docY + 188, 12.0f, (Color){ 180, 175, 170, 220 });
+                    DrawTextSharp(g_fontBody, "Excavation without proper protective tools is lethal.", docX + 18, docY + 188, 12.0f, Color{ 180, 175, 170, 220 });
 
                 }
 
@@ -15322,9 +15329,9 @@ auto RunIntroCinematic = [&]() {
 
                 bool hClose = CheckCollisionPointRec(mPos, btnCloseDossier);
 
-                DrawRectangleRec(btnCloseDossier, hClose ? (Color){ 80, 25, 20, 255 } : (Color){ 30, 16, 14, 240 });
+                DrawRectangleRec(btnCloseDossier, hClose ? Color{ 80, 25, 20, 255 } : Color{ 30, 16, 14, 240 });
 
-                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : (Color){ 140, 45, 35, 255 });
+                DrawRectangleLinesEx(btnCloseDossier, 1.0f, hClose ? WHITE : Color{ 140, 45, 35, 255 });
 
                 DrawTextSharpCentered(g_fontBody, "CLOSE [ESC]", dx + dw/2, dy + dh - 36, 13.0f, WHITE);
 
@@ -15344,13 +15351,13 @@ auto RunIntroCinematic = [&]() {
 
                 int pauseY = (int)(screenH * 0.18f);
 
-                DrawTextSharpCentered(g_fontTitle, pauseTitle, screenW/2 + 3, pauseY + 3, 44.0f, (Color){ 120, 18, 14, 210 }, 3.0f);
+                DrawTextSharpCentered(g_fontTitle, pauseTitle, screenW/2 + 3, pauseY + 3, 44.0f, Color{ 120, 18, 14, 210 }, 3.0f);
 
-                DrawTextSharpCentered(g_fontTitle, pauseTitle, screenW/2, pauseY, 44.0f, (Color){ 245, 240, 232, 255 }, 3.0f);
+                DrawTextSharpCentered(g_fontTitle, pauseTitle, screenW/2, pauseY, 44.0f, Color{ 245, 240, 232, 255 }, 3.0f);
 
 
 
-                DrawTextSharpCentered(g_fontSmall, "ROUTE 9 SERVICE STATION // SIMULATION FROZEN", screenW/2, pauseY + 50, 14.0f, (Color){ 190, 65, 55, 240 });
+                DrawTextSharpCentered(g_fontSmall, "ROUTE 9 SERVICE STATION // SIMULATION FROZEN", screenW/2, pauseY + 50, 14.0f, Color{ 190, 65, 55, 240 });
 
 
 
@@ -15430,7 +15437,7 @@ auto RunIntroCinematic = [&]() {
 
                         DrawLine(ox - 30, oy + 36, (int)(ox + ow + 30), oy + 36, emberCol);
 
-                        DrawLine(ox - 20, oy + 37, (int)(ox + ow + 20), oy + 37, (Color){ emberCol.r, emberCol.g, emberCol.b, 150 });
+                        DrawLine(ox - 20, oy + 37, (int)(ox + ow + 20), oy + 37, Color{ emberCol.r, emberCol.g, emberCol.b, 150 });
 
                         DrawTextSharp(g_fontMenu, ">", ox - 35, oy, 28.0f, emberCol);
 
@@ -15440,7 +15447,7 @@ auto RunIntroCinematic = [&]() {
 
 
 
-                    Color optCol = isSel ? WHITE : (Color){ 175, 170, 160, 220 };
+                    Color optCol = isSel ? WHITE : Color{ 175, 170, 160, 220 };
 
                     DrawTextSharp(g_fontMenu, pauseOpts[i], ox, oy, 28.0f, optCol);
 
@@ -15523,37 +15530,34 @@ auto RunIntroCinematic = [&]() {
 
 
         // ---------------------------------------------------------------------
+        // Silky-smooth post-intro cinematic fade-in from black
+        if (gameIntroFade > 0.0f) {
+            gameIntroFade = fmaxf(0.0f, gameIntroFade - dt * 1.5f);
+            DrawRectangle(0, 0, screenW, screenH, Fade(BLACK, gameIntroFade));
+        }
 
         // CURSOR UNLOCKED / RESIZE WINDOW BANNER (Clean UI notification)
-
-        // ---------------------------------------------------------------------
-
-        if (!isCursorCaptured && !showQuitConfirm && !isShopOpen && g_gameState == STATE_GAMEPLAY) {
-            const char* unlockMsg = "[ MOUSE FREED: Drag edges to resize | Press [F11] for Fullscreen | Left-Click window to Play ]";
-            float bw = MeasureTextSharp(g_fontSmall, unlockMsg, 12.0f);
-            float pw = bw + 36.0f;
-            float px = ((float)screenW - pw) * 0.5f;
-            DrawAAAPanel((Rectangle){ px, 8.0f, pw, 28.0f }, (Color){ 12, 16, 24, 235 }, (Color){ 80, 160, 245, 230 }, 5.0f, true);
-            DrawTextSharpCentered(g_fontSmall, unlockMsg, (float)screenW * 0.5f, 15.0f, 12.0f, (Color){ 215, 235, 255, 255 });
-        }
-
-
-
-        // Silky-smooth post-intro cinematic fade-in from black
-
-        if (gameIntroFade > 0.0f) {
-
-            gameIntroFade = fmaxf(0.0f, gameIntroFade - dt * 1.5f);
-
-            DrawRectangle(0, 0, screenW, screenH, Fade(BLACK, gameIntroFade));
-
-        }
-
-
-
-        if (g_gameState == STATE_GAMEPLAY) DrawFPS(10, 10);
+        // Clean AAA HUD: FPS counter gated behind F3 debug toggle
+        if (IsKeyPressed(KEY_F3)) g_showDebugFPS = !g_showDebugFPS;
+        if (g_showDebugFPS && g_gameState == STATE_GAMEPLAY) DrawFPS(10, 10);
 
         EndDrawing();
+
+        if (g_testFrames > 0) {
+            g_testFrameCount++;
+            if (g_testFrameCount >= g_testFrames) {
+                CloudProfilingMetrics m = GetCloudProfilingMetrics();
+                printf("\n--- VOLUMETRIC CLOUD & ATMOSPHERE PROFILING METRICS ---\n");
+                printf("  Cloud Raymarch Pass (Half-Res):   %.3f ms\n", m.cloudPassMs);
+                printf("  Temporal Accumulation & Reproj:   %.3f ms\n", m.accumPassMs);
+                printf("  Bilateral Upscale Reconstruction: %.3f ms\n", m.upscalePassMs);
+                printf("  World Shadow Map Pass (512x512):  %.3f ms\n", m.shadowPassMs);
+                printf("  Total System Frame Cost:          %.3f ms\n", m.totalSystemMs);
+                printf("------------------------------------------------------\n\n");
+                TakeScreenshot(g_testScreenshot);
+                break;
+            }
+        }
 
     }
 
@@ -15595,6 +15599,7 @@ auto RunIntroCinematic = [&]() {
     UnloadSound(g_sndLightSwitch);
     UnloadSound(g_sndNozzleLatch);
     UnloadSound(g_sndNozzleShutoff);
+    UnloadSound(g_sndStepperMotor);
 
     CloseAudioDevice();
 
@@ -15644,6 +15649,9 @@ auto RunIntroCinematic = [&]() {
     UnloadOceanSystem();
 
     UnloadShopAtmosphere();
+    UnloadATMSystem();
+
+    CleanupCloudSystem();
 
     CloseWindow();
 
