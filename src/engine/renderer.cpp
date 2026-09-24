@@ -217,9 +217,11 @@ void Renderer::DrawPart(const MeshAsset* mesh, int mat, const Matrix& xf, Color 
     float r = mesh->radius * MaxScale(xf);
     const SurfaceMat& m = Mat(mat);
     Item it{ mesh, mat, xf, tint, castShadow && m.castShadow, Vector3DistanceSqr(c, cam.position) };
-    // Shadow casters must be kept even when off-screen; visibility is decided per pass.
+    // Only what is in view (and within the draw distance) is drawn. Off-screen objects are
+    // kept only as nearby shadow casters, and only when shadows are on.
+    if (it.d2 > (s.drawDistance + r) * (s.drawDistance + r)) return;
     bool vis = SphereVisible(c, r);
-    if (!vis && !it.shadow) return;
+    if (!vis && (!it.shadow || !s.shadowsEnabled || it.d2 > 60.0f * 60.0f)) return;
     if (!vis) it.tint.a = 0;   // marker: shadow-only
     if (m.transparent) { if (vis) transparent_.push_back(it); }
     else items_.push_back(it);
@@ -240,6 +242,7 @@ void Renderer::DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<M
     if (!mesh || xfs.empty()) return;
     Inst inst{ mesh, mat, {} };
     inst.xfs.reserve(xfs.size());
+    maxDist = fminf(maxDist, s.drawDistance);
     float md2 = maxDist * maxDist, mn2 = minDist * minDist;
     for (const Matrix& m : xfs) {
         Vector3 c{ m.m12, m.m13, m.m14 };

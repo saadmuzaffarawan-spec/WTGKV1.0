@@ -70,13 +70,18 @@ std::vector<SettingRow> Rows() {
           [&](int d) {
               st.quality = (st.quality + (d < 0 ? 2 : 1)) % 3;
               // presets: low favours speed on weak / integrated GPUs
-              if (st.quality == 0) { st.renderScale = 0.6f; st.grass = 0.3f; st.volumetrics = false; st.shadows = false; }
-              if (st.quality == 1) { st.renderScale = 0.8f; st.grass = 0.6f; st.volumetrics = true; st.shadows = true; }
-              if (st.quality == 2) { st.renderScale = 1.0f; st.grass = 1.0f; st.volumetrics = true; st.shadows = true; }
+              if (st.quality == 0) { st.renderScale = 0.6f; st.grass = 0.2f; st.volumetrics = false; st.shadows = false; st.drawDistance = 100; }
+              if (st.quality == 1) { st.renderScale = 0.8f; st.grass = 0.5f; st.volumetrics = false; st.shadows = true; st.drawDistance = 180; }
+              if (st.quality == 2) { st.renderScale = 1.0f; st.grass = 1.0f; st.volumetrics = true; st.shadows = true; st.drawDistance = 320; }
               G().ApplySettings();
           } },
         { "volumetric fog", [&] { return onoff(st.volumetrics); }, [&](int) { st.volumetrics = !st.volumetrics; G().ApplySettings(); } },
         { "shadows", [&] { return onoff(st.shadows); }, [&](int) { st.shadows = !st.shadows; G().ApplySettings(); } },
+        { "fps limit", [&] { return st.fpsLimit ? std::to_string(st.fpsLimit) : std::string("unlimited"); },
+          [&](int d) { static const int v[] = { 30, 60, 90, 120, 144, 165, 240, 0 }; int i = 0; while (i < 7 && v[i] != st.fpsLimit) i++;
+                       i = (i + (d < 0 ? 7 : 1)) % 8; st.fpsLimit = v[i]; G().ApplySettings(); } },
+        { "show fps", [&] { return onoff(st.showFps); }, [&](int) { st.showFps = !st.showFps; } },
+        { "draw distance", [&] { return std::string(TextFormat("%d m", (int)st.drawDistance)); }, [&](int d) { st.drawDistance = Clamp(st.drawDistance + d * 20.0f, 60.0f, 320.0f); G().ApplySettings(); } },
         { "movement speed", [&] { return pct(st.moveSpeed); }, [&](int d) { st.moveSpeed = Clamp(st.moveSpeed + d * 0.1f, 0.6f, 2.0f); G().ApplySettings(); } },
         { "vsync", [&] { return onoff(st.vsync); }, [&](int) { st.vsync = !st.vsync; if (st.vsync) SetWindowState(FLAG_VSYNC_HINT); else ClearWindowState(FLAG_VSYNC_HINT); } },
         { "render scale", [&] { return pct(st.renderScale); }, [&](int d) { st.renderScale = Clamp(st.renderScale + d * 0.05f, 0.5f, 1.0f); } },

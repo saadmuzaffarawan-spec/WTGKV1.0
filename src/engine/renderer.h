@@ -45,6 +45,7 @@ struct RenderSettings {
     float redPulse = 0.0f, blur = 0.0f, gamma = 1.08f, brightness = 1.0f;
     Vector3 gradeShadow = { 0.2f, 0.45f, 0.6f }, gradeHigh = { 0.9f, 0.7f, 0.5f };
     float renderScale = 1.0f;
+    float drawDistance = 320.0f;  // user setting: nothing farther than this is drawn
 };
 
 class Renderer {

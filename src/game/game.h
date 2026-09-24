@@ -18,9 +18,12 @@ struct Settings {
     float grass = 0.6f, ascii = 1.0f, subtitleSize = 1.0f;
     bool invertY = false, subtitles = true, fullscreen = false, vsync = true, headBob = true;
     float moveSpeed = 1.0f;       // walking/running speed multiplier
-    bool volumetrics = true;      // light shafts / glow in the fog (expensive)
+    bool volumetrics = false;     // light shafts / glow in the fog (expensive)
     bool shadows = true;          // moon and flashlight shadows
-    int quality = 1;              // 0 low, 1 medium, 2 high (preset for the options above)
+    int quality = 1;
+    int fpsLimit = 60;            // 0 = unlimited
+    float drawDistance = 180.0f;  // metres
+    bool showFps = false;              // 0 low, 1 medium, 2 high (preset for the options above)
     void Load();
     void Save() const;
 };

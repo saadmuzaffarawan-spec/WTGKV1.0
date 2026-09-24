@@ -73,7 +73,9 @@ There is no day/night cycle. The only dawn comes at the very end.
 - **Graphics quality:** low, medium or high. If the game stutters, start with **low**.
 - **Render scale:** lower is faster.
 - **Volumetric fog** and **shadows:** turning these off gives the biggest speed-up.
-- **Grass density** and **vsync**.
+- **FPS limit:** 30, 60, 90, 120, 144, 165, 240 or unlimited. **Show fps** puts a counter in the corner.
+- **Draw distance:** 60–320 m. Nothing farther away is drawn, and only what is in view is ever drawn.
+- **Grass density** and **vsync**. Turn vsync off to go above your monitor's refresh rate.
 - **Movement speed:** 60–200%.
 - **Field of view** and **mouse sensitivity**.
 - **Invert look**, **head bob**, **brightness**, **spirit sight** (the ASCII effect), and
