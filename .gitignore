@@ -39,3 +39,8 @@ Thumbs.db
 [Dd]esktop.ini
 $RECYCLE.BIN/
 .DS_Store
+# Runtime output
+crash_debug.txt
+sign_*.png
+*.sav
+settings.cfg
