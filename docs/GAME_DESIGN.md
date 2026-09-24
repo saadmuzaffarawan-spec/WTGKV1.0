@@ -193,3 +193,22 @@ assets/scenes/world.scene   every placed object, human-editable text
 optional properties. Prefabs build their own mesh, colliders, lights and interaction
 hooks. Press **F10** in game to open the editor: select, move, rotate, duplicate, delete,
 place new prefabs, and save back to `world.scene`.
+
+## 8. Status (end of the v2 rebuild)
+
+All nine chapters are implemented and play in sequence, from the prologue through the
+dawn and credits. Each chapter was checked in headless screenshots. Set-pieces that need
+player input, like digging, pouring or the skeleton cow, were driven through the
+`WTGK_TEST` hooks.
+
+Known gaps, in priority order:
+
+1. **Needs a human playthrough.** Pacing, difficulty (creature speed against sprint and
+   stamina) and how clear the prompts are have not been tuned by hand.
+2. **Creatures steer, they don't path-find.** They probe ahead and stop at walls. That is
+   fine in the open field and the cavern, but they can snag on building corners.
+3. **Faces are sculpted and read as clay up close.** Keep them in low light or silhouette,
+   or replace them with scanned heads through the override hooks.
+4. **The instanced forest casts no shadows.** Only hand-placed trees and props do.
+5. **All content is generated.** The build machine could not reach CC0 asset sites.
+   `assets/textures/` and `assets/sounds/` overrides are the upgrade path.
