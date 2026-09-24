@@ -24,6 +24,11 @@ void BuildWall(PrefabBuild& b, Vector2 a, Vector2 bpt, float y0, float height, f
 // Glass pane with mullion frame filling an opening
 void BuildWindow(PrefabBuild& b, Vector2 a, Vector2 bpt, float y0, const Opening& o, int glassMat, int frameMat, int panesX = 2, bool broken = false, bool boarded = false);
 
+// Cow skeleton parts (shared by the field prefab and the story's walking skeleton)
+enum CowPart { COW_BODY, COW_HEAD, COW_UPPER, COW_LOWER };
+void CowPartGeometry(ModelBuilder& mb, int part, uint32_t seed);
+Vector3 CowHip(int leg);   // leg joint in the body frame: 0 FL, 1 FR, 2 BL, 3 BR
+
 void RegisterDoorPrefabs();
 void RegisterEnvPrefabs();
 void RegisterStationPrefabs();

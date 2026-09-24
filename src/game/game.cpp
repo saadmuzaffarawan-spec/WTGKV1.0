@@ -220,8 +220,11 @@ void Game::LoadWorld(void (*progress)(float, const char*)) {
     BuildPowerLines(Scn());
     progress(0.85f, "growing the dead grass");
     std::vector<ExclusionZone> extra;
-    for (auto& e : Scn().ents)
+    for (auto& e : Scn().ents) {
         if (e->prefab == "gas_canopy" || e->prefab == "radio_tower") extra.push_back({ { e->base.x, e->base.z }, { 6, 10 }, e->worldYaw, 2 });
+        // open ground (fields, yards): no trees, grass stays
+        if (e->prefab == "clearing") extra.push_back({ { e->base.x, e->base.z }, { e->Num("w", 20) * 0.5f, e->Num("d", 20) * 0.5f }, e->worldYaw, 3, true });
+    }
     Veg().Build(pads, extra, 1234);
     worldLoaded_ = true;
 }

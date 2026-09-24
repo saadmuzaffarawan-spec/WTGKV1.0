@@ -76,8 +76,8 @@ void InitMaterials() {
     set(MAT_CARDBOARD, Mk("cardboard", TX_CARDBOARD, WHITE, 1.5f));
     set(MAT_CORRUGATED, Mk("corrugated", TX_CORRUGATED, WHITE, 0.5f, 1.0f, 0.3f));
     set(MAT_LEATHER, Mk("leather", TX_LEATHER, WHITE, 2.0f));
-    set(MAT_BONE, Mk("bone", TX_BONE, WHITE, 2.0f));
-    set(MAT_MUD, Mk("mud", TX_MUD, WHITE, 0.4f));
+    set(MAT_BONE, Mk("bone", TX_BONE, Color{ 176, 164, 138, 255 }, 2.0f));
+    set(MAT_MUD, Mk("mud", TX_MUD, Color{ 150, 140, 130, 255 }, 0.4f));
     set(MAT_DIRT, Mk("dirt", TX_DIRT, WHITE, 0.5f));
     set(MAT_GRAVEL, Mk("gravel", TX_GRAVEL, WHITE, 0.6f));
     set(MAT_BLACK_PLASTIC, Mk("black_plastic", TX_RUBBER, Color{ 200, 200, 200, 255 }, 2.0f, 0.55f));

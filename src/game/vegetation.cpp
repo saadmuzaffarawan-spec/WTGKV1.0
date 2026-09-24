@@ -11,8 +11,8 @@ static bool InZone(const ExclusionZone& z, float x, float zz, float extra) {
     return fabsf(lx) < z.half.x + z.margin + extra && fabsf(lz) < z.half.y + z.margin + extra;
 }
 
-bool Vegetation::Excluded(float x, float z, float extra) const {
-    for (const auto& zn : zones_) if (InZone(zn, x, z, extra)) return true;
+bool Vegetation::Excluded(float x, float z, float extra, bool forTrees) const {
+    for (const auto& zn : zones_) if ((forTrees || !zn.treesOnly) && InZone(zn, x, z, extra)) return true;
     return false;
 }
 
@@ -80,7 +80,7 @@ void Vegetation::Build(const std::vector<TerrainPad>& pads, const std::vector<Ex
             dens *= 0.6f + 0.4f * (Fbm2(x * 0.02f, z * 0.02f, 3, 0, seed) * 0.5f + 0.5f) * 2.0f;
             if (dr < 22.0f) dens *= 0.3f;
             if (rng.F() > dens) continue;
-            if (Excluded(x, z, 4.0f)) continue;
+            if (Excluded(x, z, 4.0f, true)) continue;
             float pick = rng.F();
             const Kind* k = &kinds[0];
             float acc = 0;

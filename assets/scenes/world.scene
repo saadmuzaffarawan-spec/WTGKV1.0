@@ -58,7 +58,7 @@ street_lamp 5.6 0 -34.0 -90 group=street
 street_lamp 5.6 0 28.0 -90 group=street flicker=0.2
 street_lamp -5.6 0 4.0 90 group=street flicker=0.85
 road_sign 6.0 0 62.0 180 text="SPEED LIMIT|45" style=white w=0.75 h=0.95
-road_sign -6.2 0 -58.0 0 text="BLACKWOOD COLLEGE|NEXT LEFT" style=brown w=2.2 h=1.0
+road_sign -6.2 0 -58.0 0 text="BLACKWOOD COLLEGE|NEXT RIGHT" style=brown w=2.2 h=1.0
 road_sign 6.2 0 -70.0 180 text="SUMMIT VALLEY  12|ROUTE 9 NORTH" style=green w=2.4 h=1.1
 road_sign -6.0 0 90.0 0 text="CURVE|AHEAD" style=yellow w=0.9 h=0.9
 billboard 22.0 0 -95.0 -60 name=billboard
@@ -125,3 +125,29 @@ old_bed 3.9 -3.0 -5.3 90 parent=college name=old_bed
 candles 4.5 -3.0 -10.5 0 parent=college variant=1 name=candles_a
 candles 0.6 -3.0 -10.4 0 parent=college variant=2 name=candles_b
 candles 2.3 -3.0 -4.35 0 parent=college variant=3 name=candles_c
+
+# ---- the cow field (south-east, behind the station) ------------------------
+clearing 76.0 0 -110.0 0 w=80 d=90
+path 0 0 0 0 pts=30,-16;36,-44;40,-82;42,-104;58,-106 width=1.1
+fence_wood 42.0 0 -78.0 90 len=16 variant=1
+fence_wood 42.0 0 -94.0 90 len=16 variant=2
+fence_wood 42.0 0 -114.0 90 len=16 variant=3
+fence_wood 42.0 0 -130.0 90 len=16 variant=4
+fence_wood 42.0 0 -146.0 90 len=16 variant=5
+fence_wood 50.0 0 -70.0 0 len=16 variant=6
+fence_wood 66.0 0 -70.0 0 len=16 variant=7
+fence_wood 82.0 0 -70.3 3 len=16 variant=8
+fence_wire 100.0 0 -70.5 0 len=20 variant=2
+cow_skeleton 48.5 0 -107.0 30 variant=1 name=cow_1
+cow_skeleton 55.0 0 -104.5 150 variant=2 name=cow_2
+cow_skeleton 62.0 0 -107.5 70 variant=3 dig=1 name=cow_3
+cow_skeleton 69.0 0 -104.0 200 variant=4 name=cow_4
+cow_skeleton 76.5 0 -108.0 -40 variant=5 name=cow_5
+cow_skeleton 88.0 0 -125.0 10 variant=6 name=cow_6
+water_trough 70.0 0 -94.0 20
+barn_ruin 96.0 0 -92.0 90 name=barn
+shovel 90.5 0 -93.5 -90 name=shovel
+hay_bale 84.0 0 -84.0 30 variant=1
+hay_bale 85.5 0 -101.0 80 variant=2
+windmill 104.0 0 -128.0 200 name=windmill
+dead_tree 46.0 0 -122.0 60 variant=3 scale=1.2

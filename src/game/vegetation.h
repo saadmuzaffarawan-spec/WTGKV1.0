@@ -2,14 +2,14 @@
 #pragma once
 #include "engine/scene.h"
 
-struct ExclusionZone { Vector2 c; Vector2 half; float yaw; float margin; };
+struct ExclusionZone { Vector2 c; Vector2 half; float yaw; float margin; bool treesOnly = false; };
 
 class Vegetation {
 public:
     void Build(const std::vector<TerrainPad>& pads, const std::vector<ExclusionZone>& extra, uint32_t seed);
     void Draw(Vector3 camPos);
     float density = 1.0f;   // settings: grass density multiplier
-    bool Excluded(float x, float z, float extraMargin = 0.0f) const;
+    bool Excluded(float x, float z, float extraMargin = 0.0f, bool forTrees = false) const;
 private:
     struct Group { const Model3D* model; std::vector<Matrix> xfs; };
     std::vector<Group> groups_;
