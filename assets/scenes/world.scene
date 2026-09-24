@@ -151,3 +151,20 @@ hay_bale 84.0 0 -84.0 30 variant=1
 hay_bale 85.5 0 -101.0 80 variant=2
 windmill 104.0 0 -128.0 200 name=windmill
 dead_tree 46.0 0 -122.0 60 variant=3 scale=1.2
+
+# ---- behind the iron door ---------------------------------------------------
+under_stairs 0.0 -3.0 -7.5 -90 parent=college name=under_stairs
+
+# ---- the world below (far under the surface; y is absolute) -----------------
+cavern -120.0 -60.0 -40.0 0 abs=1 name=cavern
+torch -2.3 0 7.0 0 parent=cavern
+torch 2.3 0 15.0 0 parent=cavern
+torch -2.3 0 24.0 0 parent=cavern
+torch 2.3 0 33.0 0 parent=cavern
+torch -2.3 0 42.0 0 parent=cavern
+torch 2.3 0 51.0 0 parent=cavern
+torch -2.3 0 60.0 0 parent=cavern
+torch 2.3 0 69.0 0 parent=cavern
+torch -2.3 0 77.0 0 parent=cavern
+torch 1.8 0 86.0 0 parent=cavern
+chair 0.0 0 84.0 180 parent=cavern name=zain_chair

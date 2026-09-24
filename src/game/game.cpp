@@ -308,13 +308,13 @@ void Game::UpdatePlay(float dt) {
     else { focus = nullptr; focusActor.clear(); hud.SetFocus(false); }
     hud.ShowTasks(IsKeyDown(KEY_TAB) && !cut);
     if (story) story->Update(dt);
-    // test hook: WTGK_WARP="x,z,yawDeg[,pitchDeg]" teleports once the story releases the camera
+    // test hook: WTGK_WARP="x,z,yawDeg[,pitchDeg[,y]]" teleports once the story releases the camera
     static bool warped = false;
     if (!warped && !camOverride && gameTime > 0.5f) {
         if (const char* w = getenv("WTGK_WARP")) {
-            float x = 0, z = 0, yw = 0, pt = 0;
-            if (sscanf(w, "%f,%f,%f,%f", &x, &z, &yw, &pt) >= 3) {
-                player.Spawn({ x, World().Height(x, z) + 1.0f, z }, yw);
+            float x = 0, z = 0, yw = 0, pt = 0, wy = NAN;
+            if (sscanf(w, "%f,%f,%f,%f,%f", &x, &z, &yw, &pt, &wy) >= 3) {
+                player.Spawn({ x, std::isnan(wy) ? World().Height(x, z) + 1.0f : wy, z }, yw);
                 player.pitch = pt * DEG2RAD;
             }
             if (getenv("WTGK_FLASH")) player.flashOn = true;
@@ -428,6 +428,26 @@ void Game::UpdateWeather(float dt) {
     s.lightning = flick * (inUnderground ? 0.0f : 1.0f);
     s.wetWorld = Damp(s.wetWorld, w.rain > 0.1f ? 0.8f : 0.0f, 0.2f, dt);
     s.fogDensity = 0.018f * w.fog;
+    // below ground: no sky, no moon, a close brown murk lit only by fire and your torch
+    static bool wasUnder = false;
+    static RenderSettings surface;
+    if (inUnderground && !wasUnder) surface = s;
+    if (!inUnderground && wasUnder) {
+        s.moonColor = surface.moonColor; s.skyAmbient = surface.skyAmbient; s.groundAmbient = surface.groundAmbient;
+        s.fogColor = surface.fogColor; s.sky = surface.sky; s.moonShadows = surface.moonShadows;
+        s.fogBase = surface.fogBase;
+    }
+    wasUnder = inUnderground;
+    if (inUnderground) {
+        s.moonColor = { 0, 0, 0 };
+        s.skyAmbient = { 0.010f, 0.007f, 0.006f };
+        s.groundAmbient = { 0.006f, 0.004f, 0.003f };
+        s.fogColor = { 0.022f, 0.013f, 0.009f };
+        s.fogDensity = 0.03f;
+        s.fogBase = player.feet.y - 1.0f;   // height fog is relative to the cavern floor, not sea level
+        s.sky = false;
+        s.moonShadows = false;
+    }
 }
 
 void Game::UpdateAmbience(float dt) {

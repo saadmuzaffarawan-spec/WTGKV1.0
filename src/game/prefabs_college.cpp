@@ -150,7 +150,6 @@ static void BuildCollege(PrefabBuild& b, const Entity& e) {
     // basement lights (bare bulbs on the "basement" group; the boiler has its own glow)
     b.M(MAT_BULB_WARM).Sphere({ 16.5f, GF - 0.45f, -4.0f }, 0.05f, 6, 8);
     b.AddLight({ 16.5f, GF - 0.55f, -4.0f }, { 1.0f, 0.7f, 0.4f }, 1.8f, 7.0f, 0.08f).group = "basement";
-    b.AddLight({ 16.5f, GF - 0.55f, -4.0f }, { 1.0f, 0.7f, 0.4f }, 0.0f, 0.1f).flicker = 0.4f;
     // chalkboards in classrooms, portraits in the corridor
     int chalk = SignMaterial("chalk", "THE GROUND KEEPS\nTHE GROUND KEEPS\nTHE GROUND KEEPS\nTHE GROUND KEEPS", ui::F_MONO, 44, Color{ 210, 210, 200, 255 }, Color{ 28, 38, 32, 255 }, 1024, 400, 0.6f);
     b.M(chalk).BoxUV({ -13.0f, GF + 1.6f, 1.42f }, { 4.0f, 1.3f, 0.02f });
@@ -289,8 +288,10 @@ static void BuildBoiler(PrefabBuild& b, const Entity& e) {
     for (int i = 0; i < 3; i++) b.M(MAT_CHROME).Cylinder({ -0.5f + i * 0.5f, 1.72f, 0.5f }, { -0.5f + i * 0.5f, 1.75f, 0.5f }, 0.08f, 0.08f, 12, true);
     b.Collider({ 0, 0.9f, 0 }, { 2.8f, 1.8f, 1.8f }, SURF_METAL);
     b.Interact("Boiler", { -1.35f, 0.6f, 0 }, 2.0f, "boiler");
-    LightDef& l = b.AddLight({ -1.6f, 0.5f, 0 }, { 1.0f, 0.4f, 0.1f }, 0.0f, 4.0f, 0.2f);
+    LightDef& l = b.AddLight({ -1.7f, 0.55f, 0 }, { 1.0f, 0.42f, 0.12f }, 2.6f, 6.0f, 0.15f);
     l.group = "boiler_flame";
+    l.flicker = 0.25f;
+    l.on = false;   // cold until someone relights the pilot
     (void)e;
 }
 

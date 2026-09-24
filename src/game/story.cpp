@@ -213,6 +213,7 @@ void Story::Begin(int ch) {
     case CH_KEY: impl->BuildKey(script); break;
     case CH_BELOW: impl->BuildBelow(script); break;
     case CH_BURN: impl->BuildBurn(script); break;
+    case CH_END: BuildEpilogue(*impl, script); break;
     default: break;
     }
     if (ch != CH_PROLOGUE) g.SaveGame();
@@ -235,6 +236,8 @@ void Story::Update(float dt) {
 }
 
 void Story::Draw3D() {
+    impl->DrawCreatures();
+    DrawFireTrail(*impl);
     if (impl->wreckLights) {
         if (Entity* w = Scn().Find("wreck")) {
             float t = impl->t;

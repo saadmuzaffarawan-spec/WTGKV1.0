@@ -3,6 +3,7 @@
 #include "story.h"
 #include "sedan.h"
 #include "fx.h"
+#include <memory>
 
 // The brothers' car (and customer cars) as a driveable rig
 struct CarRig {
@@ -55,6 +56,12 @@ struct Creature {
     float fear = 0;           // light exposure
     float hp = 1.0f;
     float burn = 0.0f;
+    Vector3 pos{};            // feet position (skeleton cows are drawn from parts, not actors)
+    float yaw = 0;
+    float gait = 0;           // walk cycle phase
+    float wake = 0;           // 0..1 assembling itself out of the grass
+    float hitCd = 0;          // cooldown between attacks
+    uint32_t seed = 1;
 };
 
 struct Story::Impl {
@@ -136,6 +143,12 @@ struct Story::Impl {
     void SpawnCustomer(bool ghost);
     void SpawnStains(int n);
     void AddCreature(const std::string& name, int kind, Vector3 pos);
+    void DrawCreatures();
+    Creature* FindCreature(const std::string& name);
+    int playerHits = 0;       // attacks taken since the last checkpoint
+    Vector3 checkpoint{};
+    float checkpointYaw = 0;
+    std::function<void()> onCaught;   // chapter-specific reset when a creature gets you
     void Pay(float amount, const std::string& why);
 };
 
@@ -150,5 +163,29 @@ inline float RoadYaw(float z) {
 }
 
 float StoreYawFix();
+// College-local point to world (the college entity is named "college")
+Vector3 CollegeP(float x, float y, float z);
+
+// A run of dialogue chosen when the step starts (for branches after a choice)
+struct Line { std::string who, text; float dur = -1.0f; };
+inline void SayLines(Script& s, std::function<std::vector<Line>()> pick) {
+    auto lines = std::make_shared<std::vector<Line>>();
+    auto idx = std::make_shared<size_t>(0);
+    auto next = std::make_shared<float>(0.0f);
+    s.Run([lines, idx, next](float t, float) {
+        if (*idx >= lines->size()) return t >= *next;
+        if (t >= *next) {
+            const Line& l = (*lines)[*idx];
+            float d = l.dur < 0 ? 1.6f + l.text.size() * 0.055f : l.dur;
+            G().hud.Say(l.who, l.text, d);
+            *next = t + d + 0.35f;
+            (*idx)++;
+        }
+        return false;
+    }, [lines, idx, next, pick]() { *lines = pick(); *idx = 0; *next = 0; });
+}
 void RegisterCollegeActions(Story::Impl& im);
 void BuildCollegeDiscovery(Story::Impl& im, Script& s);
+void RegisterBelowActions(Story::Impl& im);
+void BuildEpilogue(Story::Impl& im, Script& s);
+void DrawFireTrail(Story::Impl& im);

@@ -200,9 +200,9 @@ void Story::Impl::CompleteTask(const std::string& id) {
     if (!t || t->done) return;
     t->done = true;
     audio::Play("paper", 0.35f);
-    Pay(id == "pump" ? 0.0f : 3.25f, "wages");
+    if (g.chapter <= CH_SHIFT3) Pay(id == "pump" ? 0.0f : 3.25f, "wages");
     g.hud.Notify("done: " + t->label);
-    if (AllTasksDone()) g.hud.Objective("Tell Grethnar you're done.");
+    if (AllTasksDone() && g.chapter <= CH_SHIFT3) g.hud.Objective("Tell Grethnar you're done.");
 }
 
 void Story::Impl::SpawnStains(int n) {
