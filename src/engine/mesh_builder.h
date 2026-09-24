@@ -9,6 +9,10 @@
 
 struct MeshAsset {
     Mesh mesh{};
+    std::vector<Mesh> more;      // further indexed chunks when a mesh has > 65535 unique vertices
+    // Optional simpler version drawn from `lodDist` metres (and in shadow maps). Chains.
+    const MeshAsset* lod = nullptr;
+    float lodDist = 0.0f;
     Vector3 bmin{}, bmax{};
     Vector3 center{};
     float radius = 0.0f;

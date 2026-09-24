@@ -98,6 +98,22 @@ static void SetupLitLocs(Shader& sh, bool instanced) {
 
 static MaterialMap g_maps[MAX_MATERIAL_MAPS];
 
+// Level of detail for a mesh seen from `dist` metres.
+static const MeshAsset* PickLod(const MeshAsset* a, float dist) {
+    while (a->lod && dist > a->lodDist) a = a->lod;
+    return a;
+}
+static const MeshAsset* CoarsestLod(const MeshAsset* a) {
+    while (a->lod) a = a->lod;
+    return a;
+}
+
+// A mesh asset can be split into several indexed chunks; draw them all.
+static void DrawAsset(const MeshAsset* a, const Material& m, const Matrix& xf) {
+    DrawMesh(a->mesh, m, xf);
+    for (const Mesh& c : a->more) DrawMesh(c, m, xf);
+}
+
 void Renderer::Init() {
     rlSetClipPlanes(0.05, 900.0);
     std::string common = std::string("#version 330\n") + kShaderCommon;
@@ -281,7 +297,7 @@ void Renderer::ShadowPass() {
             Vector3 c = Vector3Transform(it.mesh->center, it.xf);
             Vector3 dc = Vector3Subtract(c, center); dc.y = 0;
             if (Vector3LengthSqr(dc) > r2) continue;
-            DrawMesh(it.mesh->mesh, depthMat_, it.xf);
+            DrawAsset(CoarsestLod(it.mesh), depthMat_, it.xf);   // 5 cm shadow texels: fine detail can't show
         }
         EndMode3D();
         rlSetClipPlanes(0.05, 900.0);
@@ -306,7 +322,7 @@ void Renderer::ShadowPass() {
             if (!it.shadow) continue;
             Vector3 c = Vector3Transform(it.mesh->center, it.xf);
             if (Vector3Distance(c, l.pos) > l.range + it.mesh->radius * MaxScale(it.xf)) continue;
-            DrawMesh(it.mesh->mesh, depthMat_, it.xf);
+            DrawAsset(it.mesh->lod ? it.mesh->lod : it.mesh, depthMat_, it.xf);
         }
         EndMode3D();
         rlSetClipPlanes(0.05, 900.0);
@@ -378,7 +394,7 @@ void Renderer::DrawItem(const Item& it, Shader sh) {
     mat.shader = sh;
     mat.maps = g_maps;
     if (m.doubleSided) rlDisableBackfaceCulling();
-    DrawMesh(it.mesh->mesh, mat, it.xf);
+    DrawAsset(PickLod(it.mesh, sqrtf(it.d2)), mat, it.xf);
     if (m.doubleSided) rlEnableBackfaceCulling();
     drawCalls++;
 }
@@ -433,6 +449,7 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
         Material mat{}; mat.shader = litInst_; mat.maps = g_maps;
         if (m.doubleSided) rlDisableBackfaceCulling();
         DrawMeshInstanced(in.mesh->mesh, mat, in.xfs.data(), (int)in.xfs.size());
+        for (const Mesh& c : in.mesh->more) DrawMeshInstanced(c, mat, in.xfs.data(), (int)in.xfs.size());
         if (m.doubleSided) rlEnableBackfaceCulling();
         drawCalls++;
     }
