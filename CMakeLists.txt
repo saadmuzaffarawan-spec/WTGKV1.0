@@ -46,11 +46,13 @@ else()
     target_compile_options(WhatTheGroundKeeps PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
 endif()
 
-add_custom_command(TARGET WhatTheGroundKeeps POST_BUILD
+# Runtime assets are synced on every build (scene edits must not wait for a relink).
+add_custom_target(copy_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:WhatTheGroundKeeps>/assets"
     COMMENT "Copying runtime assets"
 )
+add_dependencies(copy_assets WhatTheGroundKeeps)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT WhatTheGroundKeeps)

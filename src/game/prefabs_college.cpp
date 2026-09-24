@@ -25,7 +25,32 @@ static void BuildCollege(PrefabBuild& b, const Entity& e) {
     Slab(b, MAT_WOOD_FLOOR, 0, 14.6f, -9.4f, -7.4f, GF, 0.3f, SURF_WOOD);
     Slab(b, MAT_WOOD_FLOOR, 20.6f, 22, -9.4f, -7.4f, GF, 0.3f, SURF_WOOD);
     // corridor runner of cracked linoleum
-    b.M(MAT_TILE).Box({ 0, GF + 0.003f, 0 }, { 43.4f, 0.006f, 2.9f });
+    static int linoleum = -1;
+    if (linoleum < 0) {
+        SurfaceMat m = Mat(MAT_TILE);
+        m.name = "linoleum_old"; m.tint = Color{ 128, 122, 106, 255 }; m.rough = 1.3f;
+        linoleum = AddMaterial(m);
+    }
+    b.M(linoleum).Box({ 0, GF + 0.003f, 0 }, { 43.4f, 0.006f, 2.9f });
+    // what fell from the ceiling: plaster chunks, loose paper, a toppled ceiling panel
+    {
+        Rng d(77);
+        for (int i = 0; i < 60; i++) {
+            float x = d.Range(-21, 21), z = d.Range(-11.5f, 11.5f);
+            if (x > 13.8f && x < 21.4f && z > -10.0f && z < -6.8f) continue;   // keep the stairwell clear
+            if (d.Chance(0.5f)) {
+                float sz = d.Range(0.05f, 0.18f);
+                b.M(MAT_PLASTER_DIRTY).BoxRot({ x, GF + sz * 0.3f, z }, { sz, sz * 0.5f, sz * 0.8f }, { d.Range(-20, 20), d.Range(0, 180), d.Range(-20, 20) }, 0.01f);
+            } else {
+                b.M(MAT_PAPER).BoxRot({ x, GF + 0.004f, z }, { 0.21f, 0.002f, 0.3f }, { d.Range(-3, 3), d.Range(0, 180), d.Range(-3, 3) });
+            }
+        }
+        for (int i = 0; i < 5; i++) {
+            float x = -18.0f + i * 9.0f + d.Range(-2, 2), z = d.Range(-1.0f, 1.0f);
+            b.M(MAT_PLASTER).BoxRot({ x, GF + 0.2f, z }, { 1.2f, 0.02f, 0.6f }, { d.Range(-5, 5), d.Range(0, 180), d.Range(12, 25) });
+            b.M(MAT_BLACK_PLASTIC).Box({ x + 0.3f, GF + H1 - 0.256f, z }, { 1.2f, 0.004f, 0.6f });   // the hole it left
+        }
+    }
     // ---- exterior walls, two storeys, most windows boarded
     auto windows = [](float len, float start, float step) {
         std::vector<Opening> o;
@@ -252,12 +277,15 @@ struct SlideBeh : Behaviour {
 };
 
 static void BuildBoiler(PrefabBuild& b, const Entity& e) {
-    b.mb.Push(); b.mb.RotateZ(90);
-    b.M(MAT_RUST).Cylinder({ 0.9f, -1.3f, 0 }, { 0.9f, 1.3f, 0 }, 0.85f, 0.85f, 24, true);
-    b.mb.Pop();
+    b.M(MAT_RUST).Cylinder({ -1.3f, 1.0f, 0 }, { 1.3f, 1.0f, 0 }, 0.85f, 0.85f, 24, true);
+    for (float x : { -0.8f, 0.9f }) {   // brick saddles it rests on
+        b.M(MAT_BRICK_DARK).Box({ x, 0.2f, 0 }, { 0.4f, 0.4f, 1.3f }, 0.01f);
+        b.M(MAT_BRICK_DARK).Box({ x, 0.33f, 0 }, { 0.4f, 0.14f, 0.9f }, 0.01f);
+    }
+
     b.M(MAT_RUST).Box({ -1.0f, 0.3f, 0 }, { 0.6f, 0.6f, 1.2f }, 0.03f);
     b.M(MAT_PAINT_BLACK).Box({ -1.32f, 0.6f, 0 }, { 0.05f, 0.4f, 0.5f }, 0.01f);   // burner hatch
-    b.M(MAT_STEEL).Cylinder({ 0.0f, 1.7f, 0 }, { 0.0f, 3.2f, 0 }, 0.18f, 0.18f, 12, false);
+    b.M(MAT_STEEL).Cylinder({ 0.0f, 1.7f, 0 }, { 0.0f, 3.4f, 0 }, 0.18f, 0.18f, 12, false);
     for (int i = 0; i < 3; i++) b.M(MAT_CHROME).Cylinder({ -0.5f + i * 0.5f, 1.72f, 0.5f }, { -0.5f + i * 0.5f, 1.75f, 0.5f }, 0.08f, 0.08f, 12, true);
     b.Collider({ 0, 0.9f, 0 }, { 2.8f, 1.8f, 1.8f }, SURF_METAL);
     b.Interact("Boiler", { -1.35f, 0.6f, 0 }, 2.0f, "boiler");

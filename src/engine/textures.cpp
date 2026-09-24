@@ -215,14 +215,14 @@ Pixel GenPaint(const GenCtx& c, float u, float v) {
 
 Pixel GenRust(const GenCtx& c, float u, float v) {
     float n = c.N(u, v, 6, 5, 3) * 0.5f + 0.5f;
-    Pixel p{ 0.5f, Lerp(0.20f, 0.46f, n), Lerp(0.09f, 0.22f, n), Lerp(0.05f, 0.09f, n), 0.92f };
+    Pixel p{ 0.5f, Lerp(0.13f, 0.30f, n), Lerp(0.08f, 0.15f, n), Lerp(0.05f, 0.08f, n), 0.92f };
     float dark = SmoothStep(0.3f, 0.7f, c.N(u, v, 14, 3, 8) * 0.5f + 0.5f);
     Mul(p, 1.0f - dark * 0.5f);
     float w = c.W(u, v, 70, 9);
     float pit = SmoothStep(0.2f, 0.05f, w);
     Mul(p, 1.0f - pit * 0.5f);
     float flake = SmoothStep(0.5f, 0.6f, c.N(u, v, 20, 3, 12) * 0.5f + 0.5f);
-    Mix(p, 0.52f, 0.30f, 0.14f, flake * 0.5f);
+    Mix(p, 0.36f, 0.22f, 0.12f, flake * 0.4f);
     p.h = 0.5f + n * 0.3f - pit * 0.3f + flake * 0.15f;
     return p;
 }

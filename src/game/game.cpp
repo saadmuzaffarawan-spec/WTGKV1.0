@@ -481,6 +481,7 @@ void Game::RenderWorld() {
     }
     auto& s = Rdr().s;
     s.brightness = settings.brightness;
+    if (const char* b = getenv("WTGK_BRIGHT")) s.brightness *= (float)atof(b);   // debug: inspection exposure
     s.ascii = Clamp(spirit * settings.ascii, 0.0f, 1.0f);
     s.redPulse = Damp(s.redPulse, fearPulse, 3.0f, GetFrameTime());
 
