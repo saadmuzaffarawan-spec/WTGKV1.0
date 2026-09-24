@@ -141,6 +141,14 @@ static void BuildShelf(PrefabBuild& b, const Entity& e) {
         Products(b, rng, { 0, 0.21f, D * 0.25f }, L, D * 0.45f, 0.34f, 4);
         b.mb.Pop();
     }
+    b.Interact("Shelf", { 0, 1.0f, D * 0.5f }, 2.2f, "shelf");
+}
+
+static void BuildTrashBag(PrefabBuild& b, const Entity&) {
+    b.M(MAT_BLACK_PLASTIC).Ellipsoid({ 0, 0.28f, 0 }, { 0.26f, 0.3f, 0.22f }, 8, 12);
+    b.M(MAT_BLACK_PLASTIC).Ellipsoid({ 0.05f, 0.18f, 0.08f }, { 0.2f, 0.18f, 0.2f }, 6, 10);
+    b.M(MAT_BLACK_PLASTIC).Cylinder({ 0, 0.55f, 0 }, { 0.02f, 0.66f, 0.01f }, 0.04f, 0.02f, 6, true);
+    b.Interact("Trash bag", { 0, 0.35f, 0 }, 1.8f, "trash_bag");
 }
 
 static void BuildCoolers(PrefabBuild& b, const Entity& e) {
@@ -295,4 +303,5 @@ void RegisterStorePrefabs() {
     reg("breaker_box", BuildBreakerBox);
     reg("boxes", BuildBoxes, { "variant" });
     reg("stock_box", BuildStockCrate);
+    reg("trash_bag", BuildTrashBag);
 }

@@ -59,6 +59,7 @@ Pose PoseDragging(float phase);
 Pose PoseTiedChair(float t, float struggle);
 Pose PoseCounterLean(float t);
 Pose PoseReach(float t);
+Pose PoseLoom(float t);          // the Dragger standing still
 Pose PoseCry(float t);
 Pose PoseCoverOver(float t);
 Pose PoseKneel(float t);
@@ -90,6 +91,13 @@ public:
     float lookWeight = 0.0f;
     float scale = 1.0f;
     float pitch = 0, roll = 0;   // whole-body tilt (lying, falling)
+    bool hideHead = false;       // first-person: camera sits inside this head
+    // hand IK targets (world space); applied after pose blending
+    bool ikOn[2] = { false, false };
+    Vector3 ikTarget[2]{};
+    float ikWeight[2] = { 1.0f, 1.0f };
+    void Reach(int side, Vector3 target, float weight = 1.0f) { ikOn[side] = true; ikTarget[side] = target; ikWeight[side] = weight; }
+    void ReleaseIK() { ikOn[0] = ikOn[1] = false; }
 
     void SetPose(const Pose& p, bool snap = false) { target = p; if (snap) pose = p; }
     void Update(float dt);

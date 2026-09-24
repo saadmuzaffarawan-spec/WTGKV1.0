@@ -162,7 +162,7 @@ static void BuildSedanBody(ModelBuilder& mb, int paint, bool wrecked) {
     // dashboard
     mb.M(MAT_BLACK_PLASTIC).Box({ 0, 0.82f, 0.72f }, { 1.6f, 0.34f, 0.44f }, 0.05f);
     mb.M(MAT_BLACK_PLASTIC).BoxRot({ 0, 0.98f, 0.8f }, { 1.6f, 0.06f, 0.36f }, { -12, 0, 0 }, 0.02f);
-    mb.M(MAT_BLACK_PLASTIC).Box({ 0.38f, 1.02f, 0.55f }, { 0.42f, 0.1f, 0.16f }, 0.04f);          // cluster hood
+    mb.M(MAT_BLACK_PLASTIC).Box({ kDriverX, 1.02f, 0.55f }, { 0.42f, 0.1f, 0.16f }, 0.04f);       // cluster hood
     mb.M(MAT_GREY_PLASTIC).Box({ 0, 0.5f, 0.2f }, { 0.22f, 0.36f, 0.9f }, 0.03f);                  // console
     mb.M(MAT_BLACK_PLASTIC).Box({ 0, 0.82f, 0.51f }, { 0.22f, 0.07f, 0.02f }, 0.01f);             // radio
     mb.M(MAT_SCREEN_GREEN).Box({ 0.03f, 0.83f, 0.499f }, { 0.08f, 0.02f, 0.002f });
@@ -179,11 +179,11 @@ static void BuildSedanBody(ModelBuilder& mb, int paint, bool wrecked) {
     mb.M(MAT_CLOTH_GREY).BoxRot({ 0, 0.78f, -1.36f }, { 1.35f, 0.6f, 0.14f }, { -18, 0, 0 }, 0.05f);
     // rear-view mirror + a pine air freshener + photo tucked in the visor (their mother)
     mb.M(MAT_BLACK_PLASTIC).Box({ 0, 1.3f, 0.52f }, { 0.24f, 0.06f, 0.03f }, 0.01f);
-    mb.M(MAT_BLACK_PLASTIC).Box({ 0.38f, 1.37f, 0.35f }, { 0.34f, 0.02f, 0.18f }, 0.01f);
-    mb.M(MAT_PAPER).Box({ 0.3f, 1.36f, 0.36f }, { 0.07f, 0.003f, 0.09f });
+    mb.M(MAT_BLACK_PLASTIC).Box({ kDriverX, 1.37f, 0.35f }, { 0.34f, 0.02f, 0.18f }, 0.01f);
+    mb.M(MAT_PAPER).Box({ kDriverX + 0.08f, 1.36f, 0.36f }, { 0.07f, 0.003f, 0.09f });
     if (wrecked) {
         // airbag sagging from the wheel, glass crumbs on the dash
-        mb.M(MAT_CLOTH_WHITE).Ellipsoid({ 0.38f, 0.98f, 0.18f }, { 0.2f, 0.17f, 0.1f }, 8, 12);
+        mb.M(MAT_CLOTH_WHITE).Ellipsoid({ kDriverX, 0.98f, 0.18f }, { 0.2f, 0.17f, 0.1f }, 8, 12);
         Rng r(5);
         for (int i = 0; i < 60; i++) mb.M(MAT_GLASS).Box({ r.Range(-0.7f, 0.7f), r.Range(0.99f, 1.02f), r.Range(0.6f, 0.95f) }, { 0.01f, 0.004f, 0.008f });
     }
@@ -290,7 +290,7 @@ static void BuildSedan(PrefabBuild& b, const Entity& e) {
         b.mb.Deform([](Vector3 p) {
             if (p.z > 0.6f) {
                 float t = SmoothStep(0.6f, 2.4f, p.z);
-                float dx = fabsf(p.x - 0.25f);
+                float dx = fabsf(p.x - 0.3f);
                 float push = t * (1.05f - SmoothStep(0.0f, 0.9f, dx) * 0.55f);
                 p.z -= push * 0.95f;
                 p.y += t * 0.1f * (1.0f - dx) + GradNoise2(p.x * 9.0f, p.z * 9.0f, 0, 7) * 0.05f * t;
@@ -306,7 +306,7 @@ static void BuildSedan(PrefabBuild& b, const Entity& e) {
         BuildWheel(b.mb, { 0.76f, 0.31f, -1.35f }, 0, 1);
         BuildWheel(b.mb, { -0.76f, 0.31f, -1.35f }, 0, -1);
         // steering wheel fixed in place
-        b.mb.Push(); b.mb.Translate({ 0.38f, 0.98f, 0.3f }); b.mb.RotateX(-22);
+        b.mb.Push(); b.mb.Translate({ kDriverX, 0.98f, 0.3f }); b.mb.RotateX(-22);
         b.M(MAT_LEATHER).Lathe({ 0, 0, 0 }, { { 0.17f, -0.016f }, { 0.2f, 0 }, { 0.17f, 0.016f } }, 20, false, false);
         b.mb.Pop();
         b.Interact("The car", { 0.9f, 1.0f, 0.0f }, 2.5f, "wreck");

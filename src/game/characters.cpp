@@ -207,6 +207,18 @@ Pose PoseCounterLean(float t) {
     return p;
 }
 
+Pose PoseLoom(float t) {
+    // the Dragger at rest: hunched, head cocked, arms hanging past the knees, a slow sway
+    Pose p = PoseStand(t, 0.4f);
+    p.rot[B_SPINE].x = 0.3f; p.rot[B_CHEST].x = 0.2f;
+    p.rot[B_NECK].x = -0.25f; p.rot[B_HEAD].x = -0.2f; p.rot[B_HEAD].z = 0.45f + sinf(t * 0.6f) * 0.05f;
+    p.rot[B_LUARM].x = 0.1f; p.rot[B_RUARM].x = 0.15f; p.rot[B_LUARM].z = 0.05f; p.rot[B_RUARM].z = -0.05f;
+    p.rot[B_LFARM].x = -0.05f; p.rot[B_RFARM].x = -0.15f;
+    p.rot[B_LHAND].x = 0.3f; p.rot[B_RHAND].x = 0.4f;
+    p.rot[B_PELVIS].z = sinf(t * 0.45f) * 0.03f;
+    return p;
+}
+
 Pose PoseReach(float t) {
     Pose p = PoseStand(t, 1.0f);
     p.rot[B_RUARM].x = -1.4f; p.rot[B_RUARM].z = -0.05f;
@@ -646,6 +658,7 @@ CharModel* BuildCharacter(const BodySpec& sp) {
 // ---------------------------------------------------------------------------
 // Actor
 // ---------------------------------------------------------------------------
+static void SolveArm(Actor& a, int side, Vector3 target, float weight);
 Matrix Actor::RootXf() const { return MatPose(pos, yaw, pitch, roll, { scale, scale, scale }); }
 
 void Actor::BoneMatrices(Matrix out[B_COUNT]) const {
@@ -671,6 +684,7 @@ Vector3 Actor::BonePos(int bone, Vector3 local) const {
 void Actor::Update(float dt) {
     float k = 1.0f - expf(-blendSpeed * dt);
     pose = PoseLerp(pose, target, k);
+    for (int s = 0; s < 2; s++) if (ikOn[s] && model) SolveArm(*this, s, ikTarget[s], ikWeight[s]);
     if (lookWeight > 0.001f && model) {
         // turn neck+head towards the look target (in body space)
         Vector3 head = BonePos(B_NECK, { 0, 0.1f, 0 });
@@ -685,11 +699,47 @@ void Actor::Update(float dt) {
     }
 }
 
+// Numerical two-bone arm IK: coordinate descent on shoulder (x, y, z) and elbow (x)
+// so the palm reaches the target while staying close to the animated pose.
+static void SolveArm(Actor& a, int side, Vector3 target, float weight) {
+    int ua = side == 0 ? B_LUARM : B_RUARM, fa = side == 0 ? B_LFARM : B_RFARM, hb = side == 0 ? B_LHAND : B_RHAND;
+    Pose base = a.pose;
+    auto err = [&](const Pose& p) {
+        Pose saved = a.pose; a.pose = p;
+        Vector3 h = a.BonePos(hb, { 0, -0.07f, 0.01f });
+        a.pose = saved;
+        float d = Vector3Distance(h, target);
+        float reg = 0.02f * (fabsf(p.rot[ua].y - base.rot[ua].y) + fabsf(p.rot[fa].x - base.rot[fa].x) * 0.2f);
+        return d + reg;
+    };
+    Pose p = base;
+    float* vars[4] = { &p.rot[ua].x, &p.rot[ua].z, &p.rot[ua].y, &p.rot[fa].x };
+    float step = 0.35f;
+    float e = err(p);
+    for (int it = 0; it < 18; it++) {
+        for (float* v : vars) {
+            float old = *v;
+            *v = old + step; float e1 = err(p);
+            if (e1 < e) { e = e1; continue; }
+            *v = old - step; float e2 = err(p);
+            if (e2 < e) { e = e2; continue; }
+            *v = old;
+        }
+        p.rot[fa].x = Clamp(p.rot[fa].x, -2.6f, 0.0f);   // elbows only bend one way
+        step *= 0.62f;
+    }
+    a.pose.rot[ua] = Vector3Lerp(base.rot[ua], p.rot[ua], weight);
+    a.pose.rot[fa] = Vector3Lerp(base.rot[fa], p.rot[fa], weight);
+}
+
 void Actor::Draw() const {
     if (!visible || !model) return;
     Matrix m[B_COUNT];
     BoneMatrices(m);
-    for (const auto& p : model->parts) Rdr().DrawPart(p.mesh, p.mat, m[p.bone], tint, true);
+    for (const auto& p : model->parts) {
+        if (hideHead && (p.bone == B_HEAD || p.bone == B_NECK)) continue;
+        Rdr().DrawPart(p.mesh, p.mat, m[p.bone], tint, true);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -713,7 +763,7 @@ BodySpec SpecGrethnar() {
     return b;
 }
 BodySpec SpecDragger() {
-    BodySpec b; b.height = 2.3f; b.thin = 0.95f; b.limbLen = 1.2f; b.neckLen = 1.6f; b.fingerLen = 1.9f; b.shoulders = 0.9f;
+    BodySpec b; b.height = 2.3f; b.thin = 0.86f; b.limbLen = 1.18f; b.neckLen = 1.6f; b.fingerLen = 1.9f; b.shoulders = 0.9f;
     b.eyeSink = 1.0f; b.jawDrop = 0.9f; b.head = HEAD_HOLLOW; b.ribs = true; b.top = TOP_BARE; b.pants = false;
     b.hair = HAIR_BALD; b.skinMat = MAT_SKIN_GREY; b.barefoot = true; b.seed = 14;
     return b;

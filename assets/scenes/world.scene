@@ -62,8 +62,8 @@ road_sign -6.2 0 -58.0 0 text="BLACKWOOD COLLEGE|NEXT LEFT" style=brown w=2.2 h=
 road_sign 6.2 0 -70.0 180 text="SUMMIT VALLEY  12|ROUTE 9 NORTH" style=green w=2.4 h=1.1
 road_sign -6.0 0 90.0 0 text="CURVE|AHEAD" style=yellow w=0.9 h=0.9
 billboard 22.0 0 -95.0 -60 name=billboard
-guardrail 6.5 0 120.0 2 len=16
-guardrail 8.3 0 140.0 12 len=16
+guardrail 7.0 0 118.0 92 len=16
+guardrail 9.6 0 136.0 100 len=16
 
 # ---- power line along the east shoulder -------------------------------------
 power_pole 9.5 0 -180.0 0 line=A seq=0
@@ -92,8 +92,8 @@ fence_wood 60.0 0 -20.0 90 len=14 variant=2
 
 # ---- the crash site (north, where Route 9 bends right) -----------------------
 radio_tower 23.0 0 171.0 0 name=tower
-sedan 19.2 0 166.2 52 0 -2 state=wrecked color=blue name=wreck
-debris 18.0 0 164.0 0 variant=1 color=blue bumper=1
-debris 15.5 0 160.5 30 variant=2 color=blue
+sedan 19.2 0 166.2 52 0 -2 state=wrecked color=blue name=wreck tag=after_crash
+debris 18.0 0 164.0 0 variant=1 color=blue bumper=1 tag=after_crash
+debris 15.5 0 160.5 30 variant=2 color=blue tag=after_crash
 fence_wire 27.0 0 164.0 90 len=14 variant=4
 road_sign 22.5 0 158.0 180 text="DANGER|HIGH RF ENERGY" style=yellow w=0.9 h=0.7 post=1.4

@@ -22,10 +22,10 @@ struct Light {
 struct RenderSettings {
     // Atmosphere
     Vector3 moonDir = Vector3Normalize({ -0.35f, 0.55f, 0.45f });
-    Vector3 moonColor = { 0.050f, 0.060f, 0.085f };
-    Vector3 skyAmbient = { 0.010f, 0.012f, 0.018f };
-    Vector3 groundAmbient = { 0.006f, 0.005f, 0.005f };
-    Vector3 fogColor = { 0.020f, 0.023f, 0.030f };
+    Vector3 moonColor = { 0.12f, 0.14f, 0.19f };
+    Vector3 skyAmbient = { 0.020f, 0.024f, 0.034f };
+    Vector3 groundAmbient = { 0.010f, 0.009f, 0.009f };
+    Vector3 fogColor = { 0.034f, 0.039f, 0.050f };
     float fogDensity = 0.018f, fogHeightFalloff = 0.09f, fogBase = 0.0f, fogMax = 0.97f;
     Vector3 skyZenith = { 0.0015f, 0.002f, 0.004f };
     Vector3 skyHorizon = { 0.018f, 0.020f, 0.026f };
@@ -38,9 +38,9 @@ struct RenderSettings {
     bool sky = true;
     bool moonShadows = true;
     // Post
-    float exposure = 1.6f, bloom = 0.5f, bloomThreshold = 1.2f, grain = 0.05f, vignette = 0.55f, ca = 0.35f;
+    float exposure = 1.9f, bloom = 0.5f, bloomThreshold = 1.2f, grain = 0.05f, vignette = 0.55f, ca = 0.35f;
     float ascii = 0.0f, asciiFull = 0.0f, blink = 0.0f, fade = 0.0f, white = 0.0f, desat = 0.2f;
-    float redPulse = 0.0f, blur = 0.0f, gamma = 1.0f, brightness = 1.0f;
+    float redPulse = 0.0f, blur = 0.0f, gamma = 1.08f, brightness = 1.0f;
     Vector3 gradeShadow = { 0.2f, 0.45f, 0.6f }, gradeHigh = { 0.9f, 0.7f, 0.5f };
     float renderScale = 1.0f;
 };
