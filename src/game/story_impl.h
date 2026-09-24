@@ -189,3 +189,4 @@ void BuildCollegeDiscovery(Story::Impl& im, Script& s);
 void RegisterBelowActions(Story::Impl& im);
 void BuildEpilogue(Story::Impl& im, Script& s);
 void DrawFireTrail(Story::Impl& im);
+void StoryTestHook(Story::Impl& im, const std::string& what);

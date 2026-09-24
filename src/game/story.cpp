@@ -138,6 +138,7 @@ void Story::Impl::SetupWorldForChapter(int ch) {
     G_.SetTagVisible("after_crash", afterCrash);
     G_.SetTagVisible("below_open", ch >= CH_BELOW);
     G_.SetTagVisible("burnt", false);
+    for (auto& e : Scn().ents) e->tint = WHITE;   // undo the epilogue's char
     decals.Clear();
     if (afterCrash) {
         // Skid marks from the yank to the tower, blood at the wreck, and the drag trail to the hatch.
@@ -169,7 +170,7 @@ void Story::Impl::SetupWorldForChapter(int ch) {
     Weather& w = g.weather;
     w.rain = (ch == CH_SHIFT2) ? 0.7f : 0.0f;
     w.storm = (ch == CH_SHIFT2 || ch == CH_BURN) ? 0.6f : 0.0f;
-    w.fog = ch >= CH_SHIFT3 ? 1.35f : (ch >= CH_AWAKENING ? 1.15f : 0.9f);
+    w.fog = ch == CH_END ? 0.7f : ch >= CH_SHIFT3 ? 1.35f : (ch >= CH_AWAKENING ? 1.15f : 0.9f);
     w.wind = ch == CH_BURN ? 0.9f : 0.5f;
     float spiritFor[] = { 0.0f, 0.22f, 0.26f, 0.32f, 0.4f, 0.48f, 0.58f, 0.66f, 0.3f };
     g.spirit = spiritFor[ch < CH_END ? ch : CH_END];
@@ -192,6 +193,17 @@ void Story::Impl::SpawnCast(int ch) {
 }
 
 void Story::Begin(int ch) {
+    // every chapter starts from the same night sky (the epilogue's dawn must not leak into a replay)
+    {
+        static bool captured = false;
+        static RenderSettings night;
+        RenderSettings& r = Rdr().s;
+        if (!captured) { night = r; captured = true; }
+        r.moonDir = night.moonDir; r.moonColor = night.moonColor; r.moonBright = night.moonBright;
+        r.skyAmbient = night.skyAmbient; r.groundAmbient = night.groundAmbient; r.fogColor = night.fogColor;
+        r.skyZenith = night.skyZenith; r.skyHorizon = night.skyHorizon; r.glowColor = night.glowColor; r.glowDir = night.glowDir;
+        r.stars = night.stars; r.exposure = night.exposure; r.asciiFull = 0.0f; r.white = 0.0f;
+    }
     chapter = ch;
     G().chapter = ch;
     script.Clear();
@@ -220,7 +232,10 @@ void Story::Begin(int ch) {
 }
 
 void Story::Update(float dt) {
+    float prevT = impl->t;
     impl->t += dt;
+    if (prevT < 1.5f && impl->t >= 1.5f)
+        if (const char* th = getenv("WTGK_TEST")) StoryTestHook(*impl, th);   // headless test hook
     script.Update(dt);
     side.Update(dt);
     if (pendingChapter >= 0) { int ch = pendingChapter; pendingChapter = -1; Begin(ch); return; }

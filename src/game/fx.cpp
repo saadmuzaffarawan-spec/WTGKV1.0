@@ -117,6 +117,16 @@ void Particles::Draw(const Camera3D& cam) {
                 Vector3 dir = sp > 0.01f ? Vector3Scale(v, 1.0f / sp) : up;
                 Vector3 side = Vector3Normalize(Vector3CrossProduct(dir, fwd));
                 Quad(p.pos, Vector3Scale(side, p.size), Vector3Scale(dir, p.size + sp * 0.012f), c);
+            } else if (p.type == P_FIRE) {
+                // flame tongue: narrow, stretched up along its motion, licking thinner as it dies
+                Vector3 v = Vector3Add(p.vel, { 0, 0.8f, 0 });
+                float sp = Vector3Length(v);
+                Vector3 dir = Vector3Scale(v, 1.0f / sp);
+                Vector3 side = Vector3CrossProduct(dir, fwd);
+                float sl = Vector3Length(side);
+                side = sl > 0.01f ? Vector3Scale(side, 1.0f / sl) : right;
+                float lf2 = p.life / p.maxLife;
+                Quad(p.pos, Vector3Scale(side, p.size * (0.35f + 0.3f * lf2)), Vector3Scale(dir, p.size * 1.5f + sp * 0.05f), c);
             } else {
                 Quad(p.pos, Vector3Scale(right, p.size), Vector3Scale(up, p.size), c);
             }

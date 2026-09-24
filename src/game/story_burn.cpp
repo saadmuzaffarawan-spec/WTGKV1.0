@@ -33,8 +33,8 @@ static int FuelMat() {
 static int AshMat() {
     static int m = -1;
     if (m < 0) {
-        SurfaceMat s = Mat(MAT_DIRT);
-        s.name = "ash"; s.tint = Color{ 38, 35, 33, 255 };
+        SurfaceMat s = Mat(MAT_BLOOD_SMEAR);   // translucent, so the scorch fades into the ground
+        s.name = "ash"; s.tint = Color{ 26, 24, 23, 150 }; s.wet = 0.0f; s.rough = 1.0f;
         m = AddMaterial(s);
     }
     return m;
@@ -144,6 +144,7 @@ void Story::Impl::UpdateFire(float dt) {
         }
         if (canFuel <= 0.0f) { audio::Play("drip", 0.5f); g.hud.Hint("Empty. Fill it again at a pump.", 3.0f); }
     }
+    Rdr().s.white = Damp(Rdr().s.white, 0.0f, 3.0f, dt);
     if (!fireLit) return;
     fireT += dt;
     // spread: a burning puddle lights its neighbours after a moment
@@ -155,7 +156,8 @@ void Story::Impl::UpdateFire(float dt) {
         if (F.lit[i] < 13.0f) {
             burning++;
             nearest = fminf(nearest, Vector3Distance(trail[i], g.player.feet));
-            if (GetRandomValue(0, 100) < 22) fx.Emit(P_FIRE, Vector3Add(trail[i], { Frand(-0.3f, 0.3f), 0.1f, Frand(-0.3f, 0.3f) }), { Frand(-0.2f, 0.2f), Frand(1.2f, 2.4f), Frand(-0.2f, 0.2f) }, Frand(0.5f, 0.9f), Frand(0.25f, 0.5f), Color{ 255, 150, 60, 255 });
+            float str = Saturate(F.lit[i] * 2.0f) * Saturate((13.0f - F.lit[i]) / 4.0f);
+            if (GetRandomValue(0, 100) < (int)(55 * str)) fx.Emit(P_FIRE, Vector3Add(trail[i], { Frand(-0.35f, 0.35f), 0.05f, Frand(-0.3f, 0.3f) }), { Frand(-0.15f, 0.15f), Frand(1.0f, 2.2f), Frand(-0.15f, 0.15f) }, Frand(0.3f, 0.6f), Frand(0.1f, 0.2f) * (0.6f + str * 0.6f), Color{ 255, 130, 45, 200 });
             if (GetRandomValue(0, 100) < 6) fx.Emit(P_SMOKE, Vector3Add(trail[i], { 0, 1.2f, 0 }), { Frand(-0.2f, 0.2f), 1.2f, Frand(-0.2f, 0.2f) }, 4.0f, 0.8f, Color{ 30, 28, 26, 160 });
         }
         if (F.lit[i] > 0.35f)
@@ -165,7 +167,8 @@ void Story::Impl::UpdateFire(float dt) {
     // it reaches the things you soaked
     auto boom = [&](Vector3 p, const char* what) {
         F.bigFires.push_back(p); F.bigT.push_back(0);
-        fx.Burst(P_FIRE, Vector3Add(p, { 0, 1.0f, 0 }), 120, 7.0f, 1.4f, 0.8f, Color{ 255, 150, 60, 255 }, { 0, 4, 0 });
+        fx.Burst(P_FIRE, Vector3Add(p, { 0, 1.0f, 0 }), 160, 6.0f, 1.1f, 0.45f, Color{ 255, 140, 50, 220 }, { 0, 4, 0 });
+        fx.Burst(P_SMOKE, Vector3Add(p, { 0, 3.0f, 0 }), 30, 3.0f, 5.0f, 1.5f, Color{ 25, 22, 20, 200 }, { 0, 2, 0 });
         fx.Burst(P_SPARK, Vector3Add(p, { 0, 1.0f, 0 }), 80, 9.0f, 1.2f, 0.05f, Color{ 255, 200, 120, 255 });
         audio::Play3D("crash", p, 1.0f, 0.6f, 6.0f, 120.0f);
         audio::Play3D("fire_ignite", p, 1.0f, 0.7f, 6.0f, 120.0f);
@@ -199,8 +202,8 @@ void Story::Impl::UpdateFire(float dt) {
     for (size_t k = 0; k < F.bigFires.size(); k++) {
         F.bigT[k] += dt;
         Vector3 p = F.bigFires[k];
-        for (int n = 0; n < 2; n++)
-            fx.Emit(P_FIRE, Vector3Add(p, { Frand(-1.2f, 1.2f), Frand(0.2f, 1.5f), Frand(-1.2f, 1.2f) }), { Frand(-0.4f, 0.4f), Frand(2.0f, 4.5f), Frand(-0.4f, 0.4f) }, Frand(0.6f, 1.2f), Frand(0.6f, 1.3f), Color{ 255, 140, 50, 255 });
+        for (int n = 0; n < 5; n++)
+            fx.Emit(P_FIRE, Vector3Add(p, { Frand(-1.4f, 1.4f), Frand(0.0f, 1.2f), Frand(-1.4f, 1.4f) }), { Frand(-0.4f, 0.4f), Frand(2.0f, 4.0f), Frand(-0.4f, 0.4f) }, Frand(0.5f, 1.0f), Frand(0.25f, 0.55f), Color{ 255, 125, 40, 190 });
         if (GetRandomValue(0, 100) < 25) fx.Emit(P_SMOKE, Vector3Add(p, { Frand(-1, 1), 4.0f, Frand(-1, 1) }), { Frand(-0.3f, 0.6f), 2.2f, Frand(-0.3f, 0.3f) }, 7.0f, 2.2f, Color{ 22, 20, 19, 190 });
         if (GetRandomValue(0, 100) < 8) fx.Emit(P_EMBER, Vector3Add(p, { 0, 2.0f, 0 }), { Frand(-1, 1), Frand(2, 5), Frand(-1, 1) }, 3.0f, 0.03f, Color{ 255, 170, 90, 255 });
         nearest = fminf(nearest, Vector3Distance(p, g.player.feet) - 4.0f);
@@ -388,17 +391,29 @@ void BuildEpilogue(Story::Impl& im, Script& s) {
         pim->creatures.clear();
         // dawn: grey-pink light, no moon, everything that burned still smoking
         auto& r = Rdr().s;
-        r.moonColor = { 0.20f, 0.17f, 0.16f };
-        r.moonDir = Vector3Normalize({ 0.8f, 0.18f, 0.2f });
-        r.skyAmbient = { 0.07f, 0.065f, 0.07f };
-        r.groundAmbient = { 0.03f, 0.025f, 0.022f };
-        r.fogColor = { 0.16f, 0.14f, 0.14f };
-        r.skyZenith = { 0.05f, 0.07f, 0.11f };
-        r.skyHorizon = { 0.32f, 0.22f, 0.2f };
+        r.moonColor = { 1.2f, 0.88f, 0.72f };   // a low, cold sun through smoke
+        r.moonDir = Vector3Normalize({ 0.8f, 0.22f, 0.2f });
+        r.moonBright = 1.0f;
+        r.skyAmbient = { 0.34f, 0.32f, 0.36f };
+        r.groundAmbient = { 0.12f, 0.10f, 0.09f };
+        r.fogColor = { 0.42f, 0.38f, 0.38f };
+        r.exposure = 2.3f;
+        r.skyZenith = { 0.10f, 0.13f, 0.2f };
+        r.skyHorizon = { 0.55f, 0.38f, 0.32f };
+        r.glowColor = { 0.3f, 0.12f, 0.05f };
+        r.glowDir = { 0.8f, 0.0f, 0.2f };
         r.stars = 0.0f;
         for (const char* grp : { "store", "storage", "store_sign", "open_sign", "canopy", "station", "street" }) Scn().SetLightGroup(grp, false);
         Vector3 h = HatchP();
-        for (Vector3 p : { PumpsP(), StoreDoorP(), h }) pim->decals.Pool({ p.x, 0, p.z }, 5.5f, AshMat(), (uint32_t)(p.x * 10), 1.3f);
+        for (Vector3 p : { PumpsP(), StoreDoorP() }) pim->decals.Pool({ p.x, 0, p.z }, 3.2f, AshMat(), (uint32_t)(p.x * 10), 1.3f);
+        pim->decals.Pool({ h.x, 0, h.z }, 1.6f, AshMat(), 31, 1.2f);
+        // everything that caught is charred
+        for (auto& e : Scn().ents) {
+            const std::string& pf = e->prefab;
+            if (pf == "store_building" || pf == "gas_canopy" || pf == "gas_pump" || pf == "pump_island" || pf == "price_sign" ||
+                pf == "store_counter" || pf == "store_shelf" || pf == "coolers" || pf == "door_glass" || pf == "tank_hatch")
+                e->tint = Color{ 70, 64, 60, 255 };
+        }
         pim->decals.Pool({ h.x - 1.2f, 0, h.z + 1.0f }, 0.9f, AshMat(), 77, 2.0f, 0.4f);   // where he was
         Actor* z = gg.SpawnActor("zain", SpecZain(), Vector3Add(h, { -0.4f, 0, 1.9f }), 200.0f);
         z->pos.y = SurfaceY(z->pos.x, z->pos.z, z->pos.y + 1.0f);
@@ -413,7 +428,7 @@ void BuildEpilogue(Story::Impl& im, Script& s) {
     s.Run([pim, &gg](float t, float dt) {
         if (Actor* z = gg.A("zain")) z->SetPose(PoseCry(t));
         for (Vector3 p : { PumpsP(), StoreDoorP() })
-            if (GetRandomValue(0, 100) < 20) pim->fx.Emit(P_SMOKE, Vector3Add(p, { Frand(-2, 2), 1.0f, Frand(-2, 2) }), { Frand(0.1f, 0.5f), 1.2f, 0 }, 9.0f, 2.5f, Color{ 60, 58, 58, 120 });
+            if (GetRandomValue(0, 100) < 20) pim->fx.Emit(P_SMOKE, Vector3Add(p, { Frand(-2, 2), 1.0f, Frand(-2, 2) }), { Frand(0.1f, 0.5f), 1.2f, 0 }, 9.0f, 2.0f, Color{ 120, 116, 114, 60 });
         if (fmodf(t, 3.1f) < dt && t < 20.0f) audio::Play("breath_out", 0.35f, 1.5f);   // sobbing, small
         Rdr().s.asciiFull = Saturate((t - 18.0f) / 14.0f);
         return t > 33.0f;
@@ -438,4 +453,23 @@ void BuildEpilogue(Story::Impl& im, Script& s) {
         gg.mode = Mode::Credits;
         CreditsEnter();
     });
+}
+
+// Test hook for headless screenshots (WTGK_TEST=cow|fire), fired once shortly after a chapter begins.
+void StoryTestHook(Story::Impl& im, const std::string& what) {
+    Game& g = im.g;
+    Vector3 f = Vector3Add(g.player.feet, Vector3Scale(Flat(g.player.Forward()), 5.0f));
+    if (what == "cow") {
+        im.AddCreature("cow", 1, f);
+        if (Creature* c = im.FindCreature("cow")) { c->yaw = g.player.yaw + PI; c->hitCd = 99; }
+    } else if (what == "fire") {
+        Vector3 a = g.player.feet, b = PumpsP();
+        for (float u = 0; u <= 1.0f; u += 0.02f) {
+            Vector3 p = Vector3Lerp(a, b, u);
+            p.x += sinf(u * 20) * 0.5f;
+            p.y = SurfaceY(p.x, p.z, 50.0f);
+            im.trail.push_back(p); im.trailFire.push_back(0); F.lit.push_back(u < 0.02f ? 0.0f : -1.0f); F.yaw.push_back(u * 40);
+        }
+        im.fireLit = true;
+    }
 }
