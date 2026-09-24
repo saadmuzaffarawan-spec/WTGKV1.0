@@ -5,6 +5,7 @@
 #include "common.h"
 #include <map>
 #include <memory>
+#include <functional>
 
 struct MeshAsset {
     Mesh mesh{};
@@ -82,6 +83,8 @@ public:
     void SetColor(Color c);                  // vertex tint for subsequent geometry (all groups)
     void Flex(float f);                      // foliage flex weight (alpha channel)
     Model3D* Build(bool castShadow = true);  // upload all groups; registers model
+    // Deform every vertex added so far (e.g. crumpled wreck); optionally recompute flat normals.
+    void Deform(const std::function<Vector3(Vector3)>& fn, bool flatNormals);
 private:
     std::map<int, std::unique_ptr<MeshBuilder>> groups_;
     std::vector<Matrix> stack_;

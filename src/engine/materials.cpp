@@ -56,9 +56,9 @@ void InitMaterials() {
     set(MAT_CLOTH_BROWN, Mk("cloth_brown", TX_CLOTH, Color{ 100, 78, 58, 255 }, 2.0f));
     set(MAT_CLOTH_WHITE, Mk("cloth_white", TX_CLOTH, Color{ 210, 205, 195, 255 }, 2.0f));
     set(MAT_DENIM, Mk("denim", TX_CLOTH, Color{ 58, 72, 100, 255 }, 3.0f));
-    { SurfaceMat s = Mk("skin", TX_SKIN, Color{ 225, 190, 165, 255 }, 3.0f, 0.9f); s.wrap = 0.45f; set(MAT_SKIN, s); }
-    { SurfaceMat s = Mk("skin_dead", TX_SKIN, Color{ 170, 170, 150, 255 }, 3.0f, 0.7f); s.wrap = 0.35f; set(MAT_SKIN_DEAD, s); }
-    { SurfaceMat s = Mk("skin_grey", TX_SKIN, Color{ 120, 118, 112, 255 }, 3.0f, 0.5f); s.wrap = 0.3f; s.wet = 0.3f; set(MAT_SKIN_GREY, s); }
+    { SurfaceMat s = Mk("skin", TX_SKIN, Color{ 206, 184, 168, 255 }, 3.0f, 1.6f, 0.0f, 0.6f); s.wrap = 0.3f; set(MAT_SKIN, s); }
+    { SurfaceMat s = Mk("skin_dead", TX_SKIN, Color{ 175, 185, 175, 255 }, 3.0f, 1.1f, 0.0f, 0.6f); s.wrap = 0.4f; set(MAT_SKIN_DEAD, s); }
+    { SurfaceMat s = Mk("skin_grey", TX_SKIN, Color{ 110, 128, 132, 255 }, 3.0f, 0.8f, 0.0f, 0.8f); s.wrap = 0.3f; s.wet = 0.25f; set(MAT_SKIN_GREY, s); }
     set(MAT_HAIR, Mk("hair", TX_CLOTH, Color{ 30, 24, 20, 255 }, 6.0f, 0.7f));
     set(MAT_BARK, Mk("bark", TX_BARK, WHITE, 0.9f));
     set(MAT_BARK_DARK, Mk("bark_dark", TX_BARK, Color{ 110, 100, 95, 255 }, 0.9f));

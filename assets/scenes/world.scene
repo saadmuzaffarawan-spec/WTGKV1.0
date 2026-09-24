@@ -89,3 +89,11 @@ log 48.0 0 22.0 35 variant=0
 bush 36.0 0 18.0 0 variant=1
 bush 12.0 0 -26.0 0 variant=3
 fence_wood 60.0 0 -20.0 90 len=14 variant=2
+
+# ---- the crash site (north, where Route 9 bends right) -----------------------
+radio_tower 23.0 0 171.0 0 name=tower
+sedan 19.2 0 166.2 52 0 -2 state=wrecked color=blue name=wreck
+debris 18.0 0 164.0 0 variant=1 color=blue bumper=1
+debris 15.5 0 160.5 30 variant=2 color=blue
+fence_wire 27.0 0 164.0 90 len=14 variant=4
+road_sign 22.5 0 158.0 180 text="DANGER|HIGH RF ENERGY" style=yellow w=0.9 h=0.7 post=1.4

@@ -359,3 +359,26 @@ void UnloadAllMeshes() {
     g_meshes.clear();
     g_models.clear();
 }
+
+void ModelBuilder::Deform(const std::function<Vector3(Vector3)>& fn, bool flatNormals) {
+    for (auto& kv : groups_) {
+        MeshBuilder& m = *kv.second;
+        size_t n = m.VertexCount();
+        for (size_t i = 0; i < n; i++) {
+            Vector3 p{ m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2] };
+            p = fn(p);
+            m.pos[i * 3] = p.x; m.pos[i * 3 + 1] = p.y; m.pos[i * 3 + 2] = p.z;
+        }
+        if (!flatNormals) continue;
+        for (size_t t = 0; t + 2 < n; t += 3) {
+            Vector3 a{ m.pos[t * 3], m.pos[t * 3 + 1], m.pos[t * 3 + 2] };
+            Vector3 b{ m.pos[t * 3 + 3], m.pos[t * 3 + 4], m.pos[t * 3 + 5] };
+            Vector3 c{ m.pos[t * 3 + 6], m.pos[t * 3 + 7], m.pos[t * 3 + 8] };
+            Vector3 nn = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+            // keep the original orientation hemisphere
+            Vector3 old{ m.nrm[t * 3], m.nrm[t * 3 + 1], m.nrm[t * 3 + 2] };
+            if (Vector3DotProduct(nn, old) < 0) nn = Vector3Negate(nn);
+            for (int k = 0; k < 3; k++) { m.nrm[(t + k) * 3] = nn.x; m.nrm[(t + k) * 3 + 1] = nn.y; m.nrm[(t + k) * 3 + 2] = nn.z; }
+        }
+    }
+}

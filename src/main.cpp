@@ -4,6 +4,7 @@
 #include "engine/ui.h"
 #include "game/vegetation.h"
 #include "game/prefab_util.h"
+#include "game/characters.h"
 #include <rlgl.h>
 #include <cstring>
 #include <cstdlib>
@@ -44,6 +45,20 @@ int main(int argc, char** argv) {
     camPos.y += World().Height(camPos.x, camPos.z);
     printf("entities=%zu terrainH=%.2f boxes=%zu\n", Scn().ents.size(), World().Height(camPos.x, camPos.z), Phys().Boxes().size());
 
+    std::vector<Actor> cast;
+    bool lineup = false;
+    for (int i = 1; i < argc; i++) if (!strcmp(argv[i], "--lineup")) lineup = true;
+    if (lineup) {
+        BodySpec specs[] = { SpecAdam(), SpecZain(), SpecGrethnar(), SpecDragger(), SpecOldMan(), SpecCustomer(3), SpecCrawler(4), SpecPigMan(5), SpecGoatMan(6) };
+        int n = 0;
+        for (auto& sp : specs) {
+            Actor a; a.model = BuildCharacter(sp);
+            a.pos = { 14.0f + n * 1.4f, World().Height(14.0f + n * 1.4f, -8.0f) + 0.03f, -8.0f };
+            a.yaw = PI;
+            a.SetPose(n == 6 ? PoseCrawl(0.2f) : (n == 3 ? PoseWalk(0.25f, 1.0f, 1) : PoseStand(0)), true);
+            cast.push_back(a); n++;
+        }
+    }
     int frame = 0;
     if (!shot) DisableCursor();
     while (!WindowShouldClose()) {
@@ -63,6 +78,10 @@ int main(int argc, char** argv) {
         Scn().Update(dt);
         Rdr().BeginFrame(cam, (float)GetTime());
         Scn().SubmitLights(camPos);
+        if (lineup) {
+            Light key; key.pos = Vector3Add(camPos, { 0.8f, 0.5f, 0.3f }); key.color = { 1.0f, 0.9f, 0.8f }; key.intensity = 3.0f; key.range = 6.0f;
+            Rdr().AddLight(key);
+        }
         if (flash) {
             Light fl; fl.spot = true; fl.pos = Vector3Add(camPos, Vector3Add(Vector3Scale(right, 0.2f), { 0, -0.2f, 0 })); fl.dir = fwd;
             fl.color = { 1.0f, 0.93f, 0.8f }; fl.intensity = 30; fl.range = 28; fl.innerDeg = 10; fl.outerDeg = 24; fl.shadow = true; fl.volumetric = 0.25f;
@@ -71,6 +90,7 @@ int main(int argc, char** argv) {
         World().Draw();
         Veg().Draw(camPos);
         Scn().Draw();
+        for (auto& a : cast) a.Draw();
         Rdr().Render();
         BeginDrawing();
         ClearBackground(BLACK);

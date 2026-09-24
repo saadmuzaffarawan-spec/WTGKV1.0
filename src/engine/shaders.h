@@ -81,7 +81,7 @@ vec3 Scatter(vec3 ro, vec3 rd, float dist, vec2 fragXY) {
         } else {
             // Spot light: short ray-march with the spot cone (and its shadow)
             float maxT = min(dist, range);
-            const int STEPS = 10;
+            const int STEPS = 12;
             float stepL = maxT / float(STEPS);
             vec3 sum = vec3(0.0);
             for (int s = 0; s < STEPS; s++) {
@@ -249,7 +249,7 @@ void main() {
         w /= max(w.r + w.g + w.b, 0.001);
         TriplanarAT(texture0, texture2, vWorldPos, n0, sc, uMat2.x, A1, N1, o1);
         TriplanarAT(texture3, texture4, vWorldPos, n0, sc * 1.3, uMat2.x, A2, N2, o2);
-        TriplanarAT(texture5, texture6, vWorldPos, n0, sc * 1.1, uMat2.x, A3, N3, o3);
+        TriplanarAT(texture5, texture6, vWorldPos, n0, sc * 3.4, uMat2.x, A3, N3, o3);
         // height-aware blend so dirt shows between grass tufts
         float h1 = A1.g + w.r * 1.2, h2 = (1.0 - A2.g) * 0.6 + w.g * 1.2, h3 = A3.r + w.b * 1.2;
         float mx = max(h1, max(h2, h3)) - 0.25;
