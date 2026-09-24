@@ -40,6 +40,12 @@ set(WTGK_SOURCES
     src/systems/procedural_shop_assets.cpp
     src/systems/cctv_surveillance.cpp
     src/systems/hud_manager.cpp
+    src/systems/atm_system.cpp
+    src/systems/intro_cinematic.cpp
+    src/systems/main_menu_system.cpp
+    src/systems/phone_system.cpp
+    src/systems/grethnar_system.cpp
+    src/core/game_context.cpp
 )
 
 if(WIN32)

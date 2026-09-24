@@ -1,5 +1,6 @@
 #include "systems/grethnar_system.h"
 #include "raymath.h"
+#include "rlgl.h"
 #include <algorithm>
 
 GrethnarSystem::GrethnarSystem() {}
@@ -67,11 +68,13 @@ void GrethnarSystem::Update(float dt, Vector3 playerPos, Vector3 playerCamFwd, b
             m_state = GRETHNAR_JUMPSCARE;
             m_jumpscareTimer = 0.45f;
             m_jumpscareShake = 0.85f;
+            m_jumpscareFov = 38.0f;
             PlaySound(g_sndJumpscare);
         }
     } else if (m_state == GRETHNAR_JUMPSCARE) {
         m_jumpscareTimer -= dt;
         m_jumpscareShake = Lerp(m_jumpscareShake, 0.0f, dt * 6.0f);
+        m_jumpscareFov = Lerp(m_jumpscareFov, 60.0f, dt * 7.0f);
         if (m_jumpscareTimer <= 0.0f) {
             m_state = GRETHNAR_NORMAL;
             m_stareTimer = 0.0f;
@@ -113,8 +116,9 @@ void GrethnarSystem::Draw(float timeVal) {
     rlPushMatrix();
     rlTranslatef(m_npcPos.x, m_npcPos.y, m_npcPos.z);
 
-    // Draw the NPC base
-    DrawCylinder({0,0,0}, 0.22f, 0.27f, 1.95f, 14, ApplyShopLighting(m_npcPos, { 16, 16, 18, 255 }));
+    // Draw the NPC base (Raylib DrawCylinder is centered at the given pos)
+    // Height is 2.2m. Center should be Y = 1.1f.
+    DrawCylinder({0, 1.1f, 0}, 0.25f, 0.25f, 2.2f, 14, ApplyShopLighting(m_npcPos, { 12, 12, 14, 255 }));
 
     // Draw eyes
     float curEyeRad = 0.042f * m_eyeScale;
@@ -128,30 +132,30 @@ void GrethnarSystem::Draw(float timeVal) {
         Color engorgedSclera = { (unsigned char)(145 * throb), 8, 12, 255 };
         Color veinCol = { (unsigned char)(85 * throb), 4, 6, 255 };
 
-        DrawSphere({ -0.09f, 0.27f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
-        DrawSphere({  0.09f, 0.27f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
-        DrawSphereWires({ -0.09f, 0.27f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
-        DrawSphereWires({  0.09f, 0.27f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
+        DrawSphere({ -0.09f, 2.2f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
+        DrawSphere({  0.09f, 2.2f, 0.222f }, curEyeRad * 1.08f, engorgedSclera);
+        DrawSphereWires({ -0.09f, 2.2f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
+        DrawSphereWires({  0.09f, 2.2f, 0.222f }, curEyeRad * 1.10f, 8, 8, veinCol);
 
         for (int v = 0; v < 6; v++) {
             float ang = v * 60.0f * DEG2RAD;
             float vx = cosf(ang) * curEyeRad * 1.10f;
             float vy = sinf(ang) * curEyeRad * 1.10f;
-            DrawLine3D({ -0.09f, 0.27f, 0.22f }, { -0.09f + vx, 0.27f + vy, 0.222f }, veinCol);
-            DrawLine3D({  0.09f, 0.27f, 0.22f }, {  0.09f + vx, 0.27f + vy, 0.222f }, veinCol);
+            DrawLine3D({ -0.09f, 2.2f, 0.22f }, { -0.09f + vx, 2.2f + vy, 0.222f }, veinCol);
+            DrawLine3D({  0.09f, 2.2f, 0.22f }, {  0.09f + vx, 2.2f + vy, 0.222f }, veinCol);
         }
     }
 
-    DrawSphere({ -0.09f, 0.27f, 0.222f }, curEyeRad, eyeballCol);
-    DrawSphere({  0.09f, 0.27f, 0.222f }, curEyeRad, eyeballCol);
-    DrawSphere({ -0.09f, 0.27f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
-    DrawSphere({  0.09f, 0.27f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
+    DrawSphere({ -0.09f, 2.2f, 0.222f }, curEyeRad, eyeballCol);
+    DrawSphere({  0.09f, 2.2f, 0.222f }, curEyeRad, eyeballCol);
+    DrawSphere({ -0.09f, 2.2f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
+    DrawSphere({  0.09f, 2.2f, 0.222f + curEyeRad * 0.72f }, curEyeRad * 0.38f, pupilCol);
 
     if (isBloody) {
         float blLen = m_bloodIntensity * 0.16f;
         Color bCol = { 135, 8, 14, 255 };
-        DrawCylinderEx({ -0.09f, 0.27f, 0.235f }, { -0.09f, 0.27f - blLen, 0.230f }, 0.012f * m_bloodIntensity, 0.006f, 6, bCol);
-        DrawCylinderEx({  0.09f, 0.27f, 0.235f }, {  0.09f, 0.27f - blLen, 0.230f }, 0.012f * m_bloodIntensity, 0.006f, 6, bCol);
+        DrawCylinderEx({ -0.09f, 2.2f, 0.235f }, { -0.09f, 2.2f - blLen, 0.230f }, 0.012f * m_bloodIntensity, 0.006f, 6, bCol);
+        DrawCylinderEx({  0.09f, 2.2f, 0.235f }, {  0.09f, 2.2f - blLen, 0.230f }, 0.012f * m_bloodIntensity, 0.006f, 6, bCol);
     }
 
     rlPopMatrix();

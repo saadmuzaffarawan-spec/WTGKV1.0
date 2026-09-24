@@ -20,13 +20,13 @@ void InitProceduralShopAssets() {
 
 
 
-    g_milkTexRT  = GenerateGlyphTexture("~", (Color){ 245, 245, 250, 255 },
+    g_milkTexRT  = GenerateGlyphTexture("~", Color{ 245, 245, 250, 255 },
 
-                                             (Color){ 220, 225, 235, 255 }, 256, 26, 3);
+                                             Color{ 220, 225, 235, 255 }, 256, 26, 3);
 
-    g_bloodTexRT = GenerateGlyphTexture("~", (Color){ 70, 4, 6, 255 },
+    g_bloodTexRT = GenerateGlyphTexture("~", Color{ 70, 4, 6, 255 },
 
-                                             (Color){ 150, 10, 14, 255 }, 256, 26, 3);
+                                             Color{ 150, 10, 14, 255 }, 256, 26, 3);
 
     g_crustTexRT = GenerateCrustTexture(256);
 
@@ -106,7 +106,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "Sparrow's milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
+        it.label = "Whole Milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
 
     }
 
@@ -120,7 +120,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "B+ Blood"; it.price = "$6.66"; g_shopProducts.push_back(it);
+        it.label = "Black Cherry Soda"; it.price = "$2.49"; g_shopProducts.push_back(it);
 
     }
 
@@ -152,7 +152,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "B+ Blood"; it.price = "$6.66"; g_shopProducts.push_back(it);
+        it.label = "Black Cherry Soda"; it.price = "$2.49"; g_shopProducts.push_back(it);
 
     }
 
@@ -180,7 +180,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "Sparrow's milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
+        it.label = "Whole Milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
 
     }
 
@@ -228,7 +228,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "B+ Blood"; it.price = "$6.66"; g_shopProducts.push_back(it);
+        it.label = "Black Cherry Soda"; it.price = "$2.49"; g_shopProducts.push_back(it);
 
     }
 
@@ -270,7 +270,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "Sparrow's milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
+        it.label = "Whole Milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
 
     }
 
@@ -288,7 +288,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "Sparrow's milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
+        it.label = "Whole Milk"; it.price = "$3.25"; g_shopProducts.push_back(it);
 
     }
 
@@ -302,7 +302,7 @@ void InitProceduralShopAssets() {
 
         it.fill = 0.5f; it.spawnTimer = 0.0f; it.spawnedCount = 0; it.maxSpawn = 50;
 
-        it.label = "B+ Blood"; it.price = "$6.66"; g_shopProducts.push_back(it);
+        it.label = "Black Cherry Soda"; it.price = "$2.49"; g_shopProducts.push_back(it);
 
     }
 

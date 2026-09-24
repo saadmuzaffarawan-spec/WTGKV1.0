@@ -66,17 +66,17 @@ void DrawShovelUI(int offsetX, int offsetY) {
 
             // Glow effect
 
-            DrawText(TextFormat("%c", c), px - 1, py, 26, (Color){0, 200, 255, 100});
+            DrawText(TextFormat("%c", c), px - 1, py, 26, Color{0, 200, 255, 100});
 
-            DrawText(TextFormat("%c", c), px + 1, py, 26, (Color){0, 200, 255, 100});
+            DrawText(TextFormat("%c", c), px + 1, py, 26, Color{0, 200, 255, 100});
 
-            DrawText(TextFormat("%c", c), px, py - 1, 26, (Color){0, 200, 255, 100});
+            DrawText(TextFormat("%c", c), px, py - 1, 26, Color{0, 200, 255, 100});
 
-            DrawText(TextFormat("%c", c), px, py + 1, 26, (Color){0, 200, 255, 100});
+            DrawText(TextFormat("%c", c), px, py + 1, 26, Color{0, 200, 255, 100});
 
             // Core
 
-            DrawText(TextFormat("%c", c), px, py, 26, (Color){150, 255, 255, 255});
+            DrawText(TextFormat("%c", c), px, py, 26, Color{150, 255, 255, 255});
 
         }
 
@@ -150,25 +150,25 @@ void DrawLanternUI(int offsetX, int offsetY, float timeVal) {
 
                 // Bright Green Light Glow
 
-                DrawText(TextFormat("%c", c), px - 2, py, 32, (Color){50, 255, 50, 80});
+                DrawText(TextFormat("%c", c), px - 2, py, 32, Color{50, 255, 50, 80});
 
-                DrawText(TextFormat("%c", c), px + 2, py, 32, (Color){50, 255, 50, 80});
+                DrawText(TextFormat("%c", c), px + 2, py, 32, Color{50, 255, 50, 80});
 
-                DrawText(TextFormat("%c", c), px, py - 2, 32, (Color){50, 255, 50, 80});
+                DrawText(TextFormat("%c", c), px, py - 2, 32, Color{50, 255, 50, 80});
 
-                DrawText(TextFormat("%c", c), px, py + 2, 32, (Color){50, 255, 50, 80});
+                DrawText(TextFormat("%c", c), px, py + 2, 32, Color{50, 255, 50, 80});
 
-                DrawText(TextFormat("%c", c), px, py, 32, (Color){200, 255, 200, 255});
+                DrawText(TextFormat("%c", c), px, py, 32, Color{200, 255, 200, 255});
 
             } else {
 
                 // Cyan Hand Glow
 
-                DrawText(TextFormat("%c", c), px - 1, py, 26, (Color){0, 200, 255, 100});
+                DrawText(TextFormat("%c", c), px - 1, py, 26, Color{0, 200, 255, 100});
 
-                DrawText(TextFormat("%c", c), px + 1, py, 26, (Color){0, 200, 255, 100});
+                DrawText(TextFormat("%c", c), px + 1, py, 26, Color{0, 200, 255, 100});
 
-                DrawText(TextFormat("%c", c), px, py, 26, (Color){150, 255, 255, 255});
+                DrawText(TextFormat("%c", c), px, py, 26, Color{150, 255, 255, 255});
 
             }
 

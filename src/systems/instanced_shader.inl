@@ -123,6 +123,10 @@ void main()
 
         vec3 ambient = mix(vec3(0.035, 0.045, 0.070), vec3(0.40, 0.42, 0.46), dayFactor);
 
+        if (isFoliage > 2.5) {
+            // Player character visibility floor: preserve crisp, readable silhouette at night
+            ambient = max(ambient, vec3(0.45, 0.48, 0.55));
+        }
         fragColor.rgb *= (ambient + directSun + directMoon);
 
     }
@@ -306,15 +310,10 @@ void main()
     
 
     if (texColor.a < 0.1) {
-
         discard;
-
     } else {
-
         finalColor = texColor * fragColor;
-
     }
-
 }
 
 )";

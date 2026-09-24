@@ -34,13 +34,15 @@ struct GhostCart {
     float waitTimer;
     int itemsInCart;
     bool active;
+    float rattleTimer;
+    float rattleIntensity;
 };
 
 extern ShopLightingContext g_shopLighting;
 extern GhostCart g_ghostCart;
 
 void SetShopLight(int idx, Vector3 pos, Color color, float intensity, float radius);
-Color ApplyShopLighting(Vector3 pos, Color baseAlbedo, Vector3 normal = (Vector3){ 0.0f, 1.0f, 0.0f }, int occludeAisle = 0);
+Color ApplyShopLighting(Vector3 pos, Color baseAlbedo, Vector3 normal = Vector3{ 0.0f, 1.0f, 0.0f }, int occludeAisle = 0);
 float GetShopLightFactorAt(Vector3 pos);
 
 // In-store item rendering & cart functions

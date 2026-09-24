@@ -13,7 +13,7 @@ static float g_playerBloodStainTimer = 0.0f;
 void InitFootprints() {
     memset(g_footprints, 0, sizeof(g_footprints));
     g_footprintHead = 0;
-    g_lastFootprintPos = (Vector3){ 0.0f, -999.0f, 0.0f };
+    g_lastFootprintPos = Vector3{ 0.0f, -999.0f, 0.0f };
     g_nextFootLeft = false;
     g_playerBloodStainTimer = 0.0f;
 }
@@ -26,8 +26,8 @@ void UpdateFootprints(Vector3 camPos, Vector3 viewDir, bool onGround, float hitS
         float distMoved = Vector2Distance(curXZ, lastXZ);
         if (distMoved >= 0.65f) {
             g_lastFootprintPos = camPos;
-            Vector3 fwdH = Vector3Normalize((Vector3){ viewDir.x, 0.0f, viewDir.z });
-            if (Vector3Length(fwdH) < 0.05f) fwdH = (Vector3){ 0.0f, 0.0f, 1.0f };
+            Vector3 fwdH = Vector3Normalize(Vector3{ viewDir.x, 0.0f, viewDir.z });
+            if (Vector3Length(fwdH) < 0.05f) fwdH = Vector3{ 0.0f, 0.0f, 1.0f };
             Vector3 rightH = { -fwdH.z, 0.0f, fwdH.x };
 
             float sideSign = g_nextFootLeft ? -1.0f : 1.0f;
@@ -54,7 +54,7 @@ void UpdateFootprints(Vector3 camPos, Vector3 viewDir, bool onGround, float hitS
             bool isBloody = (g_playerBloodStainTimer > 0.0f);
 
             FootprintDecal& fp = g_footprints[g_footprintHead];
-            fp.pos = (Vector3){ camPos.x + rightH.x * sideDist * sideSign, floorY + 0.018f, camPos.z + rightH.z * sideDist * sideSign };
+            fp.pos = Vector3{ camPos.x + rightH.x * sideDist * sideSign, floorY + 0.018f, camPos.z + rightH.z * sideDist * sideSign };
             fp.yaw = fYaw;
             fp.life = 8.0f; // Dissolves smoothly over 8 seconds!
             fp.maxLife = 8.0f;
@@ -90,25 +90,25 @@ void DrawFootprints() {
             Color bloodSole = { 135, 12, 18, a };
             Color bloodHeel = { 95, 8, 12, a };
             // Sole
-            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, bloodSole);
+            DrawCube(Vector3{ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, bloodSole);
             // Heel
-            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, bloodHeel);
+            DrawCube(Vector3{ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, bloodHeel);
             // Splatter droplets
             Color dripCol = { 110, 10, 14, (unsigned char)(a * 0.75f) };
-            DrawCube((Vector3){ fp.isLeft ? -0.065f : 0.065f, 0.001f, 0.02f }, 0.025f, 0.002f, 0.025f, dripCol);
-            DrawCube((Vector3){ fp.isLeft ? -0.08f : 0.08f, 0.001f, -0.02f }, 0.018f, 0.002f, 0.018f, dripCol);
+            DrawCube(Vector3{ fp.isLeft ? -0.065f : 0.065f, 0.001f, 0.02f }, 0.025f, 0.002f, 0.025f, dripCol);
+            DrawCube(Vector3{ fp.isLeft ? -0.08f : 0.08f, 0.001f, -0.02f }, 0.018f, 0.002f, 0.018f, dripCol);
         } else {
             unsigned char a = (unsigned char)(alphaRatio * 155.0f);
             Color treadCol = { 26, 24, 22, a };
             Color ridgeCol = { 14, 12, 11, (unsigned char)(a * 0.85f) };
             // Sole
-            DrawCube((Vector3){ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, treadCol);
+            DrawCube(Vector3{ 0.0f, 0.001f, 0.055f }, 0.10f, 0.002f, 0.14f, treadCol);
             // Heel
-            DrawCube((Vector3){ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, treadCol);
+            DrawCube(Vector3{ 0.0f, 0.001f, -0.065f }, 0.085f, 0.002f, 0.075f, treadCol);
             // Tread grooves
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.025f }, 0.09f, 0.002f, 0.015f, ridgeCol);
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.065f }, 0.09f, 0.002f, 0.015f, ridgeCol);
-            DrawCube((Vector3){ 0.0f, 0.0015f, 0.105f }, 0.08f, 0.002f, 0.015f, ridgeCol);
+            DrawCube(Vector3{ 0.0f, 0.0015f, 0.025f }, 0.09f, 0.002f, 0.015f, ridgeCol);
+            DrawCube(Vector3{ 0.0f, 0.0015f, 0.065f }, 0.09f, 0.002f, 0.015f, ridgeCol);
+            DrawCube(Vector3{ 0.0f, 0.0015f, 0.105f }, 0.08f, 0.002f, 0.015f, ridgeCol);
         }
         rlPopMatrix();
     }

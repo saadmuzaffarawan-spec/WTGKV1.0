@@ -16,28 +16,28 @@ static float ReceiptFrand(float lo, float hi) {
 // Real-world Authentic Super Mart Thermal Receipt:
 // Pure bright thermal paper white, prominent heading main text, total price below,
 // NO grocery items mentioned, and terrifying arterial blood stains.
-Texture2D BuildReceiptTexture(void)
+Texture2D BuildReceiptTexture(const char* stalkerWarning)
 {
     const int TEX_W = 380;
     const int TEX_H = 760;
 
     // Pure thermal paper white background
-    Image paper = GenImageColor(TEX_W, TEX_H, (Color){ 252, 252, 250, 255 });
+    Image paper = GenImageColor(TEX_W, TEX_H, Color{ 252, 252, 250, 255 });
 
     // Realistic thermal paper edge margin shading
     for (int y = 0; y < TEX_H; y++) {
-        ImageDrawPixel(&paper, 0, y, (Color){ 220, 220, 215, 255 });
-        ImageDrawPixel(&paper, 1, y, (Color){ 235, 235, 230, 255 });
-        ImageDrawPixel(&paper, TEX_W - 2, y, (Color){ 235, 235, 230, 255 });
-        ImageDrawPixel(&paper, TEX_W - 1, y, (Color){ 220, 220, 215, 255 });
+        ImageDrawPixel(&paper, 0, y, Color{ 220, 220, 215, 255 });
+        ImageDrawPixel(&paper, 1, y, Color{ 235, 235, 230, 255 });
+        ImageDrawPixel(&paper, TEX_W - 2, y, Color{ 235, 235, 230, 255 });
+        ImageDrawPixel(&paper, TEX_W - 1, y, Color{ 220, 220, 215, 255 });
     }
 
     // Top & Bottom Tear Bar Serrations (Notched zig-zag cut edges)
     for (int x = 0; x < TEX_W; x += 6) {
         for (int dy = 0; dy < 4; dy++) {
             int tooth = (x / 3) % 2 ? dy : (3 - dy);
-            ImageDrawPixel(&paper, x + dy, tooth, (Color){ 0, 0, 0, 0 });
-            ImageDrawPixel(&paper, x + dy, TEX_H - 1 - tooth, (Color){ 0, 0, 0, 0 });
+            ImageDrawPixel(&paper, x + dy, tooth, Color{ 0, 0, 0, 0 });
+            ImageDrawPixel(&paper, x + dy, TEX_H - 1 - tooth, Color{ 0, 0, 0, 0 });
         }
     }
 
@@ -57,7 +57,7 @@ Texture2D BuildReceiptTexture(void)
     auto DrawBloodPool = [&](int cx, int cy, int radius) {
         for (int r = radius; r >= 1; r--) {
             float t = (float)r / (float)radius;
-            Color col = (t < 0.45f) ? (Color){ 70, 3, 3, 250 } : (Color){ 140, 10, 10, (unsigned char)(210 - t * 70) };
+            Color col = (t < 0.45f) ? Color{ 70, 3, 3, 250 } : Color{ 140, 10, 10, (unsigned char)(210 - t * 70) };
             ImageDrawCircle(&paper, cx, cy, r, col);
         }
     };
@@ -70,7 +70,7 @@ Texture2D BuildReceiptTexture(void)
             int dx = cx + (int)(cosf(ang) * dist);
             int dy = cy + (int)(sinf(ang) * dist);
             int sz = GetRandomValue(1, 4);
-            ImageDrawCircle(&paper, dx, dy, sz, (Color){ 175, 12, 12, (unsigned char)GetRandomValue(180, 255) });
+            ImageDrawCircle(&paper, dx, dy, sz, Color{ 175, 12, 12, (unsigned char)GetRandomValue(180, 255) });
         }
         // Dripping gravity trails running down the receipt
         int dripLen = GetRandomValue(30, 90);
@@ -79,7 +79,7 @@ Texture2D BuildReceiptTexture(void)
             int nx = px + GetRandomValue(-1, 1);
             int ny = py + 3;
             unsigned char a = (unsigned char)(220 - (d * 180 / (dripLen > 0 ? dripLen : 1)));
-            Color dCol = (d < dripLen / 2) ? (Color){ 110, 6, 6, a } : (Color){ 165, 12, 12, a };
+            Color dCol = (d < dripLen / 2) ? Color{ 110, 6, 6, a } : Color{ 165, 12, 12, a };
             ImageDrawLine(&paper, px, py, nx, ny, dCol);
             ImageDrawLine(&paper, px + 1, py, nx + 1, ny, dCol);
             px = nx; py = ny;
@@ -91,17 +91,17 @@ Texture2D BuildReceiptTexture(void)
         for (int step = 0; step < 26; step++) {
             int y = sy + step * 2;
             int x = sx + (int)(sinf(step * 0.25f) * 4.0f);
-            ImageDrawRectangle(&paper, x, y, 16, 3, (Color){ 120, 10, 10, (unsigned char)(140 - step * 4) });
-            ImageDrawRectangle(&paper, x + 2, y, 12, 2, (Color){ 80, 5, 5, (unsigned char)(160 - step * 5) });
+            ImageDrawRectangle(&paper, x, y, 16, 3, Color{ 120, 10, 10, (unsigned char)(140 - step * 4) });
+            ImageDrawRectangle(&paper, x + 2, y, 12, 2, Color{ 80, 5, 5, (unsigned char)(160 - step * 5) });
         }
     };
 
     int iy = 26;
 
     // Header: Super Mart Brand & Register details
-    Color fontInk = (Color){ 18, 18, 22, 255 };
-    Color fontSub = (Color){ 65, 65, 72, 255 };
-    Color fontRule = (Color){ 90, 90, 98, 200 };
+    Color fontInk = Color{ 18, 18, 22, 255 };
+    Color fontSub = Color{ 65, 65, 72, 255 };
+    Color fontRule = Color{ 90, 90, 98, 200 };
 
     DrawCentered("*** DEAD END MART ***", iy, 22, fontInk); iy += 28;
     DrawCentered("SUPERSTORE & GROCERY", iy, 14, fontSub); iy += 20;
@@ -126,8 +126,14 @@ Texture2D BuildReceiptTexture(void)
     DrawCentered("CHANGE DUE:          $0.00", iy, 13, fontSub); iy += 20;
     DrawCentered("TOTAL ITEMS SOLD:        0", iy, 13, fontSub); iy += 26;
 
-    DrawDashed(iy, fontRule); iy += 26;
-    DrawCentered("THANK YOU FOR YOUR SOUL", iy, 14, fontSub); iy += 35;
+    DrawDashed(iy, fontRule); iy += 22;
+    if (stalkerWarning && stalkerWarning[0] != '\0') {
+        DrawCentered("--- STALKER TELEMETRY ---", iy, 14, Color{ 175, 12, 12, 255 }); iy += 18;
+        DrawCentered(stalkerWarning, iy, 13, Color{ 150, 10, 10, 255 }); iy += 24;
+        DrawDashed(iy, fontRule); iy += 22;
+    } else {
+        DrawCentered("THANK YOU FOR YOUR SOUL", iy, 14, fontSub); iy += 35;
+    }
 
     // Authentic Thermal 1D Barcode with Numbers
     int barX = 35;
@@ -162,9 +168,9 @@ void DrawPrinter(Vector3 pos, float ledGlow, float t, PrinterLightingFn lightFn)
         return lightFn ? lightFn(p, c) : c;
     };
 
-    Color body     = lit(pos, (Color){ 36, 36, 40, 255 });
-    Color bodyDark = lit(pos, (Color){ 18, 18, 22, 255 });
-    Color rust     = lit(pos, (Color){ 95, 14, 14, 210 });
+    Color body     = lit(pos, Color{ 36, 36, 40, 255 });
+    Color bodyDark = lit(pos, Color{ 18, 18, 22, 255 });
+    Color rust     = lit(pos, Color{ 95, 14, 14, 210 });
 
     // Main printer chassis
     Vector3 chassisCenter = { pos.x, pos.y + 0.11f, pos.z };
@@ -189,21 +195,21 @@ void DrawPrinter(Vector3 pos, float ledGlow, float t, PrinterLightingFn lightFn)
     Vector3 screenBezel = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.003f };
     DrawCube(screenBezel, 0.20f, 0.08f, 0.01f, bodyDark);
     Vector3 screenGlow = { pos.x - 0.04f, pos.y + 0.10f, frontZ + 0.007f };
-    DrawCube(screenGlow, 0.16f, 0.05f, 0.005f, (Color){ (unsigned char)(75 * ledGlow), 8, 8, 255 });
+    DrawCube(screenGlow, 0.16f, 0.05f, 0.005f, Color{ (unsigned char)(75 * ledGlow), 8, 8, 255 });
 
     // Buttons
-    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.11f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, lit(pos, GRAY));
-    DrawCube((Vector3){ pos.x + 0.12f, pos.y + 0.06f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, (Color){ 140, 20, 20, 255 });
+    DrawCube(Vector3{ pos.x + 0.12f, pos.y + 0.11f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, lit(pos, GRAY));
+    DrawCube(Vector3{ pos.x + 0.12f, pos.y + 0.06f, frontZ + 0.005f }, 0.035f, 0.035f, 0.01f, Color{ 140, 20, 20, 255 });
 
     // Pulsing status LED
     Vector3 ledPos = { pos.x + 0.16f, pos.y + 0.21f, pos.z + 0.08f };
-    DrawSphere(ledPos, 0.016f, (Color){ 255, (unsigned char)(35 * ledGlow), (unsigned char)(35 * ledGlow), 255 });
+    DrawSphere(ledPos, 0.016f, Color{ 255, (unsigned char)(35 * ledGlow), (unsigned char)(35 * ledGlow), 255 });
 
     // Rust & blood streaks
-    DrawCube((Vector3){ pos.x - 0.12f, pos.y + 0.08f, frontZ + 0.004f }, 0.025f, 0.14f, 0.005f, rust);
+    DrawCube(Vector3{ pos.x - 0.12f, pos.y + 0.08f, frontZ + 0.004f }, 0.025f, 0.14f, 0.005f, rust);
     for (int i = 0; i < 4; i++) {
         float dropY = pos.y + 0.18f - i * 0.045f - fmodf(t * 0.05f, 0.045f);
-        DrawSphere((Vector3){ pos.x + 0.02f, dropY, frontZ + 0.006f }, 0.008f - i * 0.001f, (Color){ 130, 10, 10, 190 });
+        DrawSphere(Vector3{ pos.x + 0.02f, dropY, frontZ + 0.006f }, 0.008f - i * 0.001f, Color{ 130, 10, 10, 190 });
     }
 }
 

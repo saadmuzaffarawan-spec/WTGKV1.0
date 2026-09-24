@@ -139,10 +139,7 @@ struct Chunk {
                             m.m11 = 1.0f; // Full sunlight
 
                             m.m12 = (float)x; m.m13 = (float)y; m.m14 = (float)z;
-
                             bucket.instances[(uint8_t)v.glyphIndex].push_back(m);
-
-                            
 
                             if (isGlow) {
 
@@ -157,7 +154,6 @@ struct Chunk {
                                     glowM.m12 = (float)x + offsets[g][0];
 
                                     glowM.m13 = (float)y + offsets[g][1];
-
                                     bucket.instances[(uint8_t)v.glyphIndex].push_back(glowM);
 
                                 }

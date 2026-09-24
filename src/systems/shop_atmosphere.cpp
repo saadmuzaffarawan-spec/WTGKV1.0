@@ -665,10 +665,10 @@ void DrawShopAtmosphereWalls(ShopLightFn lightFn, bool lightsOn, float timeVal) 
         float u0 = (wz - 127.25f) / 2.55f;
         float u1 = u0 + 1.0f;
 
-        Vector3 pBL = { 86.25f, 10.0f, wz - hz };
-        Vector3 pTL = { 86.25f, 15.2f, wz - hz };
-        Vector3 pTR = { 86.25f, 15.2f, wz + hz };
-        Vector3 pBR = { 86.25f, 10.0f, wz + hz };
+        Vector3 pBL = { 85.50f, 10.0f, wz - hz };
+        Vector3 pTL = { 85.50f, 15.2f, wz - hz };
+        Vector3 pTR = { 85.50f, 15.2f, wz + hz };
+        Vector3 pBR = { 85.50f, 10.0f, wz + hz };
 
         Color cBL = lightFn(pBL, (Color){ 250, 245, 235, 255 }, normW, 0);
         Color cTL = lightFn(pTL, (Color){ 250, 245, 235, 255 }, normW, 0);
@@ -786,10 +786,10 @@ void DrawShopAtmosphereWalls(ShopLightFn lightFn, bool lightsOn, float timeVal) 
     rlNormal3f(normW.x, normW.y, normW.z);
     for (float wz = 127.25f; wz <= 152.75f; wz += 2.55f) {
         float hz = 2.58f * 0.5f;
-        Vector3 pBL = { 86.26f, 10.0f, wz - hz };
-        Vector3 pTL = { 86.26f, 15.2f, wz - hz };
-        Vector3 pTR = { 86.26f, 15.2f, wz + hz };
-        Vector3 pBR = { 86.26f, 10.0f, wz + hz };
+        Vector3 pBL = { 85.51f, 10.0f, wz - hz };
+        Vector3 pTL = { 85.51f, 15.2f, wz - hz };
+        Vector3 pTR = { 85.51f, 15.2f, wz + hz };
+        Vector3 pBR = { 85.51f, 10.0f, wz + hz };
 
         Color cBL = lightFn(pBL, (Color){ 190, 190, 190, 220 }, normW, 0);
         Color cTL = lightFn(pTL, (Color){ 190, 190, 190, 220 }, normW, 0);
@@ -1039,7 +1039,7 @@ void DrawShopAtmosphereFloor(ShopLightFn lightFn, bool lightsOn, float timeVal) 
 
     // Floor area: X in [86.25, 107.85], Z in [126.25, 153.75]
     // Tiled in 1.8m x 1.8m quads with per-vertex lighting calculation!
-    for (float tx = 86.25f; tx <= 107.85f; tx += 1.80f) {
+    for (float tx = 85.50f; tx <= 107.85f; tx += 1.80f) {
         for (float tz = 126.25f; tz <= 153.75f; tz += 1.80f) {
             float hx = 0.90f;
             float hz = 0.90f;
@@ -1055,8 +1055,8 @@ void DrawShopAtmosphereFloor(ShopLightFn lightFn, bool lightsOn, float timeVal) 
             Color c2 = lightFn(v2, (Color){ 245, 240, 235, 255 }, normFloor, 0);
             Color c3 = lightFn(v3, (Color){ 245, 240, 235, 255 }, normFloor, 0);
 
-            float u0 = (tx - hx - 86.25f) / 1.80f;
-            float u1 = (tx + hx - 86.25f) / 1.80f;
+            float u0 = (tx - hx - 85.50f) / 1.80f;
+            float u1 = (tx + hx - 85.50f) / 1.80f;
             float w0 = (tz - hz - 126.25f) / 1.80f;
             float w1 = (tz + hz - 126.25f) / 1.80f;
 
@@ -1473,10 +1473,10 @@ void DrawShopHauntedWashroom(Camera3D camera, ShopLightFn lightFn, bool lightsOn
         DrawCube(jambR, 0.14f, 3.0f, 0.22f, frameWood);
         DrawCube({ 89.25f, 13.0f, 153.75f }, 2.64f, 0.14f, 0.22f, frameWood);
 
-        // Door leaf standing wide open into the washroom against the West interior wall
+        // Use the interaction/collision state; it was previously always drawn open.
         rlPushMatrix();
         rlTranslatef(88.05f, 10.0f, 153.75f);
-        rlRotatef(75.0f, 0.0f, 1.0f, 0.0f); // Wide open (75 deg) against inner wall for smooth passage
+        rlRotatef(g_washroomDoorAngle, 0.0f, 1.0f, 0.0f);
         DrawCube({ 1.15f, 1.45f, 0.0f }, 2.30f, 2.90f, 0.06f, lightFn((Vector3){ 89.0f, 11.5f, 154.5f }, (Color){ 58, 40, 28, 255 }, (Vector3){ 0, 0, 1 }, 0));
         // Tarnished brass door knob
         DrawSphere({ 2.10f, 1.45f, 0.04f }, 0.035f, (Color){ 195, 160, 65, 255 });
@@ -1554,6 +1554,16 @@ void DrawShopHauntedWashroom(Camera3D camera, ShopLightFn lightFn, bool lightsOn
         DrawCylinderEx({ snkPos.x, snkPos.y + 0.18f, 160.88f }, { snkPos.x, snkPos.y + 0.26f, 160.70f }, 0.018f, 0.018f, 6, (Color){ 195, 200, 205, 255 });
         // Red rusty water droplet dripping from spout
         DrawSphere({ snkPos.x, snkPos.y + 0.08f, 160.70f }, 0.014f, (Color){ 125, 20, 24, 220 });
+
+        // The faucet interaction now has an in-world result, not just HUD text.
+        if (IsWashroomSinkRunning()) {
+            Color water = lightsOn ? Color{ 125, 190, 220, 210 } : Color{ 55, 85, 100, 190 };
+            DrawCylinderEx({ snkPos.x, snkPos.y + 0.22f, 160.70f },
+                           { snkPos.x, snkPos.y - 0.03f, 160.70f },
+                           0.018f, 0.010f, 6, water);
+            DrawCircle3D({ snkPos.x, snkPos.y - 0.025f, 160.70f }, 0.11f,
+                         { 1, 0, 0 }, 90.0f, Fade(water, 0.55f));
+        }
 
         // Chrome P-trap pipe underneath going into North wall
         DrawCylinderEx({ snkPos.x, snkPos.y - 0.18f, snkPos.z }, { snkPos.x, snkPos.y - 0.42f, snkPos.z }, 0.018f, 0.018f, 6, (Color){ 180, 185, 190, 255 });
@@ -1648,4 +1658,91 @@ void UnloadShopAtmosphere() {
     UnloadRenderTexture(g_washroomMirrorRT);
 
     g_shopAtmosphereLoaded = false;
+}
+
+// -------------------------------------------------------------------------
+// WASHROOM INTERACTION & SECURITY MONITOR IMPLEMENTATIONS
+// -------------------------------------------------------------------------
+
+static bool s_washroomSinkRunning = false;
+static bool s_washroomDoorOpen = false;
+float g_washroomDoorAngle = 0.0f;
+
+bool IsPlayerNearWashroomSink(Vector3 playerPos) {
+    Vector3 sinkPos = { 89.25f, 11.20f, 160.65f };
+    return Vector3Distance(playerPos, sinkPos) < 2.0f;
+}
+
+void ToggleWashroomSinkFaucet() {
+    s_washroomSinkRunning = !s_washroomSinkRunning;
+}
+
+bool IsWashroomSinkRunning() {
+    return s_washroomSinkRunning;
+}
+
+bool IsPlayerNearWashroomDoor(Vector3 playerPos) {
+    Vector3 doorPos = { 89.25f, 11.5f, 153.75f };
+    return Vector3Distance(playerPos, doorPos) < 2.4f;
+}
+
+void ToggleWashroomDoor() {
+    s_washroomDoorOpen = !s_washroomDoorOpen;
+    g_washroomDoorAngle = s_washroomDoorOpen ? 85.0f : 0.0f;
+}
+
+bool IsWashroomDoorOpen() {
+    return s_washroomDoorOpen;
+}
+
+void UpdateCounterCCTV(Camera3D playerCam, ShopLightFn lightFn, bool lightsOn, float timeVal) {
+    (void)playerCam;
+    (void)lightFn;
+    (void)lightsOn;
+    (void)timeVal;
+}
+
+void DrawCounterSecurityMonitor(Vector3 pos, ShopLightFn lightFn, bool lightsOn, float timeVal) {
+    (void)pos;
+    (void)lightFn;
+    (void)lightsOn;
+    (void)timeVal;
+}
+
+void DrawShopSuperstoreGondolas(ShopLightFn lightFn, bool lightsOn, float timeVal) {
+    (void)lightFn;
+    (void)lightsOn;
+    (void)timeVal;
+    if (!g_shopAtmosphereLoaded) return;
+    (void)lightsOn; (void)timeVal;
+
+    float shelfY[4] = { 10.39f, 11.43f, 12.48f, 13.53f };
+    float zCenters[2] = { 140.0f, 147.0f };
+    float cX = 95.0f; 
+    float xLen = 12.0f; // 89 to 101
+    
+    Color metalCol = { 205, 210, 215, 255 };
+    Color backCol = { 220, 225, 230, 255 };
+    Color baseCol = { 45, 50, 55, 255 };
+    
+    for (int i = 0; i < 2; i++) {
+        float zC = zCenters[i];
+        
+        Vector3 basePos = { cX, 10.15f, zC };
+        DrawCube(basePos, xLen, 0.3f, 1.2f, lightFn(basePos, baseCol, (Vector3){0,1,0}, 0));
+        DrawCubeWires(basePos, xLen+0.01f, 0.31f, 1.21f, (Color){ 20, 25, 30, 255 });
+        
+        Vector3 backPos = { cX, 12.0f, zC };
+        DrawCube(backPos, xLen, 4.0f, 0.05f, lightFn(backPos, backCol, (Vector3){0,1,0}, 0));
+        
+        for (int s = 0; s < 4; s++) {
+            float sy = shelfY[s] - 0.04f;
+            Vector3 northPos = { cX, sy, zC + 0.30f };
+            DrawCube(northPos, xLen, 0.04f, 0.5f, lightFn(northPos, metalCol, (Vector3){0,1,0}, 0));
+            DrawCubeWires(northPos, xLen+0.01f, 0.05f, 0.51f, (Color){ 150, 160, 170, 255 });
+            Vector3 southPos = { cX, sy, zC - 0.30f };
+            DrawCube(southPos, xLen, 0.04f, 0.5f, lightFn(southPos, metalCol, (Vector3){0,1,0}, 0));
+            DrawCubeWires(southPos, xLen+0.01f, 0.05f, 0.51f, (Color){ 150, 160, 170, 255 });
+        }
+    }
 }

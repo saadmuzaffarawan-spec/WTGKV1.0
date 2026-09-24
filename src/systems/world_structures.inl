@@ -29,7 +29,7 @@ inline void BuildShop(Chunk* chunk) {
     // Clear all terrain voxels within the shop lot footprint (Y >= 10 up to CHUNK_H - 1)
     // Ensures zero rogue ASCII blocks anywhere inside the shop or on its floor
     for (int x = 75; x <= 116; x++) {
-        for (int z = 118; z <= 162; z++) {
+        for (int z = 118; z <= 170; z++) {
             for (int y = 10; y < CHUNK_H; y++) {
                 Voxel& v = chunk->voxels[x][y][z];
                 v.isSolid = false;

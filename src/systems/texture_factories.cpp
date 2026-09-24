@@ -25,20 +25,20 @@ RenderTexture2D GenerateGlyphTexture(const char* glyph, Color bg, Color fg, int 
 RenderTexture2D GenerateCrustTexture(int texSize) {
     RenderTexture2D rt = LoadRenderTexture(texSize, texSize);
     BeginTextureMode(rt);
-        ClearBackground((Color){ 196, 148, 84, 255 });
+        ClearBackground(Color{ 196, 148, 84, 255 });
         for (int i = 0; i < 900; i++) {
             int x = GetRandomValue(0, texSize);
             int y = GetRandomValue(0, texSize);
             int r = GetRandomValue(2, 10);
             int dark = GetRandomValue(0, 70);
-            Color c = (Color){ (unsigned char)Clamp(196 - dark, 90, 255),
+            Color c = Color{ (unsigned char)Clamp(196 - dark, 90, 255),
                                (unsigned char)Clamp(148 - dark, 60, 255),
                                (unsigned char)Clamp(84  - dark, 20, 255), 255 };
             DrawCircle(x, y, (float)r, c);
         }
         for (int i = 0; i < 6; i++) {
             int x = GetRandomValue(20, texSize - 20);
-            DrawRectangle(x, 10, 6, texSize - 20, (Color){ 120, 78, 40, 180 });
+            DrawRectangle(x, 10, 6, texSize - 20, Color{ 120, 78, 40, 180 });
         }
     EndTextureMode();
     return rt;

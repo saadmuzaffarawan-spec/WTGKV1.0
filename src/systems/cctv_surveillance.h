@@ -48,3 +48,4 @@ void DrawMenuCCTVOverlay(int screenW, int screenH, Vector2 mPos, float dt, Sound
 void GetMenuCCTVCamera(int feedIndex, float timeVal, float smoothX, float smoothY, Vector3 &outPos, Vector3 &outTarget);
 
 void DrawMiniCRTSurveillanceMonitor(Vector3 crtPos, float timeVal, std::function<Color(Vector3, Color)> applyLighting);
+

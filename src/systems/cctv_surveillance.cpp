@@ -60,7 +60,7 @@ void SetupRoofCCTVCamera(Camera3D &renderCam, const Camera3D &playerCam, std::ve
     float radYaw   = (180.0f + g_roofCamYaw) * DEG2RAD;
     Vector3 forwardDir = { sinf(radYaw) * cosf(radPitch), sinf(radPitch), cosf(radYaw) * cosf(radPitch) };
     renderCam.target = Vector3Add(camPos, forwardDir);
-    renderCam.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    renderCam.up = Vector3{ 0.0f, 1.0f, 0.0f };
     renderCam.fovy = g_roofCamFOV;
 
     // Draw player '@' model visible from roof CCTV perspective (Bigger & 3D)
@@ -129,7 +129,7 @@ void DrawPhysicalCCTVCameraAssembly(float timeVal) {
         // Active Blinking Red Recording LED beside lens (● REC)
         bool recBlink = (fmodf(timeVal, 0.8f) < 0.4f);
         Vector3 ledPos = { lensPos.x + rgt.x * 0.12f, lensPos.y + 0.07f, lensPos.z + rgt.z * 0.12f };
-        DrawSphere(ledPos, 0.035f, recBlink ? (Color){ 255, 12, 12, 255 } : (Color){ 70, 0, 0, 255 });
+        DrawSphere(ledPos, 0.035f, recBlink ? Color{ 255, 12, 12, 255 } : Color{ 70, 0, 0, 255 });
     }
 }
 
@@ -170,7 +170,7 @@ void DrawCCTVSurveillanceOverlay(float timeVal) {
 
     const char* cctvControls = "[A/D] SLIDE ROOF WALL   |   [MOUSE] PAN/TILT   |   [W/S/WHEEL] ZOOM   |   [C / ESC] EXIT";
     float cmw = MeasureTextSharp(g_fontSmall, cctvControls, 13.0f);
-    DrawAAAPanel((Rectangle){ ((float)LOGICAL_W - cmw) * 0.5f - 16.0f, (float)LOGICAL_H - 42.0f, cmw + 32.0f, 28.0f }, (Color){ 10, 16, 12, 235 }, (Color){ 70, 165, 75, 220 }, 4.0f, true);
+    DrawAAAPanel(Rectangle{ ((float)LOGICAL_W - cmw) * 0.5f - 16.0f, (float)LOGICAL_H - 42.0f, cmw + 32.0f, 28.0f }, Color{ 10, 16, 12, 235 }, Color{ 70, 165, 75, 220 }, 4.0f, true);
     DrawTextSharpCentered(g_fontSmall, cctvControls, (float)LOGICAL_W * 0.5f, (float)LOGICAL_H - 34.5f, 13.0f, { 185, 245, 185, 255 });
 }
 
@@ -195,19 +195,19 @@ void DrawMenuCCTVOverlay(int screenW, int screenH, Vector2 mPos, float dt, Sound
     (void)dt;
     // Feather-light CRT scanlines for analog texture
     for (int y = 0; y < screenH; y += 4) {
-        DrawLine(0, y, screenW, y, (Color){ 0, 0, 0, 16 });
+        DrawLine(0, y, screenW, y, Color{ 0, 0, 0, 16 });
     }
 
     // CCTV Camera Switch Glitch Overlay (video scanline flutter)
     if (g_cctvSwitchGlitch > 0.0f) {
         for (int n = 0; n < 8; n++) {
             int ly = GetRandomValue(10, screenH - 10);
-            DrawLine(0, ly, screenW, ly, (Color){ 200, 215, 235, (unsigned char)GetRandomValue(35, 80) });
+            DrawLine(0, ly, screenW, ly, Color{ 200, 215, 235, (unsigned char)GetRandomValue(35, 80) });
         }
     }
 
     // Minimalist Floating Camera Switch Tabs at Screen Bottom
-    DrawTextSharp(g_fontSmall, "[ Q / E ]  Vistas:", 45, (float)(screenH - 32), 13.0f, (Color){ 150, 155, 165, 190 }, 1.2f);
+    DrawTextSharp(g_fontSmall, "[ Q / E ]  Vistas:", 45, (float)(screenH - 32), 13.0f, Color{ 150, 155, 165, 190 }, 1.2f);
     const char* camTabs[3] = { "Portico Arch", "Courtyard", "Vestibule" };
     int tabSpacing = 145;
     int tabStartX  = screenW - 470;
@@ -218,11 +218,11 @@ void DrawMenuCCTVOverlay(int screenW, int screenH, Vector2 mPos, float dt, Sound
         bool tHover = CheckCollisionPointRec(mPos, tabHit);
         bool tActive = (g_menuCCTVFeed == c);
 
-        Color tabCol = tActive ? WHITE : (tHover ? (Color){ 245, 130, 120, 255 } : (Color){ 150, 145, 140, 190 });
+        Color tabCol = tActive ? WHITE : (tHover ? Color{ 245, 130, 120, 255 } : Color{ 150, 145, 140, 190 });
         DrawTextSharp(g_fontSmall, camTabs[c], (float)tx, (float)ty, 13.0f, tabCol, 1.2f);
         if (tActive) {
             int tLen = (int)MeasureTextSharp(g_fontSmall, camTabs[c], 13.0f, 1.2f);
-            DrawLine(tx, ty + 18, tx + tLen, ty + 18, (Color){ 235, 45, 35, 255 });
+            DrawLine(tx, ty + 18, tx + tLen, ty + 18, Color{ 235, 45, 35, 255 });
         }
 
         if (tHover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && g_menuCCTVFeed != c) {
@@ -239,16 +239,16 @@ void GetMenuCCTVCamera(int feedIndex, float timeVal, float smoothX, float smooth
 
     if (feedIndex == 0) {
         // CAM 01: Elevated perspective showcasing college facade & grand steps
-        outPos = (Vector3){ 141.6f - smoothX * 0.35f + breatheX * 0.4f, 13.85f + breatheY * 0.5f - smoothY * 0.20f, 136.2f };
-        outTarget = (Vector3){ 152.0f + smoothX * 1.0f, 14.50f - smoothY * 0.60f, 140.0f };
+        outPos = Vector3{ 141.6f - smoothX * 0.35f + breatheX * 0.4f, 13.85f + breatheY * 0.5f - smoothY * 0.20f, 136.2f };
+        outTarget = Vector3{ 152.0f + smoothX * 1.0f, 14.50f - smoothY * 0.60f, 140.0f };
     } else if (feedIndex == 1) {
         // CAM 02: Courtyard & South Facade - high crane perspective across rain-swept grounds towards entrance
-        outPos = (Vector3){ 136.5f - smoothX * 0.55f + breatheX * 0.5f, 14.20f + breatheY * 0.4f - smoothY * 0.30f, 122.0f };
-        outTarget = (Vector3){ 155.0f + smoothX * 1.2f, 12.00f - smoothY * 0.70f, 138.0f };
+        outPos = Vector3{ 136.5f - smoothX * 0.55f + breatheX * 0.5f, 14.20f + breatheY * 0.4f - smoothY * 0.30f, 122.0f };
+        outTarget = Vector3{ 155.0f + smoothX * 1.2f, 12.00f - smoothY * 0.70f, 138.0f };
     } else {
         // CAM 03: Portico Vestibule Looking Out - under the grand portico looking out between columns into stormy night
-        outPos = (Vector3){ 152.2f - smoothX * 0.25f + breatheX * 0.3f, 11.80f + breatheY * 0.5f - smoothY * 0.15f, 140.0f };
-        outTarget = (Vector3){ 136.0f + smoothX * 1.1f, 11.20f - smoothY * 0.50f, 137.0f };
+        outPos = Vector3{ 152.2f - smoothX * 0.25f + breatheX * 0.3f, 11.80f + breatheY * 0.5f - smoothY * 0.15f, 140.0f };
+        outTarget = Vector3{ 136.0f + smoothX * 1.1f, 11.20f - smoothY * 0.50f, 137.0f };
     }
 }
 
@@ -260,5 +260,6 @@ void DrawMiniCRTSurveillanceMonitor(Vector3 crtPos, float timeVal, std::function
     DrawLine3D({ crtPos.x - 0.13f, scanY, crtPos.z + 0.21f }, { crtPos.x + 0.13f, scanY, crtPos.z + 0.21f }, { 140, 255, 170, 220 });
 
     bool crtBlink = (fmodf(timeVal, 0.8f) < 0.4f);
-    DrawSphere({ crtPos.x + 0.13f, crtPos.y + 0.13f, crtPos.z + 0.20f }, 0.022f, crtBlink ? (Color){ 255, 20, 20, 255 } : (Color){ 80, 0, 0, 255 });
+    DrawSphere({ crtPos.x + 0.13f, crtPos.y + 0.13f, crtPos.z + 0.20f }, 0.022f, crtBlink ? Color{ 255, 20, 20, 255 } : Color{ 80, 0, 0, 255 });
 }
+

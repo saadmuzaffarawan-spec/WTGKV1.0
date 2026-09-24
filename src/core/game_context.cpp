@@ -1,5 +1,41 @@
 #include "core/game_context.h"
 
+Camera3D g_camera = { 0 };
+Mesh g_mGround = { 0 };
+Material g_matGround = { 0 };
+Mesh g_mRoad = { 0 };
+Material g_matRoad = { 0 };
+
+// --- SHADER UNIFORM LOCATIONS ---
+
+void ToggleGameFullscreen() {
+    int mon = GetCurrentMonitor();
+    int monW = GetMonitorWidth(mon);
+    int monH = GetMonitorHeight(mon);
+    if (!IsWindowFullscreen()) {
+        SetWindowSize(monW, monH);
+        ToggleFullscreen();
+    } else {
+        ToggleFullscreen();
+        SetWindowSize(1280, 720);
+    }
+}
+
+
+// --- SHADER UNIFORM LOCATIONS ---
+int uvScaleLoc = 0;
+int uvOffsetLoc = 0;
+int timeLoc = 0;
+int playerPosLoc = 0;
+int trailPosLoc = 0;
+int trailLifeLoc = 0;
+int lightningFlashLoc = 0;
+int sunDirLoc = 0;
+int dayFactorLoc = 0;
+int sunColorLoc = 0;
+int moonDirLoc = 0;
+int nightFactorLoc = 0;
+
 // --- KINEMATIC HORROR CAMERA & VIEWMODEL INERTIA ---
 float g_vmSwayX = 0.0f;
 float g_vmSwayY = 0.0f;
@@ -36,8 +72,11 @@ Sound g_sndStoreFootstep = { 0 };
 Sound g_sndFoil = { 0 };
 Sound g_sndMenuNav = { 0 };
 Sound g_sndMenuBoom = { 0 };
+Sound g_sndJumpscare = { 0 };
 Sound g_sndRadioStatic = { 0 };
 Sound g_sndWaterDrip = { 0 };
+Sound g_sndThunder = { 0 };
+Sound g_sndRain = { 0 };
 Sound g_sndShovelDig = { 0 };
 Sound g_sndPhoneSlide = { 0 };
 Sound g_sndPhoneTap = { 0 };

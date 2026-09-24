@@ -1,4 +1,6 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <cstdio>
+
 
 #include <functional>
 
@@ -23,9 +25,14 @@
 #include "core/game_context.h"
 #include "systems/intro_cinematic.h"
 #include "systems/phone_system.h"
+#include "systems/main_menu_system.h"
 #include "systems/grethnar_system.h"
 
-bool shouldQuitGame = false;
+// Keep the loop-control state private to this translation unit.  Menu and UI
+// systems request an exit through the function below instead of writing a
+// shared global directly.
+static bool s_exitRequested = false;
+void RequestGameQuit() { s_exitRequested = true; }
 MainMenuSystem g_mainMenuSystem;
 GrethnarSystem g_grethnarSystem;
 
@@ -185,9 +192,13 @@ static inline void UpdatePumpCrtTexture(int pumpNum, float gallons, float salePr
 #include "systems/shop_atmosphere.h"
 
 
+static FILE* g_crashLog = nullptr;
+#define LOG_STEP(msg) do { if (!g_crashLog) g_crashLog = fopen("crash_debug.txt", "w"); if (g_crashLog) { fprintf(g_crashLog, "%s\n", msg); fflush(g_crashLog); } } while(0)
+
 int main(int argc, char** argv) {
-    IntroCinematic introCinematic;
+    LOG_STEP("1. Entered main()");
     PhoneSystem phoneSystem;
+    LOG_STEP("2. Constructed PhoneSystem");
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--test") == 0 && i + 1 < argc) g_testFrames = atoi(argv[i + 1]);
         if (strcmp(argv[i], "--timeofday") == 0 && i + 1 < argc) g_pinnedTimeOfDay = (float)atof(argv[i + 1]);
@@ -200,10 +211,15 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--lookatwashroom") == 0) g_lookAtWashroom = true;
         if (strcmp(argv[i], "--lookatatm") == 0) g_lookAtAtm = true;
     }
+    if (g_testFrames > 0) {
+        g_gameState = STATE_GAMEPLAY;
+        g_hasPlayedIntro = true;
+    }
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
 
     InitWindow(LOGICAL_W, LOGICAL_H, "WHAT THE GROUND KEEPS - 3D ASCII ENGINE");
+    LOG_STEP("3. InitWindow completed");
 
     // Set runtime window icon from WhatTheGroundKeeps_LogoDesign.jpg
     if (FileExists("assets/images/WhatTheGroundKeeps_LogoDesign.jpg")) {
@@ -222,16 +238,23 @@ int main(int argc, char** argv) {
 
     SetExitKey(KEY_NULL); // Prevent default ESC window closing so we can handle skip intro & confirmation dialog
 
+    LOG_STEP("4. Before InitProceduralShopAssets");
     InitProceduralShopAssets();
+    LOG_STEP("5. After InitProceduralShopAssets");
 
     InitCollegeShaderAndTextures();
+    LOG_STEP("6. After InitCollegeShaderAndTextures");
 
     InitOceanSystem();
+    LOG_STEP("7. After InitOceanSystem");
 
     InitShopAtmosphere();
+    LOG_STEP("8. After InitShopAtmosphere");
     InitATMSystem();
+    LOG_STEP("9. After InitATMSystem");
 
     Shovel g_shovelRig = BuildShovel();
+    LOG_STEP("10. After BuildShovel");
 
 
 
@@ -283,7 +306,7 @@ int main(int argc, char** argv) {
 
 
     auto drawLoadingBar = [&](float progress, const char* statusText) {
-
+        if (g_testFrames > 0) return;
         BeginDrawing();
 
         ClearBackground(Color{ 6, 7, 9, 255 });
@@ -484,7 +507,7 @@ int main(int argc, char** argv) {
 
     Sound sndSpark = GenerateElectricSparkSound();
 
-    Sound sndJumpscare = GenerateJumpscareSound();
+    g_sndJumpscare = GenerateJumpscareSound();
 
     g_sndGunshot = GenerateGunshotSound();
 
@@ -557,17 +580,17 @@ int main(int argc, char** argv) {
 
     
 
-    Camera3D camera = { 0 };
+    g_camera = { 0 };
 
-    camera.position = Vector3{ CHUNK_W/2.0f, 11.65f, CHUNK_D/2.0f };
+    g_camera.position = Vector3{ CHUNK_W/2.0f, 11.65f, CHUNK_D/2.0f };
 
-    camera.target = Vector3{ CHUNK_W/2.0f, 12.2f, CHUNK_D/2.0f + 1.0f };
+    g_camera.target = Vector3{ CHUNK_W/2.0f, 12.2f, CHUNK_D/2.0f + 1.0f };
 
-    camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
+    g_camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
 
-    camera.fovy = 60.0f;
+    g_camera.fovy = 60.0f;
 
-    camera.projection = CAMERA_PERSPECTIVE;
+    g_camera.projection = CAMERA_PERSPECTIVE;
 
     
 
@@ -1188,7 +1211,7 @@ int main(int argc, char** argv) {
 
     bool isThirdPerson = false;
 
-    Camera3D renderCam = camera;
+    Camera3D renderCam = g_camera;
 
     Vector3 playerVel = {0.0f, 0.0f, 0.0f};
 
@@ -1364,11 +1387,7 @@ int main(int argc, char** argv) {
 
 
     // --- MR. GRETHNAR WOULE: UNCANNY HORROR ABILITY & JUMPSCARE ENGINE ---
-    // --- MR. GRETHNAR WOULE: UNCANNY HORROR ABILITY & JUMPSCARE ENGINE ---
     // (Now handled by g_grethnarSystem)
-
-
-
     // Quit confirmation state
 
 
@@ -1408,7 +1427,7 @@ int main(int argc, char** argv) {
 
     int trailIndex = 0;
 
-    Vector3 lastTrailPos = camera.position;
+    Vector3 lastTrailPos = g_camera.position;
 
 
 
@@ -1460,27 +1479,27 @@ int main(int argc, char** argv) {
 
     // Create road mesh for intro and main game
 
-    Mesh mRoad = GenMeshPlane(26.0f, 600.0f, 1, 1);
+    g_mRoad = GenMeshPlane(26.0f, 600.0f, 1, 1);
 
     
 
     // Helper to make materials
 
-    Material matRoad = LoadMaterialDefault();
+    g_matRoad = LoadMaterialDefault();
 
-    matRoad.maps[MATERIAL_MAP_ALBEDO].color = { 0, 0, 0, 255 }; // Pure pitch black road
+    g_matRoad.maps[MATERIAL_MAP_ALBEDO].color = { 0, 0, 0, 255 }; // Pure pitch black road
 
 
 
     // Solid ultra-dark ground plane covering the entire outside world (like the road material)
 
-    Mesh mGround = GenMeshPlane(800.0f, 800.0f, 1, 1);
+    g_mGround = GenMeshPlane(800.0f, 800.0f, 1, 1);
 
-    Material matGround = LoadMaterialDefault();
+    g_matGround = LoadMaterialDefault();
 
     Color darkBrownBase = { 10, 7, 5, 255 }; // Much darker earthy shade (ultra-dark)
 
-    matGround.maps[MATERIAL_MAP_ALBEDO].color = darkBrownBase;
+    g_matGround.maps[MATERIAL_MAP_ALBEDO].color = darkBrownBase;
 
 
 
@@ -1559,18 +1578,18 @@ int main(int argc, char** argv) {
     float gameIntroFade = 0.0f;
 
     if (g_lookAtAtm) {
-        camera.position = Vector3{ 105.2f, 11.6f, 143.5f };
-        camera.target = Vector3{ 107.45f, 11.4f, 143.5f };
+        g_camera.position = Vector3{ 105.2f, 11.6f, 143.5f };
+        g_camera.target = Vector3{ 107.45f, 11.4f, 143.5f };
     } else if (g_lookAtWashroom) {
-        camera.position = Vector3{ 89.25f, 11.8f, 148.5f };
-        camera.target = Vector3{ 89.25f, 11.6f, 158.0f };
+        g_camera.position = Vector3{ 89.25f, 11.8f, 148.5f };
+        g_camera.target = Vector3{ 89.25f, 11.6f, 158.0f };
     } else if (g_lookAtShop) {
-        camera.position = Vector3{ 104.5f, 12.0f, 135.2f };
-        camera.target = Vector3{ 104.4f, 11.72f, 133.5f };
+        g_camera.position = Vector3{ 104.5f, 12.0f, 135.2f };
+        g_camera.target = Vector3{ 104.4f, 11.72f, 133.5f };
     }
+    LOG_STEP("11. Entering main game loop");
 
-
-    while(!shouldQuitGame) {
+    while(!s_exitRequested) {
 
         float rawDt = GetFrameTime();
 
@@ -1751,7 +1770,7 @@ int main(int argc, char** argv) {
 
                 } else {
 
-                    shouldQuitGame = true;
+                    RequestGameQuit();
 
                 }
 
@@ -1842,7 +1861,7 @@ int main(int argc, char** argv) {
 
             if (IsKeyPressed(KEY_Y) || (IsKeyPressed(KEY_ENTER) && !IsKeyDown(KEY_LEFT_ALT) && !IsKeyDown(KEY_RIGHT_ALT))) {
 
-                shouldQuitGame = true; // Confirm exit
+                RequestGameQuit(); // Confirm exit
 
             } else if (IsKeyPressed(KEY_N)) {
 
@@ -1882,11 +1901,11 @@ int main(int argc, char** argv) {
 
             // Sensor detection zone: player or shopping cart near doorway (X = 108.0f, Z = 140.0f)
 
-            float playerDx = camera.position.x - 108.0f;
+            float playerDx = g_camera.position.x - 108.0f;
 
-            float playerDz = camera.position.z - 140.0f;
+            float playerDz = g_camera.position.z - 140.0f;
 
-            bool playerInSensor = (fabsf(playerDx) < 3.2f && fabsf(playerDz) < 2.0f && camera.position.y >= 10.0f && camera.position.y <= 14.5f);
+            bool playerInSensor = (fabsf(playerDx) < 3.2f && fabsf(playerDz) < 2.0f && g_camera.position.y >= 10.0f && g_camera.position.y <= 14.5f);
 
 
 
@@ -2098,7 +2117,7 @@ int main(int argc, char** argv) {
 
             // Spatial audio playback for electrical snap/crackle
 
-            float distToSpark = Vector3Distance(camera.position, Vector3{ 90.25f, 15.02f, 148.0f });
+            float distToSpark = Vector3Distance(g_camera.position, Vector3{ 90.25f, 15.02f, 148.0f });
 
             float sparkVol = Clamp(1.0f - (distToSpark / 24.0f), 0.0f, 1.0f) * 0.85f;
 
@@ -2314,9 +2333,9 @@ int main(int argc, char** argv) {
 
         g_curLightningFlash = lightningFlashTimer;
 
-        g_playerCamPos      = camera.position;
+        g_playerCamPos      = g_camera.position;
 
-        g_playerCamFwd      = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+        g_playerCamFwd      = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
 
 
@@ -2324,7 +2343,7 @@ int main(int argc, char** argv) {
 
         if (IsKeyPressed(KEY_F) && !isShopOpen && !showQuitConfirm && !g_mainMenuSystem.IsSettingsModalShowing() && !g_showManifestModal && g_gameState == STATE_GAMEPLAY) {
 
-            float dToCartF = Vector2Distance(Vector2{ camera.position.x, camera.position.z }, Vector2{ g_cartPos.x, g_cartPos.z });
+            float dToCartF = Vector2Distance(Vector2{ g_camera.position.x, g_camera.position.z }, Vector2{ g_cartPos.x, g_cartPos.z });
 
             if (!(g_heldProductIndex != -1 && (dToCartF < 2.2f || g_isHoldingCart))) {
 
@@ -2396,24 +2415,24 @@ int main(int argc, char** argv) {
         }
 
         bool isPlayerMoving = (IsKeyDown(KEY_W) || IsKeyDown(KEY_A) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D));
-        UpdateShopAtmosphere(dt, timeVal, camera.position, isPlayerMoving, g_shopLightsOn, sinf(shopLightSwayX) * 2.05f, sinf(shopLightSwayZ) * 2.05f);
+        UpdateShopAtmosphere(dt, timeVal, g_camera.position, isPlayerMoving, g_shopLightsOn, sinf(shopLightSwayX) * 2.05f, sinf(shopLightSwayZ) * 2.05f);
 
         // 24-HR Cashpoint ATM Terminal: Proximity interaction & update
-        bool nearATM = IsPlayerNearATM(camera.position);
+        bool nearATM = IsPlayerNearATM(g_camera.position);
         if (nearATM && IsKeyPressed(KEY_E) && !IsATMActive() && !isShopOpen && !showQuitConfirm) {
             StartATMInteraction();
         }
         bool atmInteracting = IsATMActive();
-        UpdateATMSystem(dt, camera.position, atmInteracting);
+        UpdateATMSystem(dt, g_camera.position, atmInteracting);
 
         // --- MR. GRETHNAR WOULE: GAZE DETECTION, EYE SWELL & JUMPSCARE ENGINE ---
 
-        bool playerInShop = (camera.position.x >= 85.5f && camera.position.x <= 109.2f &&
-                             camera.position.z >= 125.5f && camera.position.z <= 168.0f);
+        bool playerInShop = (g_camera.position.x >= 85.5f && g_camera.position.x <= 109.2f &&
+                             g_camera.position.z >= 125.5f && g_camera.position.z <= 168.0f);
 
 
 
-        g_grethnarSystem.Update(dt, camera.position, Vector3Normalize(Vector3Subtract(camera.target, camera.position)), playerInShop);
+        g_grethnarSystem.Update(dt, g_camera.position, Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position)), playerInShop);
         // --- HANGING MEAT BLOOD DRIPPING FLUID DYNAMICS ---
 
         // Tip 1: Primary carcass bone tip at { 95.0f, 12.28f, 143.5f }
@@ -2652,7 +2671,7 @@ int main(int argc, char** argv) {
 
         Vector3 counterPos = { 104.5f, 11.5f, 134.5f };
 
-        bool nearCounter = (Vector3Distance(camera.position, counterPos) < 2.8f && camera.position.z >= 133.5f);
+        bool nearCounter = (Vector3Distance(g_camera.position, counterPos) < 2.8f && g_camera.position.z >= 133.5f);
 
 
 
@@ -2668,9 +2687,9 @@ int main(int argc, char** argv) {
 
         if (!isShopOpen && !isRoofCamActive && !showQuitConfirm) {
 
-            focusedProductIdx = GetCrosshairFocusedProduct(camera, 2.8f, false);
+            focusedProductIdx = GetCrosshairFocusedProduct(g_camera, 2.8f, false);
 
-            hudFocusIdx = GetCrosshairFocusedProduct(camera, 2.8f, true);
+            hudFocusIdx = GetCrosshairFocusedProduct(g_camera, 2.8f, true);
 
         }
 
@@ -2724,13 +2743,13 @@ int main(int argc, char** argv) {
 
                     // Eject brass casing
 
-                    Vector3 fwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+                    Vector3 fwd = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
-                    Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwd, camera.up));
+                    Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwd, g_camera.up));
 
-                    Vector3 up  = camera.up;
+                    Vector3 up  = g_camera.up;
 
-                    Vector3 ejectPos = Vector3Add(camera.position, Vector3Scale(fwd, 0.40f));
+                    Vector3 ejectPos = Vector3Add(g_camera.position, Vector3Scale(fwd, 0.40f));
 
                     ejectPos = Vector3Add(ejectPos, Vector3Scale(rgt, 0.18f));
 
@@ -2770,7 +2789,7 @@ int main(int argc, char** argv) {
 
                     if (fwd.y < -0.01f) {
 
-                        float tFloor = (10.02f - camera.position.y) / fwd.y;
+                        float tFloor = (10.02f - g_camera.position.y) / fwd.y;
 
                         if (tFloor > 0.2f && tFloor < hitDist) hitDist = tFloor;
 
@@ -2778,7 +2797,7 @@ int main(int argc, char** argv) {
 
                     if (fwd.x < -0.01f) {
 
-                        float tWest = (86.3f - camera.position.x) / fwd.x;
+                        float tWest = (86.3f - g_camera.position.x) / fwd.x;
 
                         if (tWest > 0.2f && tWest < hitDist) hitDist = tWest;
 
@@ -2786,7 +2805,7 @@ int main(int argc, char** argv) {
 
                     if (fwd.x > 0.01f) {
 
-                        float tEast = (107.9f - camera.position.x) / fwd.x;
+                        float tEast = (107.9f - g_camera.position.x) / fwd.x;
 
                         if (tEast > 0.2f && tEast < hitDist) hitDist = tEast;
 
@@ -2794,7 +2813,7 @@ int main(int argc, char** argv) {
 
                     if (fwd.z < -0.01f) {
 
-                        float tSouth = (126.3f - camera.position.z) / fwd.z;
+                        float tSouth = (126.3f - g_camera.position.z) / fwd.z;
 
                         if (tSouth > 0.2f && tSouth < hitDist) hitDist = tSouth;
 
@@ -2802,7 +2821,7 @@ int main(int argc, char** argv) {
 
                     if (fwd.z > 0.01f) {
 
-                        float tNorth = (152.9f - camera.position.z) / fwd.z;
+                        float tNorth = (152.9f - g_camera.position.z) / fwd.z;
 
                         if (tNorth > 0.2f && tNorth < hitDist) hitDist = tNorth;
 
@@ -2810,7 +2829,7 @@ int main(int argc, char** argv) {
 
 
 
-                    Vector3 hitPoint = Vector3Add(camera.position, Vector3Scale(fwd, hitDist));
+                    Vector3 hitPoint = Vector3Add(g_camera.position, Vector3Scale(fwd, hitDist));
 
                     int sparkCount = (g_gunSparks.size() + 16 > 32) ? (32 - (int)g_gunSparks.size()) : 16;
 
@@ -2994,7 +3013,7 @@ int main(int argc, char** argv) {
 
 
 
-        Vector3 oldPos = camera.position;
+        Vector3 oldPos = g_camera.position;
 
         if (g_gameState == STATE_GAMEPLAY && hitStopTimer <= 0.0f && !isShopOpen && !IsATMActive() && !isRoofCamActive && !showQuitConfirm && !g_mainMenuSystem.IsSettingsModalShowing() && !g_showManifestModal) {
 
@@ -3008,7 +3027,7 @@ int main(int argc, char** argv) {
 
                 }
 
-                UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+                UpdateCamera(&g_camera, CAMERA_FIRST_PERSON);
 
             }
 
@@ -3024,7 +3043,7 @@ int main(int argc, char** argv) {
 
         if (g_heldProductIndex != -1) {
 
-            Vector3 fwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+            Vector3 fwd = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
             Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwd, Vector3{0, 1, 0}));
 
@@ -3034,7 +3053,7 @@ int main(int argc, char** argv) {
 
             float vmBobY = sinf(walkTime - 0.4f) * 0.010f * bobAmplitude;
 
-            Vector3 holdPos = Vector3Add(camera.position, Vector3Scale(fwd, 0.52f));
+            Vector3 holdPos = Vector3Add(g_camera.position, Vector3Scale(fwd, 0.52f));
 
             holdPos = Vector3Add(holdPos, Vector3Scale(rgt, 0.16f + g_vmSwayX + vmBobX));
 
@@ -3463,8 +3482,8 @@ int main(int argc, char** argv) {
                 if (vz >= 164 && vx >= 85 && vx <= 93) return true; // North washroom back wall
 
                 // Washroom Fixtures (Porcelain Toilet & Wall Sink - compact to allow free movement)
-                if ((vx == 86 || vx == 87) && vz >= 162 && vz <= 164 && vy <= 12) return true; // Toilet
-                if ((vx >= 88 && vx <= 90) && vz >= 163 && vz <= 164 && vy <= 12) return true; // Sink
+                if ((vx == 86 || vx == 87) && vz >= 159 && vz <= 160 && vy <= 12) return true; // Toilet
+                if ((vx >= 88 && vx <= 90) && vz >= 160 && vz <= 161 && vy <= 12) return true; // Sink
 
                 // East Facade Wall (X = 108, Z: 126..154, with doorway at Z: 139..141, Y: 11..13)
                 if (vx == 108 && vz >= 126 && vz <= 154) {
@@ -3499,17 +3518,17 @@ int main(int argc, char** argv) {
 
 
 
-        Vector3 moveDelta = Vector3Subtract(camera.position, oldPos);
+        Vector3 moveDelta = Vector3Subtract(g_camera.position, oldPos);
 
-        Vector3 viewDir = Vector3Subtract(camera.target, camera.position); // Preserve look direction mathematically
+        Vector3 viewDir = Vector3Subtract(g_camera.target, g_camera.position); // Preserve look direction mathematically
 
-        camera.position = oldPos; 
+        g_camera.position = oldPos; 
 
         
 
-        int px = roundf(camera.position.x);
+        int px = roundf(g_camera.position.x);
 
-        int pz = roundf(camera.position.z);
+        int pz = roundf(g_camera.position.z);
 
         
 
@@ -3518,9 +3537,9 @@ int main(int argc, char** argv) {
         const float PLAYER_EYE_HEIGHT = 1.65f;
 
         // Water Locomotion, Wading, Surface Floating & 3D Underwater Diving
-        UpdateWaterLocomotion(camera, playerVel, moveDelta, dt, timeVal);
+        UpdateWaterLocomotion(g_camera, playerVel, moveDelta, dt, timeVal);
 
-        bool onGround = (g_waterState == WATER_STATE_DIVING || g_waterState == WATER_STATE_SURFACE) ? false : isSolidBlock(px, roundf(camera.position.y - PLAYER_EYE_HEIGHT), pz);
+        bool onGround = (g_waterState == WATER_STATE_DIVING || g_waterState == WATER_STATE_SURFACE) ? false : isSolidBlock(px, roundf(g_camera.position.y - PLAYER_EYE_HEIGHT), pz);
 
         if (onGround) {
 
@@ -3612,13 +3631,13 @@ int main(int argc, char** argv) {
 
         // X Collision
 
-        camera.position.x += moveDelta.x;
+        g_camera.position.x += moveDelta.x;
 
-        if (isSolidBlock(roundf(camera.position.x), roundf(camera.position.y), roundf(camera.position.z)) || 
+        if (isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y), roundf(g_camera.position.z)) || 
 
-            isSolidBlock(roundf(camera.position.x), roundf(camera.position.y - 1.0f), roundf(camera.position.z))) {
+            isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y - 1.0f), roundf(g_camera.position.z))) {
 
-            camera.position.x -= moveDelta.x; 
+            g_camera.position.x -= moveDelta.x; 
 
         }
 
@@ -3626,21 +3645,21 @@ int main(int argc, char** argv) {
 
         // Z Collision
 
-        camera.position.z += moveDelta.z;
+        g_camera.position.z += moveDelta.z;
 
-        if (isSolidBlock(roundf(camera.position.x), roundf(camera.position.y), roundf(camera.position.z)) || 
+        if (isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y), roundf(g_camera.position.z)) || 
 
-            isSolidBlock(roundf(camera.position.x), roundf(camera.position.y - 1.0f), roundf(camera.position.z))) {
+            isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y - 1.0f), roundf(g_camera.position.z))) {
 
-            camera.position.z -= moveDelta.z; 
+            g_camera.position.z -= moveDelta.z; 
 
         }
 
         // Continuous Oriented Collision against Crashed Sedan Body & Impact Pole
-        if (camera.position.y >= 9.0f && camera.position.y <= 13.5f) {
+        if (g_camera.position.y >= 9.0f && g_camera.position.y <= 13.5f) {
             // 1. Crashed Car Body (Oriented Bounding Box at X = 143.8, Z = 136.5, yaw = -24 deg)
-            float cdx = camera.position.x - 143.8f;
-            float cdz = camera.position.z - 136.5f;
+            float cdx = g_camera.position.x - 143.8f;
+            float cdz = g_camera.position.z - 136.5f;
             float rad = 24.0f * DEG2RAD; // Rotating back by -yaw
             float cosR = cosf(rad);
             float sinR = sinf(rad);
@@ -3658,28 +3677,28 @@ int main(int argc, char** argv) {
                 } else {
                     localZ = (localZ > 0.0f) ? halfL : -halfL;
                 }
-                camera.position.x = 143.8f + (localX * cosR + localZ * sinR);
-                camera.position.z = 136.5f + (-localX * sinR + localZ * cosR);
+                g_camera.position.x = 143.8f + (localX * cosR + localZ * sinR);
+                g_camera.position.z = 136.5f + (-localX * sinR + localZ * cosR);
             }
 
             // 2. Utility Pole Obstacle (Center: 145.3f, 138.8f, Radius: 0.25m + 0.42m = 0.67m)
-            float poleDx = camera.position.x - 145.3f;
-            float poleDz = camera.position.z - 138.8f;
+            float poleDx = g_camera.position.x - 145.3f;
+            float poleDz = g_camera.position.z - 138.8f;
             float poleDistSq = poleDx * poleDx + poleDz * poleDz;
             float poleMinDist = 0.68f;
             if (poleDistSq < poleMinDist * poleMinDist && poleDistSq > 0.0001f) {
                 float poleDist = sqrtf(poleDistSq);
                 float push = poleMinDist - poleDist;
-                camera.position.x += (poleDx / poleDist) * push;
-                camera.position.z += (poleDz / poleDist) * push;
+                g_camera.position.x += (poleDx / poleDist) * push;
+                g_camera.position.z += (poleDz / poleDist) * push;
             }
         }
 
         // 3. Weathered Timber Pier Solid Deck Walkway Collision (X: 15.5..36.5, Z: 135.8..140.2, Deck Y = 10.875)
-        if (camera.position.x >= 15.5f && camera.position.x <= 36.5f && camera.position.z >= 135.8f && camera.position.z <= 140.2f) {
+        if (g_camera.position.x >= 15.5f && g_camera.position.x <= 36.5f && g_camera.position.z >= 135.8f && g_camera.position.z <= 140.2f) {
             float deckEyeY = 10.875f + PLAYER_EYE_HEIGHT; // Top of pier planks + player height = 12.525m
-            if (camera.position.y >= deckEyeY - 0.45f && camera.position.y <= deckEyeY + 1.20f && playerVel.y <= 0.0f) {
-                camera.position.y = deckEyeY;
+            if (g_camera.position.y >= deckEyeY - 0.45f && g_camera.position.y <= deckEyeY + 1.20f && playerVel.y <= 0.0f) {
+                g_camera.position.y = deckEyeY;
                 playerVel.y = 0.0f;
                 onGround = true;
             }
@@ -3687,21 +3706,21 @@ int main(int argc, char** argv) {
 
         // Y Collision (Roof and Floor with Step-Up Height Smoothing)
 
-        camera.position.y += moveDelta.y;
+        g_camera.position.y += moveDelta.y;
 
-        if (moveDelta.y > 0.0f && isSolidBlock(roundf(camera.position.x), roundf(camera.position.y + 0.2f), roundf(camera.position.z))) {
+        if (moveDelta.y > 0.0f && isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y + 0.2f), roundf(g_camera.position.z))) {
 
-            camera.position.y -= moveDelta.y; 
+            g_camera.position.y -= moveDelta.y; 
 
             playerVel.y = 0.0f;
 
-        } else if (moveDelta.y < 0.0f && isSolidBlock(roundf(camera.position.x), roundf(camera.position.y - PLAYER_EYE_HEIGHT), roundf(camera.position.z))) {
+        } else if (moveDelta.y < 0.0f && isSolidBlock(roundf(g_camera.position.x), roundf(g_camera.position.y - PLAYER_EYE_HEIGHT), roundf(g_camera.position.z))) {
 
-            int floorY = roundf(camera.position.y - PLAYER_EYE_HEIGHT);
+            int floorY = roundf(g_camera.position.y - PLAYER_EYE_HEIGHT);
 
             float targetFloorY = (float)floorY + PLAYER_EYE_HEIGHT;
 
-            float stepDelta = camera.position.y - targetFloorY;
+            float stepDelta = g_camera.position.y - targetFloorY;
 
             if (g_waterState != WATER_STATE_DIVING && fabsf(stepDelta) > 0.04f && fabsf(stepDelta) <= 0.85f) {
 
@@ -3711,7 +3730,7 @@ int main(int argc, char** argv) {
 
             }
 
-            camera.position.y = targetFloorY; 
+            g_camera.position.y = targetFloorY; 
 
             playerVel.y = 0.0f;
 
@@ -3721,11 +3740,11 @@ int main(int argc, char** argv) {
 
         // Reapply exactly the same look direction from the new collision-resolved position
 
-        camera.target = Vector3Add(camera.position, viewDir);
+        g_camera.target = Vector3Add(g_camera.position, viewDir);
 
 
 
-        // Smooth decay for camera step offset and landing compression dip
+        // Smooth decay for g_camera step offset and landing compression dip
 
         g_camStepOffset = Lerp(g_camStepOffset, 0.0f, 18.0f * dt);
 
@@ -3734,7 +3753,7 @@ int main(int argc, char** argv) {
         // -------------------------------------------------------------
         // DYNAMIC DISSOLVING FOOTPRINT STAMPING & HORROR ATMOSPHERE
         // -------------------------------------------------------------
-        UpdateFootprints(camera.position, viewDir, onGround, hitStopTimer, dt);
+        UpdateFootprints(g_camera.position, viewDir, onGround, hitStopTimer, dt);
         
         // Abandoned College Creepy Fluorescent Lighting Flicker & Audio Ambience
         g_collegeFlickerTimer -= dt;
@@ -3752,9 +3771,9 @@ int main(int argc, char** argv) {
             }
         }
         
-        bool isInsideCollege = (camera.position.x >= 152.0f && camera.position.x <= 188.0f &&
-                                camera.position.z >= 124.0f && camera.position.z <= 160.0f &&
-                                camera.position.y >= 9.8f && camera.position.y <= 16.2f);
+        bool isInsideCollege = (g_camera.position.x >= 152.0f && g_camera.position.x <= 188.0f &&
+                                g_camera.position.z >= 124.0f && g_camera.position.z <= 160.0f &&
+                                g_camera.position.y >= 9.8f && g_camera.position.y <= 16.2f);
         if (isInsideCollege) {
             g_collegeCreakTimer -= dt;
             if (g_collegeCreakTimer <= 0.0f) {
@@ -3778,7 +3797,7 @@ int main(int argc, char** argv) {
 
         {
 
-            Vector3 playerMoveDelta = Vector3Subtract(camera.position, oldPos);
+            Vector3 playerMoveDelta = Vector3Subtract(g_camera.position, oldPos);
 
             Vector2 playerSpeedXZ = { (dt > 0.0f) ? playerMoveDelta.x / dt : 0.0f,
 
@@ -3786,7 +3805,7 @@ int main(int argc, char** argv) {
 
 
 
-            Vector2 playerXZ = { camera.position.x, camera.position.z };
+            Vector2 playerXZ = { g_camera.position.x, g_camera.position.z };
 
             Vector2 cartXZ   = { g_cartPos.x, g_cartPos.z };
 
@@ -3798,9 +3817,9 @@ int main(int argc, char** argv) {
 
             if (g_isHoldingCart) {
 
-                Vector3 camFwd = Vector3Normalize(Vector3{ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
+                Vector3 camFwd = Vector3Normalize(Vector3{ g_camera.target.x - g_camera.position.x, 0.0f, g_camera.target.z - g_camera.position.z });
 
-                Vector3 targetCartPos = { camera.position.x + camFwd.x * 1.15f, 10.02f, camera.position.z + camFwd.z * 1.15f };
+                Vector3 targetCartPos = { g_camera.position.x + camFwd.x * 1.15f, 10.02f, g_camera.position.z + camFwd.z * 1.15f };
 
                 float moveDist = Vector2Distance(Vector2{ g_cartPos.x, g_cartPos.z }, Vector2{ targetCartPos.x, targetCartPos.z });
 
@@ -3886,7 +3905,7 @@ int main(int argc, char** argv) {
 
             // Hook D: Take phantom item from ghost shopping cart [E]
             if (g_ghostCart.active && g_ghostCart.alpha > 0.35f && g_ghostCart.itemsInCart > 0 && !g_isHoldingCart) {
-                float dGhost = Vector3Distance(camera.position, g_ghostCart.pos);
+                float dGhost = Vector3Distance(g_camera.position, g_ghostCart.pos);
                 if (dGhost < 2.4f && g_heldProductIndex == -1) {
                     if (IsKeyPressed(KEY_E)) {
                         g_ghostCart.itemsInCart--;
@@ -3928,7 +3947,7 @@ int main(int argc, char** argv) {
 
             Vector3 cPos = { 104.5f, 11.5f, 134.5f };
 
-            float distToCounter = Vector3Distance(camera.position, cPos);
+            float distToCounter = Vector3Distance(g_camera.position, cPos);
 
             float cartDistToCounter = Vector3Distance(g_cartPos, cPos);
 
@@ -3936,7 +3955,7 @@ int main(int argc, char** argv) {
 
             Vector3 storeSwitchPos = { 107.75f, 11.5f, 138.2f };
 
-            float distToSwitch = Vector3Distance(camera.position, storeSwitchPos);
+            float distToSwitch = Vector3Distance(g_camera.position, storeSwitchPos);
 
             if (distToSwitch < 2.2f && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
 
@@ -3951,14 +3970,14 @@ int main(int argc, char** argv) {
             }
 
             // Washroom Ceramic Sink Faucet Interaction [E]
-            if (IsPlayerNearWashroomSink(camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
+            if (IsPlayerNearWashroomSink(g_camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
                 if (IsKeyPressed(KEY_E)) {
                     ToggleWashroomSinkFaucet();
                 }
             }
 
             // Washroom Entrance Door Interaction [E]
-            if (IsPlayerNearWashroomDoor(camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
+            if (IsPlayerNearWashroomDoor(g_camera.position) && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
                 if (IsKeyPressed(KEY_E)) {
                     ToggleWashroomDoor();
                     PlaySound(g_sndChestOpen);
@@ -4012,7 +4031,7 @@ int main(int argc, char** argv) {
 
             Vector3 printerPosWorld = { 106.3f, 11.56f, 133.5f };
 
-            if (Vector3Distance(camera.position, printerPosWorld) < 2.2f && g_printerState == PRINTER_DONE) {
+            if (Vector3Distance(g_camera.position, printerPosWorld) < 2.2f && g_printerState == PRINTER_DONE) {
 
                 if (IsKeyPressed(KEY_E)) {
 
@@ -4048,9 +4067,9 @@ int main(int argc, char** argv) {
 
                         g_receiptThrown = true;
 
-                        Vector3 camFwd = Vector3Normalize(Vector3{ camera.target.x - camera.position.x, 0.0f, camera.target.z - camera.position.z });
+                        Vector3 camFwd = Vector3Normalize(Vector3{ g_camera.target.x - g_camera.position.x, 0.0f, g_camera.target.z - g_camera.position.z });
 
-                        g_thrownReceiptPos = Vector3{ camera.position.x + camFwd.x * 1.1f, 10.03f, camera.position.z + camFwd.z * 1.1f };
+                        g_thrownReceiptPos = Vector3{ g_camera.position.x + camFwd.x * 1.1f, 10.03f, g_camera.position.z + camFwd.z * 1.1f };
 
                     }
 
@@ -4066,7 +4085,7 @@ int main(int argc, char** argv) {
 
             // Pickup thrown receipt
 
-            if (g_receiptThrown && Vector3Distance(camera.position, g_thrownReceiptPos) < 1.8f) {
+            if (g_receiptThrown && Vector3Distance(g_camera.position, g_thrownReceiptPos) < 1.8f) {
 
                 if (IsKeyPressed(KEY_E)) {
 
@@ -4204,13 +4223,13 @@ int main(int argc, char** argv) {
             }
 
 
-            float dToCarpet = Vector3Distance(camera.position, carpetWorld);
+            float dToCarpet = Vector3Distance(g_camera.position, carpetWorld);
 
 
 
             // 1. Interaction on surface outside shop behind back wall (Carpet & Heavy Steel Hatch)
 
-            if (dToCarpet < 3.2f && camera.position.y > 9.2f) {
+            if (dToCarpet < 3.2f && g_camera.position.y > 9.2f) {
 
                 if (IsKeyPressed(KEY_E)) {
 
@@ -4246,7 +4265,7 @@ int main(int argc, char** argv) {
 
             Vector3 worldShovelPos = { 84.4f, 10.0f, 138.6f };
 
-            float dToShovel = Vector3Distance(camera.position, worldShovelPos);
+            float dToShovel = Vector3Distance(g_camera.position, worldShovelPos);
 
             if (!g_hasShovel && dToShovel < 2.6f && !isShopOpen && !showQuitConfirm && !g_isHoldingCart) {
 
@@ -4323,9 +4342,9 @@ int main(int argc, char** argv) {
 
             if (!g_tunnelDug) {
 
-                float dToCaveIn = Vector3Distance(camera.position, Vector3{ 63.2f, 2.4f, 140.0f });
+                float dToCaveIn = Vector3Distance(g_camera.position, Vector3{ 63.2f, 2.4f, 140.0f });
 
-                if (dToCaveIn < 3.4f && camera.position.x > 61.5f && camera.position.y < 8.0f) {
+                if (dToCaveIn < 3.4f && g_camera.position.x > 61.5f && g_camera.position.y < 8.0f) {
 
                     if (IsKeyPressed(KEY_E) || (holdingShovel && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))) {
 
@@ -4391,7 +4410,7 @@ int main(int argc, char** argv) {
 
             // 3. Subterranean Bunker Systems & Interactions
 
-            if (camera.position.y < 9.0f) {
+            if (g_camera.position.y < 9.0f) {
 
                 // A. Pail Water Dripping Audio (spatial)
 
@@ -4401,7 +4420,7 @@ int main(int argc, char** argv) {
 
                     g_tunnelDripTimer = 0.0f;
 
-                    float dToBucket = Vector3Distance(camera.position, Vector3{ 98.5f, 5.0f, 137.6f });
+                    float dToBucket = Vector3Distance(g_camera.position, Vector3{ 98.5f, 5.0f, 137.6f });
 
                     if (dToBucket < 14.0f) {
 
@@ -4453,7 +4472,7 @@ int main(int argc, char** argv) {
 
                         g_radioMsgTimer = 0.0f;
 
-                        float dToRadio = Vector3Distance(camera.position, Vector3{ 100.5f, 6.2f, 140.6f });
+                        float dToRadio = Vector3Distance(g_camera.position, Vector3{ 100.5f, 6.2f, 140.6f });
 
                         if (dToRadio < 11.0f) {
 
@@ -4471,15 +4490,15 @@ int main(int argc, char** argv) {
 
 
 
-                float dToTable = Vector3Distance(camera.position, Vector3{ 100.2f, 6.2f, 140.0f });
+                float dToTable = Vector3Distance(g_camera.position, Vector3{ 100.2f, 6.2f, 140.0f });
 
-                float dToChest = Vector3Distance(camera.position, Vector3{ 100.4f, 5.5f, 137.8f });
+                float dToChest = Vector3Distance(g_camera.position, Vector3{ 100.4f, 5.5f, 137.8f });
 
 
 
                 // D. Radio Interaction (South end of worktable)
 
-                if (dToTable < 2.5f && camera.position.z >= 140.0f) {
+                if (dToTable < 2.5f && g_camera.position.z >= 140.0f) {
 
                     if (IsKeyPressed(KEY_E) && !g_mainMenuSystem.IsDossierModalShowing()) {
 
@@ -4507,7 +4526,7 @@ int main(int argc, char** argv) {
 
                 // E. Clandestine Dossier Interaction (North end of worktable)
 
-                else if (dToTable < 2.5f && camera.position.z < 140.0f) {
+                else if (dToTable < 2.5f && g_camera.position.z < 140.0f) {
 
                     if (IsKeyPressed(KEY_E) && !g_mainMenuSystem.IsDossierModalShowing()) {
 
@@ -4749,9 +4768,9 @@ int main(int argc, char** argv) {
         if (holdingShovel && g_gameState == STATE_GAMEPLAY && !isShopOpen && !showQuitConfirm && !g_mainMenuSystem.IsSettingsModalShowing() && !g_showManifestModal && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && swingTimer <= 0.0f) {
             swingTimer = 0.3f;
 
-            Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+            Vector3 forward = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
-            Vector3 pos = camera.position;
+            Vector3 pos = g_camera.position;
 
             
 
@@ -5014,11 +5033,11 @@ int main(int argc, char** argv) {
 
                 m.m11 = 1.0f;
 
-                m.m12 = s.basePos.x + camera.position.x;
+                m.m12 = s.basePos.x + g_camera.position.x;
 
-                m.m13 = s.basePos.y + camera.position.y;
+                m.m13 = s.basePos.y + g_camera.position.y;
 
-                m.m14 = s.basePos.z + camera.position.z;
+                m.m14 = s.basePos.z + g_camera.position.z;
 
                 uint8_t glyph = s.isBig ? '*' : '.';
 
@@ -5038,9 +5057,9 @@ int main(int argc, char** argv) {
 
         if (moonDir.y > -0.15f && moonAlpha > 0.04f) {
 
-            Vector3 moonCenter = Vector3Add(camera.position, Vector3Scale(moonDir, 280.0f));
+            Vector3 moonCenter = Vector3Add(g_camera.position, Vector3Scale(moonDir, 280.0f));
 
-            Vector3 moonForward = Vector3Normalize(Vector3Subtract(camera.position, moonCenter)); 
+            Vector3 moonForward = Vector3Normalize(Vector3Subtract(g_camera.position, moonCenter)); 
 
             Vector3 upRefMoon = (fabsf(moonForward.y) > 0.88f) ? Vector3{0, 0, 1} : Vector3{0, 1, 0};
 
@@ -5106,7 +5125,7 @@ int main(int argc, char** argv) {
 
         for (int b = 0; b < MAX_BOVINE_NPCS; b++) {
 
-            UpdateBovineAI(g_bovineNPCs[b], camera.position, dt, isRainingBovine);
+            UpdateBovineAI(g_bovineNPCs[b], g_camera.position, dt, isRainingBovine);
 
             UpdateBovineKinematics(g_bovineNPCs[b], dt);
 
@@ -5116,7 +5135,7 @@ int main(int argc, char** argv) {
 
         // PROCEDURAL HORROR HOUND (DOG NPC)
 
-        UpdateDogAI(g_houndNPC, camera.position, dt, lightningFlashTimer, nightFactor > 0.35f);
+        UpdateDogAI(g_houndNPC, g_camera.position, dt, lightningFlashTimer, nightFactor > 0.35f);
 
         UpdateDog(g_houndNPC, dt);
 
@@ -5124,7 +5143,7 @@ int main(int argc, char** argv) {
 
         // Hound Interaction (Petting & Blood Feeding Companion System)
 
-        float distToHound = Vector3Distance(camera.position, g_houndNPC.pos);
+        float distToHound = Vector3Distance(g_camera.position, g_houndNPC.pos);
 
         bool hasBloodBottle = (g_heldProductIndex != -1 && g_shopProducts[g_heldProductIndex].type == PROD_BLOOD && g_shopProducts[g_heldProductIndex].fill > 0.02f);
 
@@ -5216,23 +5235,23 @@ int main(int argc, char** argv) {
 
         if (isMoving && currentStep > lastStep) {
 
-            bool inShop = (camera.position.x >= 86.0f && camera.position.x <= 108.5f &&
+            bool inShop = (g_camera.position.x >= 86.0f && g_camera.position.x <= 108.5f &&
 
-                           camera.position.z >= 126.0f && camera.position.z <= 153.5f);
+                           g_camera.position.z >= 126.0f && g_camera.position.z <= 153.5f);
 
-            bool onGround = (camera.position.y <= 12.5f);
+            bool onGround = (g_camera.position.y <= 12.5f);
 
             if (onGround) {
 
                 g_isLeftFootStep = !g_isLeftFootStep;
 
-                Vector3 stepFwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+                Vector3 stepFwd = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
                 Vector3 stepRgt = Vector3Normalize(Vector3CrossProduct(stepFwd, Vector3{0, 1, 0}));
 
                 float footOffset = g_isLeftFootStep ? -0.16f : 0.16f;
 
-                Vector3 footPos = { camera.position.x + stepRgt.x * footOffset, 10.019f, camera.position.z + stepRgt.z * footOffset };
+                Vector3 footPos = { g_camera.position.x + stepRgt.x * footOffset, 10.019f, g_camera.position.z + stepRgt.z * footOffset };
 
                 float footYaw = atan2f(stepFwd.x, stepFwd.z) * RAD2DEG;
 
@@ -5292,7 +5311,7 @@ int main(int argc, char** argv) {
 
         // Natural Figure-8 Human Gait Kinematics
 
-        Vector3 forwardBob = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+        Vector3 forwardBob = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
         Vector3 rightBob   = Vector3Normalize(Vector3CrossProduct(forwardBob, Vector3{ 0.0f, 1.0f, 0.0f }));
 
@@ -5370,7 +5389,7 @@ int main(int argc, char** argv) {
 
             bobOffset = Vector3Add(bobOffset, Vector3Scale(rightBob, sx));
 
-            bobOffset = Vector3Add(bobOffset, Vector3Scale(camera.up, sy));
+            bobOffset = Vector3Add(bobOffset, Vector3Scale(g_camera.up, sy));
 
             if (hitStopTimer <= 0.0f) digShake -= rawDt * 3.0f;
 
@@ -5387,20 +5406,20 @@ int main(int argc, char** argv) {
         
 
         if (isRoofCamActive) {
-            SetupRoofCCTVCamera(renderCam, camera, playerInstances);
+            SetupRoofCCTVCamera(renderCam, g_camera, playerInstances);
         } else if (isThirdPerson) {
 
             // ELASTIC THIRD PERSON CAMERA (INDOOR AWARE & WALL-COLLISION PROTECTED)
 
             if (playerInShop) {
 
-                // Tighter, responsive indoor third-person camera (distance ~2.1m, height ~0.55m)
+                // Tighter, responsive indoor third-person g_camera (distance ~2.1m, height ~0.55m)
 
                 float indoorDist = 2.1f;
 
                 float indoorHeight = 0.55f;
 
-                Vector3 idealPos = Vector3Subtract(camera.position, Vector3Scale(forwardBob, indoorDist));
+                Vector3 idealPos = Vector3Subtract(g_camera.position, Vector3Scale(forwardBob, indoorDist));
 
                 idealPos.y += indoorHeight;
 
@@ -5421,51 +5440,51 @@ int main(int argc, char** argv) {
 
 
 
-                // Ray clipping against shop outer walls so camera pulls in smoothly near walls
+                // Ray clipping against shop outer walls so g_camera pulls in smoothly near walls
 
-                Vector3 camDir = Vector3Subtract(idealPos, camera.position);
+                Vector3 camDir = Vector3Subtract(idealPos, g_camera.position);
 
                 float maxT = 1.0f;
 
                 if (camDir.x < -1e-4f && idealPos.x < SHOP_CAM_MIN_X) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MIN_X - camera.position.x) / camDir.x);
+                    maxT = fminf(maxT, (SHOP_CAM_MIN_X - g_camera.position.x) / camDir.x);
 
                 }
 
                 if (camDir.x > 1e-4f && idealPos.x > SHOP_CAM_MAX_X) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MAX_X - camera.position.x) / camDir.x);
+                    maxT = fminf(maxT, (SHOP_CAM_MAX_X - g_camera.position.x) / camDir.x);
 
                 }
 
                 if (camDir.z < -1e-4f && idealPos.z < SHOP_CAM_MIN_Z) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MIN_Z - camera.position.z) / camDir.z);
+                    maxT = fminf(maxT, (SHOP_CAM_MIN_Z - g_camera.position.z) / camDir.z);
 
                 }
 
                 if (camDir.z > 1e-4f && idealPos.z > SHOP_CAM_MAX_Z) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MAX_Z - camera.position.z) / camDir.z);
+                    maxT = fminf(maxT, (SHOP_CAM_MAX_Z - g_camera.position.z) / camDir.z);
 
                 }
 
                 if (camDir.y > 1e-4f && idealPos.y > SHOP_CAM_MAX_Y) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MAX_Y - camera.position.y) / camDir.y);
+                    maxT = fminf(maxT, (SHOP_CAM_MAX_Y - g_camera.position.y) / camDir.y);
 
                 }
 
                 if (camDir.y < -1e-4f && idealPos.y < SHOP_CAM_MIN_Y) {
 
-                    maxT = fminf(maxT, (SHOP_CAM_MIN_Y - camera.position.y) / camDir.y);
+                    maxT = fminf(maxT, (SHOP_CAM_MIN_Y - g_camera.position.y) / camDir.y);
 
                 }
 
                 maxT = Clamp(maxT, 0.55f, 1.0f);
 
-                idealPos = Vector3Add(camera.position, Vector3Scale(camDir, maxT));
+                idealPos = Vector3Add(g_camera.position, Vector3Scale(camDir, maxT));
 
 
 
@@ -5491,15 +5510,15 @@ int main(int argc, char** argv) {
 
                 }
 
-                renderCam.target = Vector3{ camera.position.x, camera.position.y - 0.20f, camera.position.z };
+                renderCam.target = Vector3{ g_camera.position.x, g_camera.position.y - 0.20f, g_camera.position.z };
 
                 renderCam.up = Vector3{0, 1, 0};
 
             } else {
 
-                // Outdoor elastic drone camera (5.0m distance, 1.5m height)
+                // Outdoor elastic drone g_camera (5.0m distance, 1.5m height)
 
-                Vector3 idealPos = Vector3Subtract(camera.position, Vector3Scale(forwardBob, 5.0f));
+                Vector3 idealPos = Vector3Subtract(g_camera.position, Vector3Scale(forwardBob, 5.0f));
 
                 idealPos.y += 1.5f;
 
@@ -5509,7 +5528,7 @@ int main(int argc, char** argv) {
 
                 }
 
-                renderCam.target = camera.position;
+                renderCam.target = g_camera.position;
 
                 renderCam.up = Vector3{0, 1, 0};
 
@@ -5525,7 +5544,7 @@ int main(int argc, char** argv) {
 
 
 
-            // Apply Grethnar Jumpscare Zoom & Screen Shake to 3rd person camera as well
+            // Apply Grethnar Jumpscare Zoom & Screen Shake to 3rd person g_camera as well
 
             if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
@@ -5559,7 +5578,7 @@ int main(int argc, char** argv) {
 
             Matrix m = MatrixIdentity();
             if (playerInShop) {
-                Color pLit = ApplyShopLighting(camera.position, { 230, 230, 235, 255 });
+                Color pLit = ApplyShopLighting(g_camera.position, { 230, 230, 235, 255 });
                 m.m0 = pLit.r / 255.0f;
                 m.m1 = pLit.g / 255.0f;
                 m.m2 = pLit.b / 255.0f;
@@ -5578,11 +5597,11 @@ int main(int argc, char** argv) {
 
             float pBobY = (fabs(cosf(walkTime / 2.0f)) - 0.5f) * 0.4f * bobAmplitude;
 
-            m.m12 = camera.position.x;
+            m.m12 = g_camera.position.x;
 
-            m.m13 = camera.position.y - 0.90f + pBobY;
+            m.m13 = g_camera.position.y - 0.90f + pBobY;
 
-            m.m14 = camera.position.z;
+            m.m14 = g_camera.position.z;
 
             
 
@@ -5600,7 +5619,7 @@ int main(int argc, char** argv) {
 
             // 3D Volumetric Extrusion: Multi-layered depth slices create a real 3D sculpted figure
 
-            Vector3 camToP = Vector3Normalize(Vector3Subtract(camera.position, renderCam.position));
+            Vector3 camToP = Vector3Normalize(Vector3Subtract(g_camera.position, renderCam.position));
 
             float depthStep = 0.035f;
 
@@ -5628,7 +5647,7 @@ int main(int argc, char** argv) {
 
             // Ground contact drop shadow for player entity
 
-            DrawCircle3D(Vector3{ camera.position.x, 10.018f, camera.position.z }, 0.45f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 8, 12, 185 });
+            DrawCircle3D(Vector3{ g_camera.position.x, 10.018f, g_camera.position.z }, 0.45f, Vector3{ 1, 0, 0 }, 90.0f, Color{ 8, 8, 12, 185 });
 
         } else {
 
@@ -5661,7 +5680,7 @@ int main(int argc, char** argv) {
                 Vector3 basePos, baseTgt;
                 GetMenuCCTVCamera(g_menuCCTVFeed, timeVal, g_menuCamSmoothX, g_menuCamSmoothY, basePos, baseTgt);
 
-                // Cinematic camera dolly surge forward down the corridor when PLAY is activated
+                // Cinematic g_camera dolly surge forward down the corridor when PLAY is activated
                 float targetFov = g_userFov;
                 if (g_isMenuStartingGame) {
                     float startProg = Clamp(g_menuPlayTransitionTimer / 0.70f, 0.0f, 1.0f);
@@ -5678,7 +5697,7 @@ int main(int argc, char** argv) {
 
             } else {
 
-                renderCam = camera;
+                renderCam = g_camera;
 
                 renderCam.fovy = g_camDynamicFov;
 
@@ -5738,39 +5757,6 @@ int main(int argc, char** argv) {
 
         // MR. GRETHNAR EYE-BLOOD: Hyper-realistic blood drops made of '~' characters dripping to ground
 
-        for (const auto& bd : grethnarBloodDrops) {
-
-            Matrix mb = MatrixIdentity();
-
-            mb.m0 = 175.0f / 255.0f; // Deep arterial crimson red
-
-            mb.m1 = 6.0f / 255.0f;
-
-            mb.m2 = 12.0f / 255.0f;
-
-            mb.m3 = Clamp(bd.life / 0.6f, 0.0f, 1.0f);
-
-            mb.m4 = bd.scale;
-
-            mb.m5 = bd.scale;
-
-            mb.m8 = 0.0f;
-
-            mb.m9 = 0.0f;
-
-            mb.m10 = 0.0f; // Billboard
-
-            mb.m11 = 1.0f;
-
-            mb.m12 = bd.pos.x;
-
-            mb.m13 = bd.pos.y;
-
-            mb.m14 = bd.pos.z;
-
-            playerInstances['~'].push_back(mb);
-
-        }
 
 
 
@@ -5815,11 +5801,11 @@ int main(int argc, char** argv) {
 
                     float rAng = GetRandomValue(0, 360) * DEG2RAD;
 
-                    groundImpactPos.x = camera.position.x + cosf(rAng) * rDist;
+                    groundImpactPos.x = g_camera.position.x + cosf(rAng) * rDist;
 
-                    groundImpactPos.z = camera.position.z + sinf(rAng) * rDist;
+                    groundImpactPos.z = g_camera.position.z + sinf(rAng) * rDist;
 
-                    groundImpactPos.y = camera.position.y;
+                    groundImpactPos.y = g_camera.position.y;
 
                     groundImpactTimer = 0.5f;
 
@@ -5865,7 +5851,7 @@ int main(int argc, char** argv) {
                     if (Vector3Length(refFwd) < 0.01f) refFwd = Vector3{ 0.0f, 0.0f, 1.0f };
                     float dx = refFwd.x * cosA - refFwd.z * sinA;
                     float dz = refFwd.x * sinA + refFwd.z * cosA;
-                    Vector3 rainCenter = (g_gameState == STATE_MAIN_MENU) ? renderCam.position : camera.position;
+                    Vector3 rainCenter = (g_gameState == STATE_MAIN_MENU) ? renderCam.position : g_camera.position;
 
                     rp.pos.x = rainCenter.x + dx * dist;
                     rp.pos.z = rainCenter.z + dz * dist;
@@ -5963,7 +5949,7 @@ int main(int argc, char** argv) {
         
 
         // Build rain instances (suppressed underwater for 144 FPS and realism)
-        bool isUnderwaterScene = (camera.position.y < 9.75f && camera.position.x <= 36.0f);
+        bool isUnderwaterScene = (g_camera.position.y < 9.75f && g_camera.position.x <= 36.0f);
 
         for(int i=0; i<256; i++) rainInstances[i].clear();
 
@@ -6037,13 +6023,13 @@ int main(int argc, char** argv) {
 
         // Drop a new footprint when the player moves 1.2 units on the ground
 
-        if (onGround && Vector3Distance(camera.position, lastTrailPos) > 1.2f) {
+        if (onGround && Vector3Distance(g_camera.position, lastTrailPos) > 1.2f) {
 
-            trail[trailIndex].pos = camera.position;
+            trail[trailIndex].pos = g_camera.position;
 
             trail[trailIndex].life = 1.0f;
 
-            lastTrailPos = camera.position;
+            lastTrailPos = g_camera.position;
 
             trailIndex = (trailIndex + 1) % 16;
 
@@ -6082,7 +6068,8 @@ int main(int argc, char** argv) {
         }
 
         // Update Haunted Washroom Real Planar Reflection Mirror Pre-pass (BEFORE BeginTextureMode(target) to prevent FBO conflict!)
-        Camera3D shopEvalCam = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson) ? renderCam : camera;
+        Camera3D shopEvalCam = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson) ? renderCam : g_camera;
+        PreRenderATMScreen(timeVal);
         UpdateShopWashroomMirror(shopEvalCam, ApplyShopLighting, g_shopLightsOn, timeVal);
 
         // Update Midnight Security Monitor (CCTV CRT) Pre-pass
@@ -6124,7 +6111,7 @@ int main(int argc, char** argv) {
 
         SetShaderValue(instancedShader, timeLoc, &timeVal, SHADER_UNIFORM_FLOAT);
 
-        SetShaderValue(instancedShader, playerPosLoc, &camera.position, SHADER_UNIFORM_VEC3);
+        SetShaderValue(instancedShader, playerPosLoc, &g_camera.position, SHADER_UNIFORM_VEC3);
 
         SetShaderValueV(instancedShader, trailPosLoc, shaderTrailPos, SHADER_UNIFORM_VEC3, 16);
 
@@ -6178,7 +6165,7 @@ int main(int argc, char** argv) {
 
         // --- SPATIAL & FRUSTUM BUCKET CULLING (MASSIVE FPS BOOST) ---
 
-        // Pre-calculate which buckets are within a visible radius of the camera, and in front of it.
+        // Pre-calculate which buckets are within a visible radius of the g_camera, and in front of it.
 
         static std::vector<RenderBucket*> visibleBuckets;
 
@@ -6198,7 +6185,7 @@ int main(int argc, char** argv) {
 
         
 
-        Vector3 camForward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+        Vector3 camForward = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
         camForward.y = 0.0f;
 
@@ -6218,9 +6205,9 @@ int main(int argc, char** argv) {
 
                 float centerZ = bz * BUCKET_SIZE + (BUCKET_SIZE / 2.0f);
 
-                float dx = centerX - camera.position.x;
+                float dx = centerX - g_camera.position.x;
 
-                float dz = centerZ - camera.position.z;
+                float dz = centerZ - g_camera.position.z;
 
                 float distSq = dx*dx + dz*dz;
 
@@ -6282,7 +6269,7 @@ int main(int argc, char** argv) {
 
         }
 
-        // Populate curated ASCII cloud letters with camera frustum culling (only exist above water)
+        // Populate curated ASCII cloud letters with g_camera frustum culling (only exist above water)
         if (!isUnderwaterScene) {
             PopulateCloudInstances(renderCam, sunDir, sunElev, lightningFlashTimer, cloudInstances, timeVal);
         } else {
@@ -6381,7 +6368,7 @@ int main(int argc, char** argv) {
 
         if (isThirdPerson || isRoofCamActive) {
 
-            DrawCircle3D({ camera.position.x, 10.02f, camera.position.z }, 0.45f, { 1.0f, 0.0f, 0.0f }, 90.0f, { 10, 12, 16, 140 });
+            DrawCircle3D({ g_camera.position.x, 10.02f, g_camera.position.z }, 0.45f, { 1.0f, 0.0f, 0.0f }, 90.0f, { 10, 12, 16, 140 });
 
         }
 
@@ -6489,7 +6476,7 @@ int main(int argc, char** argv) {
 
         };
 
-        float distGasSq = (128.0f - camera.position.x)*(128.0f - camera.position.x) + (140.0f - camera.position.z)*(140.0f - camera.position.z);
+        float distGasSq = (128.0f - g_camera.position.x)*(128.0f - g_camera.position.x) + (140.0f - g_camera.position.z)*(140.0f - g_camera.position.z);
 
         if (isRoofCamActive || distGasSq < 85.0f * 85.0f)
 
@@ -6535,12 +6522,12 @@ int main(int argc, char** argv) {
                 if (g_holdingFuelNozzle && !g_nozzleInCar && g_activePumpIndex != -1) {
                     float pz = (g_activePumpIndex == 0) ? 137.5f : 142.5f;
                     Vector3 pumpOutlet = { 127.42f, 11.2f, pz - 0.25f };
-                    Vector3 fwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-                    Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, camera.up));
+                    Vector3 fwd = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
+                    Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, g_camera.up));
                     Vector3 camUp = Vector3Normalize(Vector3CrossProduct(camRight, fwd));
                     float stepBobY = (walkTime > 0.0f) ? sinf(walkTime * 2.0f) * 0.008f : 0.0f;
                     float breathe  = sinf(timeVal * 1.8f) * 0.004f;
-                    Vector3 handPos = Vector3Add(camera.position,
+                    Vector3 handPos = Vector3Add(g_camera.position,
                         Vector3Add(Vector3Scale(camRight, 0.22f),
                         Vector3Add(Vector3Scale(camUp, -0.20f + stepBobY + breathe),
                         Vector3Scale(fwd, 0.40f))));
@@ -6553,7 +6540,7 @@ int main(int argc, char** argv) {
                     // Draw first-person nozzle viewmodel if not in roof cam
                     if (!isRoofCamActive) {
                         bool isFlowing = (g_customerCar.state == CAR_REFUELING && (IsKeyDown(KEY_E) || IsMouseButtonDown(MOUSE_BUTTON_LEFT)));
-                        DrawFirstPersonFuelNozzle(camera, isFlowing, walkTime, timeVal);
+                        DrawFirstPersonFuelNozzle(g_camera, isFlowing, walkTime, timeVal);
                     }
                 }
 
@@ -6709,7 +6696,7 @@ int main(int argc, char** argv) {
             // ---------------------------------------------------------------------
 
             // 0. CRASHED SILVER SEDAN & ROADSIDE WRECK (Mile Marker 14, East Verge: X = 143.8, Z = 136.5)
-            DrawCrashedSedan(g_crashedCarPos, timeVal, extDayFactor, extNightFactor, camera);
+            DrawCrashedSedan(g_crashedCarPos, timeVal, extDayFactor, extNightFactor, g_camera);
 
             // Contact drop shadows for exterior gas pump island & pillars
 
@@ -6725,7 +6712,7 @@ int main(int argc, char** argv) {
 
             // ---------------------------------------------------------------------
 
-            float distLotSq = (96.5f - camera.position.x)*(96.5f - camera.position.x) + (140.0f - camera.position.z)*(140.0f - camera.position.z);
+            float distLotSq = (96.5f - g_camera.position.x)*(96.5f - g_camera.position.x) + (140.0f - g_camera.position.z)*(140.0f - g_camera.position.z);
 
             if (distLotSq < 90.0f * 90.0f) {
 
@@ -6805,9 +6792,9 @@ int main(int argc, char** argv) {
 
                 // Rear Alley Props: only drawn when outside the store
 
-                bool isInsideStore = (camera.position.x <= 107.5f && camera.position.x >= 86.2f &&
+                bool isInsideStore = (g_camera.position.x <= 107.5f && g_camera.position.x >= 86.2f &&
 
-                                      camera.position.z >= 126.2f && camera.position.z <= 153.8f);
+                                      g_camera.position.z >= 126.2f && g_camera.position.z <= 153.8f);
 
                 if (!isInsideStore) {
 
@@ -6969,7 +6956,7 @@ int main(int argc, char** argv) {
 
                     Vector3 lDirWorld = { -0.2f, -1.0f, -0.3f };
 
-                    DrawShovel(g_shovelRig, sWorld, camera.position, lDirWorld);
+                    DrawShovel(g_shovelRig, sWorld, g_camera.position, lDirWorld);
 
 
 
@@ -7063,11 +7050,11 @@ int main(int argc, char** argv) {
 
                 // =================================================================
 
-                bool nearTunnel = (camera.position.x <= 84.0f && camera.position.x >= 28.0f &&
+                bool nearTunnel = (g_camera.position.x <= 84.0f && g_camera.position.x >= 28.0f &&
 
-                                  camera.position.z >= 132.0f && camera.position.z <= 148.0f);
+                                  g_camera.position.z >= 132.0f && g_camera.position.z <= 148.0f);
 
-                if (nearTunnel || camera.position.y < 9.5f) {
+                if (nearTunnel || g_camera.position.y < 9.5f) {
 
                     // --- UPPER CREEPY METALLIC TUNNEL (X: 82.0 -> 62.0, Y: 6.5 -> 1.2, Width 6.0m) ---
 
@@ -7267,7 +7254,7 @@ int main(int argc, char** argv) {
 
                     // --- LOWER DEEP METALLIC CONDUIT (X: 62.0 -> 32.0, Y: 1.2 -> -16.0) ---
 
-                    if (g_tunnelDug || camera.position.x < 62.0f) {
+                    if (g_tunnelDug || g_camera.position.x < 62.0f) {
 
                         for (int ds = 0; ds <= 16; ds++) {
 
@@ -7375,7 +7362,7 @@ int main(int argc, char** argv) {
 
                 // =================================================================
 
-                bool inVillage = (camera.position.x <= 40.0f && camera.position.y <= -2.0f);
+                bool inVillage = (g_camera.position.x <= 40.0f && g_camera.position.y <= -2.0f);
 
                 if (inVillage) {
 
@@ -8000,9 +7987,16 @@ int main(int argc, char** argv) {
 
             // ---------------------------------------------------------------------
 
-            Vector3 camPosForShop = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson || isRoofCamActive) ? renderCam.position : camera.position;
-            bool canSeeShopInterior = (camPosForShop.x <= 135.0f && camPosForShop.x >= 70.0f &&
-                                       camPosForShop.z >= 110.0f && camPosForShop.z <= 175.0f);
+            Vector3 camPosForShop = (g_lookAtShop || g_lookAtWashroom || g_lookAtAtm || isThirdPerson || isRoofCamActive) ? renderCam.position : g_camera.position;
+            // The building is part of the persistent world.  Its render path
+            // must not depend on the player entering an arbitrary rectangle.
+            bool canSeeShopInterior = (camPosForShop.x <= 135.0f && camPosForShop.x >= 70.0f && camPosForShop.z >= 110.0f && camPosForShop.z <= 175.0f);
+
+            // BuildShop clears this entire lot.  Draw its base independently
+            // of the interior-detail cull so approaching the store cannot
+            // expose a hole in the ground.
+            DrawCube({ 95.5f, 10.005f, 144.0f }, 41.0f, 0.01f, 52.0f,
+                     { 46, 47, 44, 255 });
 
             if (canSeeShopInterior) {
 
@@ -8096,6 +8090,7 @@ int main(int argc, char** argv) {
             // Phase 3: High-Fidelity Textured Timber Walls, Water Leaks, Grunge & Storytelling Posters
             DrawShopAtmosphereWalls(ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawShopAtmosphereDetails(ApplyShopLighting, g_shopLightsOn, timeVal);
+            DrawShopSuperstoreGondolas(ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawShopInteriorProps(ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawShopHauntedWashroom(renderCam, ApplyShopLighting, g_shopLightsOn, timeVal);
             DrawATM3D(ApplyShopLighting, g_shopLightsOn, timeVal);
@@ -8686,9 +8681,9 @@ int main(int argc, char** argv) {
 
 
 
-                    bool drawNorth1 = (camera.position.z >= 139.8f || camera.position.x < 89.0f || camera.position.x > 101.0f);
+                    bool drawNorth1 = (g_camera.position.z >= 139.8f || g_camera.position.x < 89.0f || g_camera.position.x > 101.0f);
 
-                    bool drawSouth1 = (camera.position.z <= 140.2f || camera.position.x < 89.0f || camera.position.x > 101.0f);
+                    bool drawSouth1 = (g_camera.position.z <= 140.2f || g_camera.position.x < 89.0f || g_camera.position.x > 101.0f);
 
 
 
@@ -8804,9 +8799,9 @@ int main(int argc, char** argv) {
 
 
 
-                    bool drawNorth2 = (camera.position.z >= 146.8f || camera.position.x < 89.0f || camera.position.x > 101.0f);
+                    bool drawNorth2 = (g_camera.position.z >= 146.8f || g_camera.position.x < 89.0f || g_camera.position.x > 101.0f);
 
-                    bool drawSouth2 = (camera.position.z <= 147.2f || camera.position.x < 89.0f || camera.position.x > 101.0f);
+                    bool drawSouth2 = (g_camera.position.z <= 147.2f || g_camera.position.x < 89.0f || g_camera.position.x > 101.0f);
 
 
 
@@ -8918,7 +8913,7 @@ int main(int argc, char** argv) {
 
             // ---------------------------------------------------------------------
 
-            DrawHorizontalRefrigerator(Vector3{ 94.5f, 10.015f, 133.5f }, camera);
+            DrawHorizontalRefrigerator(Vector3{ 94.5f, 10.015f, 133.5f }, g_camera);
 
 
 
@@ -9077,7 +9072,9 @@ int main(int argc, char** argv) {
                 // When vanished or jumpscaring, the counter is completely empty under the warm spotlight!
 
         g_grethnarSystem.Draw(timeVal);
-            DrawShopProductsAndParticles(camera, walkTime, bobAmplitude, dt);
+            DrawShopProductsAndParticles(g_camera, walkTime, bobAmplitude, dt);
+        } // Close Checkout Counter block
+        } // Close if (canSeeShopInterior)
 
 
 
@@ -9091,9 +9088,9 @@ int main(int argc, char** argv) {
 
             if (holdingShovel && !isRoofCamActive && g_gameState == STATE_GAMEPLAY) {
 
-                Vector3 fwd = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+                Vector3 fwd = Vector3Normalize(Vector3Subtract(g_camera.target, g_camera.position));
 
-                Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, camera.up));
+                Vector3 camRight = Vector3Normalize(Vector3CrossProduct(fwd, g_camera.up));
 
                 Vector3 camUp = Vector3Normalize(Vector3CrossProduct(camRight, fwd));
 
@@ -9109,7 +9106,7 @@ int main(int argc, char** argv) {
 
                 // Primary rear hand anchor holding the shovel grip
 
-                Vector3 handAnchor = Vector3Add(camera.position,
+                Vector3 handAnchor = Vector3Add(g_camera.position,
                     Vector3Add(Vector3Scale(camRight, 0.25f + swayX),
                                Vector3Add(Vector3Scale(camUp, -0.24f + swayY + stepBobY),
                                           Vector3Scale(fwd, 0.36f))));
@@ -9124,7 +9121,7 @@ int main(int argc, char** argv) {
 
                 Vector3 lDir = g_flashlightActive ? fwd : (g_curExtDayFactor > 0.2f ? g_curSunDir : Vector3{ -0.3f, -1.0f, -0.2f });
 
-                DrawShovel(g_shovelRig, shovelWorld, camera.position, lDir);
+                DrawShovel(g_shovelRig, shovelWorld, g_camera.position, lDir);
 
 
 
@@ -9200,17 +9197,17 @@ int main(int argc, char** argv) {
 
         // ---- SOLID OUTSIDE GROUND LAYER (Very, very dark brown, like the road material) ----
 
-        matGround.maps[MATERIAL_MAP_ALBEDO].color = ApplyExteriorDaylight(darkBrownBase, 1.0f);
+        g_matGround.maps[MATERIAL_MAP_ALBEDO].color = ApplyExteriorDaylight(darkBrownBase, 1.0f);
 
-        DrawMesh(mGround, matGround, MatrixTranslate(128.0f, 10.00f, 128.0f));
+        DrawMesh(g_mGround, g_matGround, MatrixTranslate(128.0f, 9.98f, 128.0f));
 
 
 
         // ---- ROAD (Main Game) ----
 
-        matRoad.maps[MATERIAL_MAP_ALBEDO].color = { 0, 0, 0, 255 }; // Pure pitch black asphalt road
+        g_matRoad.maps[MATERIAL_MAP_ALBEDO].color = { 0, 0, 0, 255 }; // Pure pitch black asphalt road
 
-        DrawMesh(mRoad, matRoad, MatrixTranslate(128.0f, 10.01f, 250.0f));
+        DrawMesh(g_mRoad, g_matRoad, MatrixTranslate(128.0f, 10.01f, 250.0f));
 
         // 3D Cloud Ground Shadows on Highway, Apron, and Terrain
         if (!isUnderwaterScene) {
@@ -9219,7 +9216,7 @@ int main(int argc, char** argv) {
 
         // Draw dual-lane stripes (Left Lane at X=119.5, Right Lane at X=136.5)
 
-        int startStripe = (int)(camera.position.z / 6.0f) - 15;
+        int startStripe = (int)(g_camera.position.z / 6.0f) - 15;
 
         if (startStripe < -50) startStripe = -50;
 
@@ -9299,7 +9296,7 @@ int main(int argc, char** argv) {
             float distHoundSq = Vector3DistanceSqr(renderCam.position, g_houndNPC.pos);
             if (distHoundSq < 150.0f * 150.0f && g_gameState != STATE_MAIN_MENU) {
 
-                // Pass dynamic camera and time uniforms
+                // Pass dynamic g_camera and time uniforms
 
                 float dogTime = g_houndNPC.animTime;
 
@@ -9427,15 +9424,15 @@ int main(int argc, char** argv) {
 
 
 
-            // Standing right on the shop floor 1.6m in front of player (fully in camera frame in both 1st and 3rd person)
+            // Standing right on the shop floor 1.6m in front of player (fully in g_camera frame in both 1st and 3rd person)
 
-            Vector3 jsPos = Vector3Add(camera.position, Vector3Scale(pFwdH, 1.60f));
+            Vector3 jsPos = Vector3Add(g_camera.position, Vector3Scale(pFwdH, 1.60f));
 
             jsPos.y = 10.0f; // Exact floor level
 
 
 
-            float faceYaw = -atan2f(camera.position.x - jsPos.x, camera.position.z - jsPos.z) * RAD2DEG;
+            float faceYaw = -atan2f(g_camera.position.x - jsPos.x, g_camera.position.z - jsPos.z) * RAD2DEG;
 
 
 
@@ -9723,7 +9720,7 @@ int main(int argc, char** argv) {
         // AAA TOP-LEFT PLAYER HUD & TELEMETRY (CASH CARD, LOCATION, POPUPS)
         // ---------------------------------------------------------------------
         if (g_gameState == STATE_GAMEPLAY && !isRoofCamActive && !showQuitConfirm) {
-            DrawPlayerHUD(camera);
+            DrawPlayerHUD(g_camera);
         }
 
         // ---------------------------------------------------------------------
@@ -9737,7 +9734,7 @@ int main(int argc, char** argv) {
         // AAA CENTRALIZED INTERACTION MANAGER (PRIORITY QUEUE - ZERO COLLISIONS)
         // ---------------------------------------------------------------------
         if (g_gameState == STATE_GAMEPLAY && !isShopOpen && !isRoofCamActive && !showQuitConfirm) {
-            DrawInteractionManager(camera, dt, timeVal, g_camLandingDip);
+            DrawInteractionManager(g_camera, dt, timeVal, g_camLandingDip);
         }
 
         // Subterranean Notification Banner
@@ -9775,14 +9772,14 @@ int main(int argc, char** argv) {
         // =========================================================================
         if (g_gameState == STATE_GAMEPLAY && !isShopOpen && !isRoofCamActive) {
             DrawTacticalCrosshair(hudFocusIdx, nearCounter, g_heldProductIndex);
-            if (IsPlayerNearWashroomSink(camera.position)) {
+            if (IsPlayerNearWashroomSink(g_camera.position)) {
                 const char* faucetPrompt = IsWashroomSinkRunning() ? "[E] TURN FAUCET OFF" : "[E] TURN FAUCET ON";
                 int textW = MeasureText(faucetPrompt, 16);
                 DrawRectangle(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 15, 18, 22, 210 });
                 DrawRectangleLines(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 85, 165, 235, 240 });
                 DrawText(faucetPrompt, LOGICAL_W / 2 - textW / 2, LOGICAL_H / 2 + 36, 16, Color{ 225, 240, 255, 255 });
             }
-            if (IsPlayerNearWashroomDoor(camera.position)) {
+            if (IsPlayerNearWashroomDoor(g_camera.position)) {
                 const char* doorPrompt = IsWashroomDoorOpen() ? "[E] CLOSE WASHROOM DOOR" : "[E] OPEN WASHROOM DOOR";
                 int textW = MeasureText(doorPrompt, 16);
                 DrawRectangle(LOGICAL_W / 2 - textW / 2 - 8, LOGICAL_H / 2 + 32, textW + 16, 24, Color{ 15, 18, 22, 210 });
@@ -9790,7 +9787,7 @@ int main(int argc, char** argv) {
                 DrawText(doorPrompt, LOGICAL_W / 2 - textW / 2, LOGICAL_H / 2 + 36, 16, Color{ 245, 230, 195, 255 });
             }
             if (g_ghostCart.active && g_ghostCart.alpha > 0.35f && g_ghostCart.itemsInCart > 0 && !g_isHoldingCart) {
-                float dGhost = Vector3Distance(camera.position, g_ghostCart.pos);
+                float dGhost = Vector3Distance(g_camera.position, g_ghostCart.pos);
                 if (dGhost < 2.4f && g_heldProductIndex == -1) {
                     const char* ghostPrompt = "[E] TAKE PHANTOM ITEM FROM CART";
                     int textW = MeasureText(ghostPrompt, 16);
@@ -9802,11 +9799,11 @@ int main(int argc, char** argv) {
         }
 
         // HYPER-REALISTIC SMARTPHONE & LIVE "MIRE-NAV" GPS MAP SYSTEM
-        phoneSystem.Draw(target, camera, g_vmSwayX, g_vmSwayY, dayCycleTime, dayCycleDuration, g_waterState);
+        phoneSystem.Draw(target, g_camera, g_vmSwayX, g_vmSwayY, dayCycleTime, dayCycleDuration, g_waterState);
 
 
 
-        EndMode2D(); // Close pixel-perfect virtual UI camera
+        EndMode2D(); // Close pixel-perfect virtual UI g_camera
 
 
 
@@ -9854,7 +9851,7 @@ int main(int argc, char** argv) {
 
         if (g_grethnarSystem.GetState() == GRETHNAR_JUMPSCARE) {
 
-            float flashAlpha = Clamp(grethnarJumpscareTimer / 0.45f, 0.0f, 1.0f) * 115.0f;
+            float flashAlpha = Clamp(g_grethnarSystem.GetJumpscareTimer() / 0.45f, 0.0f, 1.0f) * 115.0f;
 
             DrawRectangle(0, 0, screenW, screenH, Color{ 180, 0, 0, (unsigned char)flashAlpha });
 
@@ -9864,7 +9861,7 @@ int main(int argc, char** argv) {
 
             for (int b = 0; b < 24; b += 2) {
 
-                unsigned char vigA = (unsigned char)(130 * (1.0f - (float)b / 24.0f) * (grethnarJumpscareTimer / 0.45f));
+                unsigned char vigA = (unsigned char)(130 * (1.0f - (float)b / 24.0f) * (g_grethnarSystem.GetJumpscareTimer() / 0.45f));
 
                 DrawRectangleLines(b, b, screenW - b*2, screenH - b*2, Color{ 120, 0, 0, vigA });
 
@@ -9912,7 +9909,7 @@ int main(int argc, char** argv) {
             DrawTextSharpCentered(g_fontMenu, "RESUME", btnResumeRec.x + btnResumeRec.width * 0.5f, btnResumeRec.y + 14.0f, 16.0f, WHITE);
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                if (hoverQuit) shouldQuitGame = true;
+                if (hoverQuit) RequestGameQuit();
                 if (hoverMenu) {
                     showQuitConfirm = false;
                     g_gameState = STATE_MAIN_MENU;
@@ -9939,6 +9936,7 @@ int main(int argc, char** argv) {
             if (g_mainMenuSystem.ShouldTransitionToGame()) {
                 g_gameState = STATE_GAMEPLAY;
                 if (!g_hasPlayedIntro) {
+                    IntroCinematic introCinematic;
                     introCinematic.Run();
                     g_hasPlayedIntro = true;
                 }
@@ -10168,7 +10166,7 @@ int main(int argc, char** argv) {
 
                         PlaySound(g_sndMenuBoom);
 
-                        shouldQuitGame = true;
+                        RequestGameQuit();
 
                     }
 
@@ -10216,6 +10214,7 @@ int main(int argc, char** argv) {
                 printf("  Total System Frame Cost:          %.3f ms\n", m.totalSystemMs);
                 printf("------------------------------------------------------\n\n");
                 TakeScreenshot(g_testScreenshot);
+                LOG_STEP("TAKING SCREENSHOT"); TakeScreenshot(g_testScreenshot);
                 break;
             }
         }
@@ -10232,7 +10231,7 @@ int main(int argc, char** argv) {
 
     UnloadSound(sndSpark);
 
-    UnloadSound(sndJumpscare);
+    UnloadSound(g_sndJumpscare);
 
     UnloadSound(g_sndGunshot);
 
@@ -10287,13 +10286,13 @@ int main(int argc, char** argv) {
 
     UnloadTexture(atlas);
 
-    UnloadMesh(mGround);
+    UnloadMesh(g_mGround);
 
-    UnloadMaterial(matGround);
+    UnloadMaterial(g_matGround);
 
-    UnloadMesh(mRoad);
+    UnloadMesh(g_mRoad);
 
-    UnloadMaterial(matRoad);
+    UnloadMaterial(g_matRoad);
 
     UnloadMesh(quad);
 
@@ -10315,8 +10314,5 @@ int main(int argc, char** argv) {
     CleanupCloudSystem();
 
     CloseWindow();
-
     return 0;
-    exit(0);
-
 }

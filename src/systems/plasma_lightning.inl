@@ -49,20 +49,20 @@ inline void DrawPlasmaLightningBolt(const std::vector<std::pair<Vector3, Vector3
     
     // 1. Layer 1: Wide Ultraviolet / Violet Corona Glow
     for (const auto& seg : segments) {
-        DrawLine3D((Vector3){ seg.first.x + 0.28f, seg.first.y, seg.first.z + 0.28f },
-                   (Vector3){ seg.second.x + 0.28f, seg.second.y, seg.second.z + 0.28f }, colViolet);
-        DrawLine3D((Vector3){ seg.first.x - 0.28f, seg.first.y, seg.first.z - 0.28f },
-                   (Vector3){ seg.second.x - 0.28f, seg.second.y, seg.second.z - 0.28f }, colViolet);
-        DrawLine3D((Vector3){ seg.first.x, seg.first.y + 0.28f, seg.first.z },
-                   (Vector3){ seg.second.x, seg.second.y + 0.28f, seg.second.z }, colViolet);
+        DrawLine3D(Vector3{ seg.first.x + 0.28f, seg.first.y, seg.first.z + 0.28f },
+                   Vector3{ seg.second.x + 0.28f, seg.second.y, seg.second.z + 0.28f }, colViolet);
+        DrawLine3D(Vector3{ seg.first.x - 0.28f, seg.first.y, seg.first.z - 0.28f },
+                   Vector3{ seg.second.x - 0.28f, seg.second.y, seg.second.z - 0.28f }, colViolet);
+        DrawLine3D(Vector3{ seg.first.x, seg.first.y + 0.28f, seg.first.z },
+                   Vector3{ seg.second.x, seg.second.y + 0.28f, seg.second.z }, colViolet);
     }
     
     // 2. Layer 2: Ionized Plasma Sheath (Electric Cyan)
     for (const auto& seg : segments) {
-        DrawLine3D((Vector3){ seg.first.x + 0.09f, seg.first.y, seg.first.z - 0.09f },
-                   (Vector3){ seg.second.x + 0.09f, seg.second.y, seg.second.z - 0.09f }, colCyan);
-        DrawLine3D((Vector3){ seg.first.x - 0.09f, seg.first.y, seg.first.z + 0.09f },
-                   (Vector3){ seg.second.x - 0.09f, seg.second.y, seg.second.z + 0.09f }, colCyan);
+        DrawLine3D(Vector3{ seg.first.x + 0.09f, seg.first.y, seg.first.z - 0.09f },
+                   Vector3{ seg.second.x + 0.09f, seg.second.y, seg.second.z - 0.09f }, colCyan);
+        DrawLine3D(Vector3{ seg.first.x - 0.09f, seg.first.y, seg.first.z + 0.09f },
+                   Vector3{ seg.second.x - 0.09f, seg.second.y, seg.second.z + 0.09f }, colCyan);
     }
     
     // 3. Layer 3: Blinding Stark White Core Channel
@@ -84,9 +84,9 @@ inline void DrawPlasmaLightningBolt(const std::vector<std::pair<Vector3, Vector3
         unsigned char ringAlpha = (unsigned char)(blastProg * 255.0f);
         
         // Expanding ionized shockwave ring
-        DrawCircle3D(impactPos, ringRadius, (Vector3){ 1.0f, 0.0f, 0.0f }, 90.0f, { 150, 220, 255, ringAlpha });
+        DrawCircle3D(impactPos, ringRadius, Vector3{ 1.0f, 0.0f, 0.0f }, 90.0f, { 150, 220, 255, ringAlpha });
         // Secondary electric arc ring
-        DrawCircle3D(impactPos, ringRadius * 0.45f, (Vector3){ 1.0f, 0.0f, 0.0f }, 90.0f, { 255, 255, 255, ringAlpha });
+        DrawCircle3D(impactPos, ringRadius * 0.45f, Vector3{ 1.0f, 0.0f, 0.0f }, 90.0f, { 255, 255, 255, ringAlpha });
         // Radiant ground fireball
         DrawSphere(impactPos, blastProg * 2.4f, { 240, 250, 255, (unsigned char)(blastProg * 225.0f) });
     }

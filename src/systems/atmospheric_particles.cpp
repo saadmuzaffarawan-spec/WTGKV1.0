@@ -57,9 +57,9 @@ void SpawnPickupDust(Vector3 center, int count)
 
         float a = Frand(0.0f, 2.0f * PI);
 
-        p.pos = (Vector3){ center.x + cosf(a) * r, center.y + Frand(-0.01f, 0.04f), center.z + sinf(a) * r };
+        p.pos = Vector3{ center.x + cosf(a) * r, center.y + Frand(-0.01f, 0.04f), center.z + sinf(a) * r };
 
-        p.vel = (Vector3){ cosf(a) * Frand(0.06f, 0.28f), Frand(0.12f, 0.38f), sinf(a) * Frand(0.06f, 0.28f) };
+        p.vel = Vector3{ cosf(a) * Frand(0.06f, 0.28f), Frand(0.12f, 0.38f), sinf(a) * Frand(0.06f, 0.28f) };
 
         p.size = Frand(0.008f, 0.018f);
 
@@ -69,7 +69,7 @@ void SpawnPickupDust(Vector3 center, int count)
 
         unsigned char shade = (unsigned char)GetRandomValue(195, 240);
 
-        p.color = (Color){ shade, (unsigned char)(shade * 0.96f), (unsigned char)(shade * 0.88f), 220 };
+        p.color = Color{ shade, (unsigned char)(shade * 0.96f), (unsigned char)(shade * 0.88f), 220 };
 
         p.spin = Frand(0.0f, 360.0f);
 
@@ -257,7 +257,7 @@ void DrawFootstepTrails()
 
         if (a < 2) continue;
 
-        Color col = ApplyShopLighting(t.pos, (Color){ 16, 18, 22, a });
+        Color col = ApplyShopLighting(t.pos, Color{ 16, 18, 22, a });
 
         rlColor4ub(col.r, col.g, col.b, a);
 
@@ -367,7 +367,7 @@ void UpdateShellCasingsAndSparks(float dt)
 
                     sc.landed = true;
 
-                    sc.vel = (Vector3){0, 0, 0};
+                    sc.vel = Vector3{0, 0, 0};
 
                 }
 
@@ -429,9 +429,9 @@ void DrawShellCasingsAndSparks()
 
             rlRotatef(sc.rot.z, 0, 0, 1);
 
-            Color brass = ApplyShopLighting(sc.pos, (Color){ 225, 185, 65, 255 });
+            Color brass = ApplyShopLighting(sc.pos, Color{ 225, 185, 65, 255 });
 
-            DrawCylinder((Vector3){0,0,0}, 0.005f, 0.005f, 0.019f, 6, brass);
+            DrawCylinder(Vector3{0,0,0}, 0.005f, 0.005f, 0.019f, 6, brass);
 
         rlPopMatrix();
 
@@ -461,27 +461,27 @@ void DrawChocolateBar(Vector3 pos, int subType, bool opened, bool held, Vector3 
 
     if (subType == 0) { // Dark Noir 85% Cacao
 
-        wrapCol   = ApplyShopLighting(pos, (Color){ 24, 24, 26, 255 });
+        wrapCol   = ApplyShopLighting(pos, Color{ 24, 24, 26, 255 });
 
-        foilCol   = ApplyShopLighting(pos, (Color){ 235, 195, 75, 255 }); // Gold foil
+        foilCol   = ApplyShopLighting(pos, Color{ 235, 195, 75, 255 }); // Gold foil
 
-        accentCol = (Color){ 245, 215, 110, 255 };
+        accentCol = Color{ 245, 215, 110, 255 };
 
     } else if (subType == 1) { // Alpine Milk Chocolate
 
-        wrapCol   = ApplyShopLighting(pos, (Color){ 28, 65, 155, 255 }); // Royal Blue
+        wrapCol   = ApplyShopLighting(pos, Color{ 28, 65, 155, 255 }); // Royal Blue
 
-        foilCol   = ApplyShopLighting(pos, (Color){ 215, 222, 230, 255 }); // Silver foil
+        foilCol   = ApplyShopLighting(pos, Color{ 215, 222, 230, 255 }); // Silver foil
 
-        accentCol = (Color){ 240, 245, 255, 255 };
+        accentCol = Color{ 240, 245, 255, 255 };
 
     } else { // Sea Salt Caramel
 
-        wrapCol   = ApplyShopLighting(pos, (Color){ 180, 95, 32, 255 }); // Amber bronze
+        wrapCol   = ApplyShopLighting(pos, Color{ 180, 95, 32, 255 }); // Amber bronze
 
-        foilCol   = ApplyShopLighting(pos, (Color){ 225, 165, 95, 255 }); // Copper foil
+        foilCol   = ApplyShopLighting(pos, Color{ 225, 165, 95, 255 }); // Copper foil
 
-        accentCol = (Color){ 255, 225, 160, 255 };
+        accentCol = Color{ 255, 225, 160, 255 };
 
     }
 
@@ -515,7 +515,7 @@ void DrawChocolateBar(Vector3 pos, int subType, bool opened, bool held, Vector3 
 
     if (held) {
 
-        Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwdDir, (Vector3){0, 1, 0}));
+        Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwdDir, Vector3{0, 1, 0}));
 
         rlRotatef(25.0f, rgt.x, rgt.y, rgt.z);
 
@@ -525,13 +525,13 @@ void DrawChocolateBar(Vector3 pos, int subType, bool opened, bool held, Vector3 
 
 
 
-    Color chocDark = ApplyShopLighting(pos, (Color){ 52, 28, 18, 255 });
+    Color chocDark = ApplyShopLighting(pos, Color{ 52, 28, 18, 255 });
 
 
 
     // Inner chocolate bar body (dark rich chocolate)
 
-    DrawCube((Vector3){ 0, 0, 0 }, w, h, l, chocDark);
+    DrawCube(Vector3{ 0, 0, 0 }, w, h, l, chocDark);
 
 
 
@@ -547,9 +547,9 @@ void DrawChocolateBar(Vector3 pos, int subType, bool opened, bool held, Vector3 
 
                 float sz = 0.020f + row * 0.045f;
 
-                DrawCube((Vector3){ sx, h * 0.52f, sz }, w * 0.40f, 0.004f, 0.038f, chocDark);
+                DrawCube(Vector3{ sx, h * 0.52f, sz }, w * 0.40f, 0.004f, 0.038f, chocDark);
 
-                DrawCubeWires((Vector3){ sx, h * 0.52f, sz }, w * 0.40f, 0.004f, 0.038f, ApplyShopLighting(pos, (Color){ 35, 18, 10, 255 }));
+                DrawCubeWires(Vector3{ sx, h * 0.52f, sz }, w * 0.40f, 0.004f, 0.038f, ApplyShopLighting(pos, Color{ 35, 18, 10, 255 }));
 
             }
 
@@ -557,33 +557,33 @@ void DrawChocolateBar(Vector3 pos, int subType, bool opened, bool held, Vector3 
 
         // Crinkled peeled foil boundary
 
-        DrawCube((Vector3){ 0, 0.002f, -0.005f }, w * 1.03f, h * 1.06f, 0.015f, foilCol);
+        DrawCube(Vector3{ 0, 0.002f, -0.005f }, w * 1.03f, h * 1.06f, 0.015f, foilCol);
 
         // Bottom sleeve wrapper (Z <= 0)
 
-        DrawCube((Vector3){ 0, 0, -l * 0.25f }, w * 1.02f, h * 1.04f, l * 0.50f, wrapCol);
+        DrawCube(Vector3{ 0, 0, -l * 0.25f }, w * 1.02f, h * 1.04f, l * 0.50f, wrapCol);
 
         // Gold/silver brand accent band
 
-        DrawCube((Vector3){ 0, 0, -l * 0.25f }, w * 1.025f, h * 1.05f, 0.035f, foilCol);
+        DrawCube(Vector3{ 0, 0, -l * 0.25f }, w * 1.025f, h * 1.05f, 0.035f, foilCol);
 
     } else {
 
         // Fully wrapped bar
 
-        DrawCube((Vector3){ 0, 0, 0 }, w * 1.02f, h * 1.04f, l * 0.94f, wrapCol);
+        DrawCube(Vector3{ 0, 0, 0 }, w * 1.02f, h * 1.04f, l * 0.94f, wrapCol);
 
         // Shiny foil ends peeking out
 
-        DrawCube((Vector3){ 0, 0,  l * 0.49f }, w * 0.98f, h * 0.90f, 0.025f, foilCol);
+        DrawCube(Vector3{ 0, 0,  l * 0.49f }, w * 0.98f, h * 0.90f, 0.025f, foilCol);
 
-        DrawCube((Vector3){ 0, 0, -l * 0.49f }, w * 0.98f, h * 0.90f, 0.025f, foilCol);
+        DrawCube(Vector3{ 0, 0, -l * 0.49f }, w * 0.98f, h * 0.90f, 0.025f, foilCol);
 
         // Center printed label band & brand accent stripe
 
-        DrawCube((Vector3){ 0, 0, 0 }, w * 1.025f, h * 1.05f, 0.070f, accentCol);
+        DrawCube(Vector3{ 0, 0, 0 }, w * 1.025f, h * 1.05f, 0.070f, accentCol);
 
-        DrawCube((Vector3){ 0, 0, 0 }, w * 1.030f, h * 1.06f, 0.045f, wrapCol);
+        DrawCube(Vector3{ 0, 0, 0 }, w * 1.030f, h * 1.06f, 0.045f, wrapCol);
 
     }
 
@@ -607,21 +607,21 @@ void DrawGunWorld(Vector3 pos, bool held)
 
     Vector3 trayPos = { pos.x, pos.y - 0.03f, pos.z };
 
-    Color velvetDark = ApplyShopLighting(trayPos, (Color){ 75, 12, 20, 255 });
+    Color velvetDark = ApplyShopLighting(trayPos, Color{ 75, 12, 20, 255 });
 
-    Color brassTrim  = ApplyShopLighting(trayPos, (Color){ 175, 140, 60, 255 });
+    Color brassTrim  = ApplyShopLighting(trayPos, Color{ 175, 140, 60, 255 });
 
     DrawCube(trayPos, 0.46f, 0.022f, 0.32f, velvetDark);
 
     DrawCubeWires(trayPos, 0.462f, 0.024f, 0.322f, brassTrim);
 
-    DrawCube((Vector3){ trayPos.x, trayPos.y + 0.012f, trayPos.z - 0.15f }, 0.46f, 0.015f, 0.02f, brassTrim);
+    DrawCube(Vector3{ trayPos.x, trayPos.y + 0.012f, trayPos.z - 0.15f }, 0.46f, 0.015f, 0.02f, brassTrim);
 
-    DrawCube((Vector3){ trayPos.x, trayPos.y + 0.012f, trayPos.z + 0.15f }, 0.46f, 0.015f, 0.02f, brassTrim);
+    DrawCube(Vector3{ trayPos.x, trayPos.y + 0.012f, trayPos.z + 0.15f }, 0.46f, 0.015f, 0.02f, brassTrim);
 
-    DrawCube((Vector3){ trayPos.x - 0.22f, trayPos.y + 0.012f, trayPos.z }, 0.02f, 0.015f, 0.32f, brassTrim);
+    DrawCube(Vector3{ trayPos.x - 0.22f, trayPos.y + 0.012f, trayPos.z }, 0.02f, 0.015f, 0.32f, brassTrim);
 
-    DrawCube((Vector3){ trayPos.x + 0.22f, trayPos.y + 0.012f, trayPos.z }, 0.02f, 0.015f, 0.32f, brassTrim);
+    DrawCube(Vector3{ trayPos.x + 0.22f, trayPos.y + 0.012f, trayPos.z }, 0.02f, 0.015f, 0.32f, brassTrim);
 
 
 
@@ -629,19 +629,19 @@ void DrawGunWorld(Vector3 pos, bool held)
 
     Vector3 boxPos = { pos.x - 0.13f, pos.y - 0.005f, pos.z + 0.06f };
 
-    Color ammoBoxCol = ApplyShopLighting(boxPos, (Color){ 42, 65, 45, 255 });
+    Color ammoBoxCol = ApplyShopLighting(boxPos, Color{ 42, 65, 45, 255 });
 
     DrawCube(boxPos, 0.10f, 0.045f, 0.075f, ammoBoxCol);
 
-    DrawCubeWires(boxPos, 0.102f, 0.046f, 0.076f, ApplyShopLighting(boxPos, (Color){ 180, 195, 120, 255 }));
+    DrawCubeWires(boxPos, 0.102f, 0.046f, 0.076f, ApplyShopLighting(boxPos, Color{ 180, 195, 120, 255 }));
 
     // Loose brass cartridges resting on tray
 
-    Color brass = ApplyShopLighting(boxPos, (Color){ 225, 185, 65, 255 });
+    Color brass = ApplyShopLighting(boxPos, Color{ 225, 185, 65, 255 });
 
-    DrawCylinderEx((Vector3){ pos.x - 0.12f, pos.y - 0.015f, pos.z - 0.06f }, (Vector3){ pos.x - 0.10f, pos.y - 0.015f, pos.z - 0.06f }, 0.005f, 0.005f, 6, brass);
+    DrawCylinderEx(Vector3{ pos.x - 0.12f, pos.y - 0.015f, pos.z - 0.06f }, Vector3{ pos.x - 0.10f, pos.y - 0.015f, pos.z - 0.06f }, 0.005f, 0.005f, 6, brass);
 
-    DrawCylinderEx((Vector3){ pos.x - 0.12f, pos.y - 0.015f, pos.z - 0.04f }, (Vector3){ pos.x - 0.10f, pos.y - 0.015f, pos.z - 0.04f }, 0.005f, 0.005f, 6, brass);
+    DrawCylinderEx(Vector3{ pos.x - 0.12f, pos.y - 0.015f, pos.z - 0.04f }, Vector3{ pos.x - 0.10f, pos.y - 0.015f, pos.z - 0.04f }, 0.005f, 0.005f, 6, brass);
 
 
 
@@ -659,37 +659,37 @@ void DrawGunWorld(Vector3 pos, bool held)
 
 
 
-    Color frameCol = ApplyShopLighting(pos, (Color){ 30, 32, 35, 255 });
+    Color frameCol = ApplyShopLighting(pos, Color{ 30, 32, 35, 255 });
 
-    Color slideCol = ApplyShopLighting(pos, (Color){ 44, 46, 50, 255 });
+    Color slideCol = ApplyShopLighting(pos, Color{ 44, 46, 50, 255 });
 
-    Color metalCol = ApplyShopLighting(pos, (Color){ 160, 165, 170, 255 });
+    Color metalCol = ApplyShopLighting(pos, Color{ 160, 165, 170, 255 });
 
-    Color sightDot = (Color){ 90, 255, 100, 255 };
+    Color sightDot = Color{ 90, 255, 100, 255 };
 
 
 
     // Slide
 
-    DrawCube((Vector3){ 0, 0.038f, -0.04f }, 0.030f, 0.034f, 0.180f, slideCol);
+    DrawCube(Vector3{ 0, 0.038f, -0.04f }, 0.030f, 0.034f, 0.180f, slideCol);
 
-    DrawCubeWires((Vector3){ 0, 0.038f, -0.04f }, 0.031f, 0.035f, 0.181f, ApplyShopLighting(pos, Fade(BLACK, 0.4f)));
+    DrawCubeWires(Vector3{ 0, 0.038f, -0.04f }, 0.031f, 0.035f, 0.181f, ApplyShopLighting(pos, Fade(BLACK, 0.4f)));
 
     // Barrel chamber
 
-    DrawCube((Vector3){ 0.008f, 0.040f, -0.02f }, 0.016f, 0.018f, 0.040f, metalCol);
+    DrawCube(Vector3{ 0.008f, 0.040f, -0.02f }, 0.016f, 0.018f, 0.040f, metalCol);
 
     // Sights
 
-    DrawCube((Vector3){ 0, 0.058f, -0.12f }, 0.008f, 0.010f, 0.012f, slideCol); // Front sight
+    DrawCube(Vector3{ 0, 0.058f, -0.12f }, 0.008f, 0.010f, 0.012f, slideCol); // Front sight
 
-    DrawSphere((Vector3){ 0, 0.060f, -0.12f }, 0.003f, sightDot);
+    DrawSphere(Vector3{ 0, 0.060f, -0.12f }, 0.003f, sightDot);
 
-    DrawCube((Vector3){ 0, 0.058f, 0.045f }, 0.020f, 0.010f, 0.012f, slideCol); // Rear sight
+    DrawCube(Vector3{ 0, 0.058f, 0.045f }, 0.020f, 0.010f, 0.012f, slideCol); // Rear sight
 
     // Frame & Grip
 
-    DrawCube((Vector3){ 0, 0.018f, -0.04f }, 0.028f, 0.016f, 0.170f, frameCol); // Picatinny frame
+    DrawCube(Vector3{ 0, 0.018f, -0.04f }, 0.028f, 0.016f, 0.170f, frameCol); // Picatinny frame
 
     rlPushMatrix();
 
@@ -697,21 +697,21 @@ void DrawGunWorld(Vector3 pos, bool held)
 
         rlRotatef(-16.0f, 1, 0, 0); // Grip rake angle
 
-        DrawCube((Vector3){ 0, 0, 0 }, 0.027f, 0.105f, 0.048f, frameCol);
+        DrawCube(Vector3{ 0, 0, 0 }, 0.027f, 0.105f, 0.048f, frameCol);
 
         // Stippled grip panels
 
-        DrawCube((Vector3){ 0, 0, 0 }, 0.029f, 0.080f, 0.036f, ApplyShopLighting(pos, (Color){ 20, 20, 22, 255 }));
+        DrawCube(Vector3{ 0, 0, 0 }, 0.029f, 0.080f, 0.036f, ApplyShopLighting(pos, Color{ 20, 20, 22, 255 }));
 
     rlPopMatrix();
 
     // Trigger guard & skeleton trigger
 
-    DrawCylinderEx((Vector3){ 0, 0.010f, -0.010f }, (Vector3){ 0, -0.025f, -0.010f }, 0.004f, 0.004f, 6, frameCol);
+    DrawCylinderEx(Vector3{ 0, 0.010f, -0.010f }, Vector3{ 0, -0.025f, -0.010f }, 0.004f, 0.004f, 6, frameCol);
 
-    DrawCylinderEx((Vector3){ 0, -0.025f, -0.010f }, (Vector3){ 0, -0.020f, 0.022f }, 0.004f, 0.004f, 6, frameCol);
+    DrawCylinderEx(Vector3{ 0, -0.025f, -0.010f }, Vector3{ 0, -0.020f, 0.022f }, 0.004f, 0.004f, 6, frameCol);
 
-    DrawCube((Vector3){ 0, -0.008f, 0.006f }, 0.006f, 0.018f, 0.008f, metalCol);
+    DrawCube(Vector3{ 0, -0.008f, 0.006f }, 0.006f, 0.018f, 0.008f, metalCol);
 
 
 
@@ -825,13 +825,13 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
 
 
-    Color frameCol = ApplyShopLighting(gunPos, (Color){ 28, 30, 34, 255 });
+    Color frameCol = ApplyShopLighting(gunPos, Color{ 28, 30, 34, 255 });
 
-    Color slideCol = ApplyShopLighting(gunPos, (Color){ 46, 48, 52, 255 });
+    Color slideCol = ApplyShopLighting(gunPos, Color{ 46, 48, 52, 255 });
 
-    Color metalCol = ApplyShopLighting(gunPos, (Color){ 175, 180, 185, 255 });
+    Color metalCol = ApplyShopLighting(gunPos, Color{ 175, 180, 185, 255 });
 
-    Color sightDot = (Color){ 80, 255, 95, 255 };
+    Color sightDot = Color{ 80, 255, 95, 255 };
 
 
 
@@ -841,9 +841,9 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
         rlTranslatef(0, 0.038f, -0.04f + slideBlowback);
 
-        DrawCube((Vector3){ 0, 0, 0 }, 0.030f, 0.034f, 0.180f, slideCol);
+        DrawCube(Vector3{ 0, 0, 0 }, 0.030f, 0.034f, 0.180f, slideCol);
 
-        DrawCubeWires((Vector3){ 0, 0, 0 }, 0.031f, 0.035f, 0.181f, ApplyShopLighting(gunPos, Fade(BLACK, 0.45f)));
+        DrawCubeWires(Vector3{ 0, 0, 0 }, 0.031f, 0.035f, 0.181f, ApplyShopLighting(gunPos, Fade(BLACK, 0.45f)));
 
 
 
@@ -853,9 +853,9 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
             float sz = 0.055f + s * 0.007f;
 
-            DrawLine3D((Vector3){ -0.0155f, -0.012f, sz }, (Vector3){ -0.0155f, 0.012f, sz }, ApplyShopLighting(gunPos, (Color){ 18, 18, 20, 255 }));
+            DrawLine3D(Vector3{ -0.0155f, -0.012f, sz }, Vector3{ -0.0155f, 0.012f, sz }, ApplyShopLighting(gunPos, Color{ 18, 18, 20, 255 }));
 
-            DrawLine3D((Vector3){  0.0155f, -0.012f, sz }, (Vector3){  0.0155f, 0.012f, sz }, ApplyShopLighting(gunPos, (Color){ 18, 18, 20, 255 }));
+            DrawLine3D(Vector3{  0.0155f, -0.012f, sz }, Vector3{  0.0155f, 0.012f, sz }, ApplyShopLighting(gunPos, Color{ 18, 18, 20, 255 }));
 
         }
 
@@ -863,17 +863,17 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
         // High-contrast tactical sights
 
-        DrawCube((Vector3){ 0, 0.021f, -0.080f }, 0.007f, 0.009f, 0.012f, slideCol);
+        DrawCube(Vector3{ 0, 0.021f, -0.080f }, 0.007f, 0.009f, 0.012f, slideCol);
 
-        DrawSphere((Vector3){ 0, 0.021f, -0.074f }, 0.0028f, sightDot);
+        DrawSphere(Vector3{ 0, 0.021f, -0.074f }, 0.0028f, sightDot);
 
-        DrawCube((Vector3){ -0.008f, 0.021f, 0.082f }, 0.007f, 0.009f, 0.010f, slideCol);
+        DrawCube(Vector3{ -0.008f, 0.021f, 0.082f }, 0.007f, 0.009f, 0.010f, slideCol);
 
-        DrawCube((Vector3){  0.008f, 0.021f, 0.082f }, 0.007f, 0.009f, 0.010f, slideCol);
+        DrawCube(Vector3{  0.008f, 0.021f, 0.082f }, 0.007f, 0.009f, 0.010f, slideCol);
 
-        DrawSphere((Vector3){ -0.008f, 0.021f, 0.082f }, 0.0025f, sightDot);
+        DrawSphere(Vector3{ -0.008f, 0.021f, 0.082f }, 0.0025f, sightDot);
 
-        DrawSphere((Vector3){  0.008f, 0.021f, 0.082f }, 0.0025f, sightDot);
+        DrawSphere(Vector3{  0.008f, 0.021f, 0.082f }, 0.0025f, sightDot);
 
     rlPopMatrix();
 
@@ -881,21 +881,21 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
     // Fixed Barrel & Chamber (exposed when slide cycles back!)
 
-    DrawCube((Vector3){ 0, 0.038f, -0.020f }, 0.022f, 0.022f, 0.050f, metalCol);
+    DrawCube(Vector3{ 0, 0.038f, -0.020f }, 0.022f, 0.022f, 0.050f, metalCol);
 
-    DrawCylinderEx((Vector3){ 0, 0.038f, -0.020f }, (Vector3){ 0, 0.038f, -0.145f }, 0.008f, 0.008f, 10, metalCol);
+    DrawCylinderEx(Vector3{ 0, 0.038f, -0.020f }, Vector3{ 0, 0.038f, -0.145f }, 0.008f, 0.008f, 10, metalCol);
 
-    DrawCylinder((Vector3){ 0, 0.038f, -0.146f }, 0.005f, 0.005f, 0.002f, 8, BLACK);
+    DrawCylinder(Vector3{ 0, 0.038f, -0.146f }, 0.005f, 0.005f, 0.002f, 8, BLACK);
 
 
 
     // Frame, Picatinny accessory rail & trigger guard
 
-    DrawCube((Vector3){ 0, 0.018f, -0.04f }, 0.028f, 0.016f, 0.170f, frameCol);
+    DrawCube(Vector3{ 0, 0.018f, -0.04f }, 0.028f, 0.016f, 0.170f, frameCol);
 
     for (int r = 0; r < 3; r++) {
 
-        DrawCube((Vector3){ 0, 0.008f, -0.085f - r * 0.016f }, 0.029f, 0.004f, 0.008f, ApplyShopLighting(gunPos, (Color){ 20, 20, 22, 255 }));
+        DrawCube(Vector3{ 0, 0.008f, -0.085f - r * 0.016f }, 0.029f, 0.004f, 0.008f, ApplyShopLighting(gunPos, Color{ 20, 20, 22, 255 }));
 
     }
 
@@ -909,11 +909,11 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
         rlRotatef(-16.0f, 1, 0, 0);
 
-        DrawCube((Vector3){ 0, 0, 0 }, 0.027f, 0.105f, 0.048f, frameCol);
+        DrawCube(Vector3{ 0, 0, 0 }, 0.027f, 0.105f, 0.048f, frameCol);
 
-        DrawCube((Vector3){ 0, 0, 0 }, 0.029f, 0.080f, 0.036f, ApplyShopLighting(gunPos, (Color){ 18, 18, 20, 255 }));
+        DrawCube(Vector3{ 0, 0, 0 }, 0.029f, 0.080f, 0.036f, ApplyShopLighting(gunPos, Color{ 18, 18, 20, 255 }));
 
-        DrawCube((Vector3){ 0, -0.054f, 0.004f }, 0.031f, 0.012f, 0.054f, ApplyShopLighting(gunPos, (Color){ 36, 38, 42, 255 }));
+        DrawCube(Vector3{ 0, -0.054f, 0.004f }, 0.031f, 0.012f, 0.054f, ApplyShopLighting(gunPos, Color{ 36, 38, 42, 255 }));
 
     rlPopMatrix();
 
@@ -921,11 +921,11 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
     // Trigger guard and trigger
 
-    DrawCylinderEx((Vector3){ 0, 0.010f, -0.010f }, (Vector3){ 0, -0.025f, -0.010f }, 0.004f, 0.004f, 6, frameCol);
+    DrawCylinderEx(Vector3{ 0, 0.010f, -0.010f }, Vector3{ 0, -0.025f, -0.010f }, 0.004f, 0.004f, 6, frameCol);
 
-    DrawCylinderEx((Vector3){ 0, -0.025f, -0.010f }, (Vector3){ 0, -0.020f, 0.022f }, 0.004f, 0.004f, 6, frameCol);
+    DrawCylinderEx(Vector3{ 0, -0.025f, -0.010f }, Vector3{ 0, -0.020f, 0.022f }, 0.004f, 0.004f, 6, frameCol);
 
-    DrawCube((Vector3){ 0, -0.008f, 0.006f }, 0.006f, 0.018f, 0.008f, metalCol);
+    DrawCube(Vector3{ 0, -0.008f, 0.006f }, 0.006f, 0.018f, 0.008f, metalCol);
 
 
 
@@ -935,19 +935,19 @@ void DrawGunViewModel(const Camera3D &camera, float walkTime, float bobAmplitude
 
         Vector3 mPos = { 0, 0.038f, -0.150f };
 
-        DrawLine3D((Vector3){ mPos.x - 0.07f, mPos.y, mPos.z }, (Vector3){ mPos.x + 0.07f, mPos.y, mPos.z }, (Color){ 255, 235, 160, 255 });
+        DrawLine3D(Vector3{ mPos.x - 0.07f, mPos.y, mPos.z }, Vector3{ mPos.x + 0.07f, mPos.y, mPos.z }, Color{ 255, 235, 160, 255 });
 
-        DrawLine3D((Vector3){ mPos.x, mPos.y - 0.07f, mPos.z }, (Vector3){ mPos.x, mPos.y + 0.07f, mPos.z }, (Color){ 255, 235, 160, 255 });
+        DrawLine3D(Vector3{ mPos.x, mPos.y - 0.07f, mPos.z }, Vector3{ mPos.x, mPos.y + 0.07f, mPos.z }, Color{ 255, 235, 160, 255 });
 
-        DrawLine3D((Vector3){ mPos.x - 0.05f, mPos.y - 0.05f, mPos.z }, (Vector3){ mPos.x + 0.05f, mPos.y + 0.05f, mPos.z }, (Color){ 255, 200, 100, 255 });
+        DrawLine3D(Vector3{ mPos.x - 0.05f, mPos.y - 0.05f, mPos.z }, Vector3{ mPos.x + 0.05f, mPos.y + 0.05f, mPos.z }, Color{ 255, 200, 100, 255 });
 
-        DrawLine3D((Vector3){ mPos.x - 0.05f, mPos.y + 0.05f, mPos.z }, (Vector3){ mPos.x + 0.05f, mPos.y - 0.05f, mPos.z }, (Color){ 255, 200, 100, 255 });
+        DrawLine3D(Vector3{ mPos.x - 0.05f, mPos.y + 0.05f, mPos.z }, Vector3{ mPos.x + 0.05f, mPos.y - 0.05f, mPos.z }, Color{ 255, 200, 100, 255 });
 
-        DrawSphere(mPos, 0.032f, (Color){ 255, 255, 240, 255 });
+        DrawSphere(mPos, 0.032f, Color{ 255, 255, 240, 255 });
 
-        DrawSphere(mPos, 0.085f, (Color){ 255, 185, 45, 180 });
+        DrawSphere(mPos, 0.085f, Color{ 255, 185, 45, 180 });
 
-        DrawSphere(mPos, 0.220f, (Color){ 255, 130, 20, 75 });
+        DrawSphere(mPos, 0.220f, Color{ 255, 130, 20, 75 });
 
     }
 
@@ -989,7 +989,7 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
         Vector3 fwdDir = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
 
-        Vector3 toObj = Vector3Normalize((Vector3){ dx, dy, dz });
+        Vector3 toObj = Vector3Normalize(Vector3{ dx, dy, dz });
 
         if (Vector3DotProduct(fwdDir, toObj) < -0.25f) return;
 
@@ -1001,7 +1001,7 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     Vector3 basePos = { center.x, 10.09f, center.z };
 
-    Color kickplateCol = ApplyShopLighting(basePos, (Color){ 26, 28, 32, 255 });
+    Color kickplateCol = ApplyShopLighting(basePos, Color{ 26, 28, 32, 255 });
 
     DrawCube(basePos, 3.44f, 0.15f, 1.16f, kickplateCol);
 
@@ -1011,7 +1011,7 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     Vector3 bodyPos = { center.x, 10.53f, center.z };
 
-    Color whiteEnamel = ApplyShopLighting(bodyPos, (Color){ 238, 240, 244, 255 });
+    Color whiteEnamel = ApplyShopLighting(bodyPos, Color{ 238, 240, 244, 255 });
 
     DrawCube(bodyPos, 3.60f, 0.72f, 1.26f, whiteEnamel);
 
@@ -1021,7 +1021,7 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     Vector3 bumperPos = { center.x, 10.52f, center.z };
 
-    Color bumperRubber = ApplyShopLighting(bumperPos, (Color){ 36, 38, 42, 255 });
+    Color bumperRubber = ApplyShopLighting(bumperPos, Color{ 36, 38, 42, 255 });
 
     DrawCube(bumperPos, 3.65f, 0.065f, 1.31f, bumperRubber);
 
@@ -1029,35 +1029,35 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     // 3. Top Deck Stainless Steel Trim Frame (perimeter lip)
 
-    Color stainless = ApplyShopLighting((Vector3){ center.x, 10.90f, center.z }, (Color){ 215, 220, 226, 255 });
+    Color stainless = ApplyShopLighting(Vector3{ center.x, 10.90f, center.z }, Color{ 215, 220, 226, 255 });
 
-    DrawCube((Vector3){ center.x, 10.90f, center.z - 0.58f }, 3.62f, 0.035f, 0.11f, stainless);
+    DrawCube(Vector3{ center.x, 10.90f, center.z - 0.58f }, 3.62f, 0.035f, 0.11f, stainless);
 
-    DrawCube((Vector3){ center.x, 10.90f, center.z + 0.58f }, 3.62f, 0.035f, 0.11f, stainless);
+    DrawCube(Vector3{ center.x, 10.90f, center.z + 0.58f }, 3.62f, 0.035f, 0.11f, stainless);
 
-    DrawCube((Vector3){ center.x - 1.76f, 10.90f, center.z }, 0.12f, 0.035f, 1.28f, stainless);
+    DrawCube(Vector3{ center.x - 1.76f, 10.90f, center.z }, 0.12f, 0.035f, 1.28f, stainless);
 
-    DrawCube((Vector3){ center.x + 1.76f, 10.90f, center.z }, 0.12f, 0.035f, 1.28f, stainless);
+    DrawCube(Vector3{ center.x + 1.76f, 10.90f, center.z }, 0.12f, 0.035f, 1.28f, stainless);
 
 
 
     // 4. Interior Refrigerated Compartment & Cold Arctic LED Glow
 
-    Color ledStripCol = (Color){ 175, 240, 255, 255 };
+    Color ledStripCol = Color{ 175, 240, 255, 255 };
 
-    DrawLine3D((Vector3){ center.x - 1.66f, 10.87f, center.z - 0.50f }, (Vector3){ center.x + 1.66f, 10.87f, center.z - 0.50f }, ledStripCol);
+    DrawLine3D(Vector3{ center.x - 1.66f, 10.87f, center.z - 0.50f }, Vector3{ center.x + 1.66f, 10.87f, center.z - 0.50f }, ledStripCol);
 
-    DrawLine3D((Vector3){ center.x - 1.66f, 10.87f, center.z + 0.50f }, (Vector3){ center.x + 1.66f, 10.87f, center.z + 0.50f }, ledStripCol);
+    DrawLine3D(Vector3{ center.x - 1.66f, 10.87f, center.z + 0.50f }, Vector3{ center.x + 1.66f, 10.87f, center.z + 0.50f }, ledStripCol);
 
-    DrawCube((Vector3){ center.x, 10.60f, center.z }, 3.32f, 0.44f, 0.98f, (Color){ 160, 230, 255, 28 });
+    DrawCube(Vector3{ center.x, 10.60f, center.z }, 3.32f, 0.44f, 0.98f, Color{ 160, 230, 255, 28 });
 
 
 
     // Dual Sliding Glass Lids (Translucent Cyan-Tinted Tempered Glass)
 
-    Color glassTint = (Color){ 190, 235, 255, 68 };
+    Color glassTint = Color{ 190, 235, 255, 68 };
 
-    DrawCube((Vector3){ center.x, 10.925f, center.z }, 3.44f, 0.012f, 1.06f, glassTint);
+    DrawCube(Vector3{ center.x, 10.925f, center.z }, 3.44f, 0.012f, 1.06f, glassTint);
 
 
 
@@ -1071,15 +1071,15 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     // Compressor ventilation louvers
 
-    Color louverSlot = ApplyShopLighting(basePos, (Color){ 12, 14, 16, 255 });
+    Color louverSlot = ApplyShopLighting(basePos, Color{ 12, 14, 16, 255 });
 
     for (int v = 0; v < 3; v++) {
 
         float vy = 10.06f + v * 0.030f;
 
-        DrawCube((Vector3){ center.x - 0.90f, vy, center.z - 0.582f }, 0.85f, 0.012f, 0.015f, louverSlot);
+        DrawCube(Vector3{ center.x - 0.90f, vy, center.z - 0.582f }, 0.85f, 0.012f, 0.015f, louverSlot);
 
-        DrawCube((Vector3){ center.x + 0.90f, vy, center.z - 0.582f }, 0.85f, 0.012f, 0.015f, louverSlot);
+        DrawCube(Vector3{ center.x + 0.90f, vy, center.z - 0.582f }, 0.85f, 0.012f, 0.015f, louverSlot);
 
     }
 
@@ -1101,7 +1101,7 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     };
 
-    Color cornerCol = ApplyShopLighting(bodyPos, (Color){ 55, 58, 65, 255 });
+    Color cornerCol = ApplyShopLighting(bodyPos, Color{ 55, 58, 65, 255 });
 
     for (int c = 0; c < 4; c++) {
 
@@ -1113,15 +1113,15 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     // Chrome Wire Divider Baskets
 
-    Color wireCol = ApplyShopLighting((Vector3){ center.x, 10.60f, center.z }, (Color){ 200, 205, 215, 255 });
+    Color wireCol = ApplyShopLighting(Vector3{ center.x, 10.60f, center.z }, Color{ 200, 205, 215, 255 });
 
     const float dividersX[3] = { center.x - 0.85f, center.x, center.x + 0.85f };
 
     for (int d = 0; d < 3; d++) {
 
-        DrawCube((Vector3){ dividersX[d], 10.60f, center.z }, 0.015f, 0.45f, 1.02f, Fade(wireCol, 0.65f));
+        DrawCube(Vector3{ dividersX[d], 10.60f, center.z }, 0.015f, 0.45f, 1.02f, Fade(wireCol, 0.65f));
 
-        DrawCylinderEx((Vector3){ dividersX[d], 10.82f, center.z - 0.51f }, (Vector3){ dividersX[d], 10.82f, center.z + 0.51f }, 0.007f, 0.007f, 6, wireCol);
+        DrawCylinderEx(Vector3{ dividersX[d], 10.82f, center.z - 0.51f }, Vector3{ dividersX[d], 10.82f, center.z + 0.51f }, 0.007f, 0.007f, 6, wireCol);
 
     }
 
@@ -1129,15 +1129,15 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     // Aluminum Handles & Diagonal Glass Highlights
 
-    Color handleAlum = ApplyShopLighting((Vector3){ center.x, 10.93f, center.z }, (Color){ 220, 225, 232, 255 });
+    Color handleAlum = ApplyShopLighting(Vector3{ center.x, 10.93f, center.z }, Color{ 220, 225, 232, 255 });
 
-    DrawCube((Vector3){ center.x - 0.86f, 10.932f, center.z - 0.49f }, 1.50f, 0.018f, 0.035f, handleAlum);
+    DrawCube(Vector3{ center.x - 0.86f, 10.932f, center.z - 0.49f }, 1.50f, 0.018f, 0.035f, handleAlum);
 
-    DrawCube((Vector3){ center.x + 0.86f, 10.944f, center.z - 0.49f }, 1.50f, 0.018f, 0.035f, handleAlum);
+    DrawCube(Vector3{ center.x + 0.86f, 10.944f, center.z - 0.49f }, 1.50f, 0.018f, 0.035f, handleAlum);
 
-    DrawLine3D((Vector3){ center.x - 1.56f, 10.926f, center.z - 0.35f }, (Vector3){ center.x - 0.31f, 10.926f, center.z + 0.35f }, (Color){ 255, 255, 255, 110 });
+    DrawLine3D(Vector3{ center.x - 1.56f, 10.926f, center.z - 0.35f }, Vector3{ center.x - 0.31f, 10.926f, center.z + 0.35f }, Color{ 255, 255, 255, 110 });
 
-    DrawLine3D((Vector3){ center.x + 0.16f, 10.938f, center.z - 0.35f }, (Vector3){ center.x + 1.41f, 10.938f, center.z + 0.35f }, (Color){ 255, 255, 255, 110 });
+    DrawLine3D(Vector3{ center.x + 0.16f, 10.938f, center.z - 0.35f }, Vector3{ center.x + 1.41f, 10.938f, center.z + 0.35f }, Color{ 255, 255, 255, 110 });
 
 
 
@@ -1145,29 +1145,29 @@ void DrawHorizontalRefrigerator(Vector3 center, const Camera3D &camera)
 
     Vector3 dispPos = { center.x, 10.66f, center.z - 0.635f };
 
-    DrawCube(dispPos, 0.28f, 0.09f, 0.015f, (Color){ 14, 16, 18, 255 });
+    DrawCube(dispPos, 0.28f, 0.09f, 0.015f, Color{ 14, 16, 18, 255 });
 
 
 
     // Digital readout: "-18°C" in glowing arctic cyan
 
-    Color ledText = (Color){ 50, 240, 255, 255 };
+    Color ledText = Color{ 50, 240, 255, 255 };
 
     float textZ = dispPos.z - 0.010f;
 
-    DrawLine3D((Vector3){ center.x - 0.095f, 10.66f, textZ }, (Vector3){ center.x - 0.075f, 10.66f, textZ }, ledText);
+    DrawLine3D(Vector3{ center.x - 0.095f, 10.66f, textZ }, Vector3{ center.x - 0.075f, 10.66f, textZ }, ledText);
 
-    DrawLine3D((Vector3){ center.x - 0.055f, 10.635f, textZ }, (Vector3){ center.x - 0.055f, 10.685f, textZ }, ledText);
+    DrawLine3D(Vector3{ center.x - 0.055f, 10.635f, textZ }, Vector3{ center.x - 0.055f, 10.685f, textZ }, ledText);
 
-    DrawCube((Vector3){ center.x - 0.025f, 10.66f, textZ }, 0.024f, 0.050f, 0.002f, ledText);
+    DrawCube(Vector3{ center.x - 0.025f, 10.66f, textZ }, 0.024f, 0.050f, 0.002f, ledText);
 
-    DrawCube((Vector3){ center.x + 0.005f, 10.680f, textZ }, 0.008f, 0.008f, 0.002f, ledText);
+    DrawCube(Vector3{ center.x + 0.005f, 10.680f, textZ }, 0.008f, 0.008f, 0.002f, ledText);
 
-    DrawCube((Vector3){ center.x + 0.032f, 10.66f, textZ }, 0.024f, 0.050f, 0.002f, ledText);
+    DrawCube(Vector3{ center.x + 0.032f, 10.66f, textZ }, 0.024f, 0.050f, 0.002f, ledText);
 
     // Green operational status LED dot
 
-    DrawSphere((Vector3){ center.x + 0.095f, 10.66f, textZ }, 0.005f, (Color){ 45, 255, 95, 255 });
+    DrawSphere(Vector3{ center.x + 0.095f, 10.66f, textZ }, 0.005f, Color{ 45, 255, 95, 255 });
 
 }
 
@@ -1183,9 +1183,8 @@ void DrawShopProductsAndParticles(const Camera3D &camera, float walkTime, float 
 
 
 
-    bool canSeeShopInterior = (camera.position.x <= 110.0f) || 
-
-        (camera.position.x <= 116.0f && camera.position.z >= 135.0f && camera.position.z <= 145.0f);
+    bool canSeeShopInterior = (camera.position.x <= 135.0f && camera.position.x >= 70.0f &&
+                               camera.position.z >= 110.0f && camera.position.z <= 175.0f);
 
 
 
@@ -1221,7 +1220,7 @@ void DrawShopProductsAndParticles(const Camera3D &camera, float walkTime, float 
 
                 if (distSq > 4.0f * 4.0f) {
 
-                    Vector3 toCart = Vector3Normalize((Vector3){ dx, dy, dz });
+                    Vector3 toCart = Vector3Normalize(Vector3{ dx, dy, dz });
 
                     if (Vector3DotProduct(fwdDir, toCart) < -0.35f) continue;
 
@@ -1257,7 +1256,7 @@ void DrawShopProductsAndParticles(const Camera3D &camera, float walkTime, float 
 
                 if (distSq > 1.2f * 1.2f) {
 
-                    Vector3 toProd = Vector3Normalize((Vector3){ dx, dy, dz });
+                    Vector3 toProd = Vector3Normalize(Vector3{ dx, dy, dz });
 
                     if (Vector3DotProduct(fwdDir, toProd) < 0.35f) continue;
 
@@ -1279,13 +1278,13 @@ void DrawShopProductsAndParticles(const Camera3D &camera, float walkTime, float 
 
             case PROD_MILK:
 
-                DrawBottle(it.homePos, 0.34f, 0.055f, g_milkLiquidModel, it.fill, (Color){ 200, 230, 255, 255 }, it.opened, isHeld, fwdDir, distSq);
+                DrawBottle(it.homePos, 0.34f, 0.055f, g_milkLiquidModel, it.fill, Color{ 200, 230, 255, 255 }, it.opened, isHeld, fwdDir, distSq);
 
                 break;
 
             case PROD_BLOOD:
 
-                DrawBottle(it.homePos, 0.34f, 0.055f, g_bloodLiquidModel, it.fill, (Color){ 180, 200, 190, 255 }, it.opened, isHeld, fwdDir, distSq);
+                DrawBottle(it.homePos, 0.34f, 0.055f, g_bloodLiquidModel, it.fill, Color{ 180, 200, 190, 255 }, it.opened, isHeld, fwdDir, distSq);
 
                 break;
 
@@ -1445,30 +1444,3 @@ int GetCrosshairFocusedProduct(const Camera3D &camera, float maxReach, bool allo
 
 }
 
-
-
-void ToggleGameFullscreen() {
-
-    int mon = GetCurrentMonitor();
-
-    int monW = GetMonitorWidth(mon);
-
-    int monH = GetMonitorHeight(mon);
-
-    if (!IsWindowFullscreen()) {
-
-        SetWindowSize(monW, monH);
-
-        ToggleFullscreen();
-
-    } else {
-
-        ToggleFullscreen();
-
-        SetWindowSize(LOGICAL_W, LOGICAL_H);
-
-        SetWindowPosition((monW - LOGICAL_W) / 2, (monH - LOGICAL_H) / 2);
-
-    }
-
-}

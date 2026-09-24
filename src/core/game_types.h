@@ -25,7 +25,7 @@
 #endif
 
 #ifndef CYAN
-#define CYAN (Color){ 0, 255, 255, 255 }
+#define CYAN Color{ 0, 255, 255, 255 }
 #endif
 
 struct Voxel {
@@ -46,4 +46,10 @@ struct Star {
     Vector3 basePos;
     float phase;
     bool isBig;
+};
+
+enum ShovelAnimState {
+    SHOVEL_ANIM_IDLE,
+    SHOVEL_ANIM_DIG,
+    SHOVEL_ANIM_ATTACK
 };

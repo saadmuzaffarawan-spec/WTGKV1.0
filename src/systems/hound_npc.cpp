@@ -674,7 +674,7 @@ static void HoundDrawBoneSegment(Mesh mesh, Material *mat, Vector3 from, Vector3
 
     Vector3 dir = Vector3Scale(diff, 1.0f / len);
 
-    Quaternion q = QuaternionFromVector3ToVector3((Vector3){ 0, 1, 0 }, dir);
+    Quaternion q = QuaternionFromVector3ToVector3(Vector3{ 0, 1, 0 }, dir);
 
     Matrix rot = QuaternionToMatrix(q);
 
@@ -696,7 +696,7 @@ static void HoundDrawForm(Mesh mesh, Material *mat, Vector3 center, Vector3 radi
 
     Matrix s = MatrixScale(radii.x, radii.y, radii.z);
 
-    Matrix r = MatrixRotateXYZ((Vector3){ DEG2RAD * eulerDeg.x, DEG2RAD * eulerDeg.y, DEG2RAD * eulerDeg.z });
+    Matrix r = MatrixRotateXYZ(Vector3{ DEG2RAD * eulerDeg.x, DEG2RAD * eulerDeg.y, DEG2RAD * eulerDeg.z });
 
     Matrix t = MatrixTranslate(center.x, center.y, center.z);
 
@@ -714,7 +714,7 @@ static void HoundDrawPartLocal(Mesh mesh, Material *mat, Matrix parentWorld, Vec
 
     Matrix s = MatrixScale(localScale.x, localScale.y, localScale.z);
 
-    Matrix r = MatrixRotateXYZ((Vector3){ DEG2RAD * localEulerDeg.x, DEG2RAD * localEulerDeg.y, DEG2RAD * localEulerDeg.z });
+    Matrix r = MatrixRotateXYZ(Vector3{ DEG2RAD * localEulerDeg.x, DEG2RAD * localEulerDeg.y, DEG2RAD * localEulerDeg.z });
 
     Matrix t = MatrixTranslate(localOffset.x, localOffset.y, localOffset.z);
 
@@ -884,7 +884,7 @@ void InitHoundResources() {
 
         // Spawn faithful Hound at gas station pump apron facing incoming car
 
-        InitDog(g_houndNPC, (Vector3){ 124.0f, 10.0f, 135.0f }, 0.0f);
+        InitDog(g_houndNPC, Vector3{ 124.0f, 10.0f, 135.0f }, 0.0f);
 
     }
 
@@ -1002,7 +1002,7 @@ void UpdateDog(DogNPC &dog, float dt) {
 
     
 
-    dog.pelvis = (Vector3){ dog.pos.x, dog.pos.y + basePelvis + bob - sitDrop + breathe, dog.pos.z };
+    dog.pelvis = Vector3{ dog.pos.x, dog.pos.y + basePelvis + bob - sitDrop + breathe, dog.pos.z };
 
     
 
@@ -1048,7 +1048,7 @@ void UpdateDog(DogNPC &dog, float dt) {
 
     float headVisualPitch = -15.0f + (dog.barkBlend * -30.0f) + (dog.sitBlend * -10.0f);
 
-    Matrix headRot = MatrixRotateXYZ((Vector3){ DEG2RAD * headVisualPitch, 0, 0 });
+    Matrix headRot = MatrixRotateXYZ(Vector3{ DEG2RAD * headVisualPitch, 0, 0 });
 
     Matrix bodyRot = MatrixRotateY(dog.yaw);
 
@@ -1371,9 +1371,9 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
     HoundDrawBoneSegment(cyl, mat, dog.pelvis, dog.chest, 0.14f, 0.16f, furCol, 0);
 
-    HoundDrawForm(sphere, mat, dog.chest, (Vector3){0.18f * chestScale, 0.22f * chestScale, 0.22f * chestScale}, (Vector3){0, dog.yaw*RAD2DEG, 0}, furCol, 0);
+    HoundDrawForm(sphere, mat, dog.chest, Vector3{0.18f * chestScale, 0.22f * chestScale, 0.22f * chestScale}, Vector3{0, dog.yaw*RAD2DEG, 0}, furCol, 0);
 
-    HoundDrawForm(sphere, mat, dog.pelvis, (Vector3){0.14f, 0.14f, 0.16f}, (Vector3){0, dog.yaw*RAD2DEG, 0}, furCol, 0);
+    HoundDrawForm(sphere, mat, dog.pelvis, Vector3{0.14f, 0.14f, 0.16f}, Vector3{0, dog.yaw*RAD2DEG, 0}, furCol, 0);
 
     
 
@@ -1431,7 +1431,7 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
         
 
-        Vector3 paw = Vector3Add(carpal, (Vector3){0, -0.05f, 0.05f});
+        Vector3 paw = Vector3Add(carpal, Vector3{0, -0.05f, 0.05f});
 
         paw.y = fmaxf(dog.pos.y + 0.02f, paw.y);
 
@@ -1439,13 +1439,13 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
         HoundDrawBoneSegment(cyl, mat, shoulderJoint, elbow, 0.05f, 0.06f, furCol, 0);
 
-        HoundDrawForm(sphere, mat, elbow, (Vector3){0.055f, 0.055f, 0.055f}, (Vector3){0,0,0}, furCol, 0);
+        HoundDrawForm(sphere, mat, elbow, Vector3{0.055f, 0.055f, 0.055f}, Vector3{0,0,0}, furCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, elbow, carpal, 0.04f, 0.04f, furCol, 0);
 
-        HoundDrawForm(sphere, mat, carpal, (Vector3){0.045f, 0.045f, 0.045f}, (Vector3){0,0,0}, furCol, 0);
+        HoundDrawForm(sphere, mat, carpal, Vector3{0.045f, 0.045f, 0.045f}, Vector3{0,0,0}, furCol, 0);
 
-        HoundDrawForm(cube, mat, paw, (Vector3){0.08f, 0.06f, 0.10f}, (Vector3){0, dog.yaw*RAD2DEG, 0}, furCol, 0);
+        HoundDrawForm(cube, mat, paw, Vector3{0.08f, 0.06f, 0.10f}, Vector3{0, dog.yaw*RAD2DEG, 0}, furCol, 0);
 
     }
 
@@ -1501,7 +1501,7 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
         
 
-        Vector3 paw = Vector3Add(fetlock, (Vector3){0, -0.04f, 0.06f});
+        Vector3 paw = Vector3Add(fetlock, Vector3{0, -0.04f, 0.06f});
 
         paw.y = fmaxf(dog.pos.y + 0.02f, paw.y);
 
@@ -1509,15 +1509,15 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
         HoundDrawBoneSegment(cyl, mat, hipJoint, stifle, 0.08f, 0.09f, furCol, 0);
 
-        HoundDrawForm(sphere, mat, stifle, (Vector3){0.065f, 0.065f, 0.065f}, (Vector3){0,0,0}, furCol, 0);
+        HoundDrawForm(sphere, mat, stifle, Vector3{0.065f, 0.065f, 0.065f}, Vector3{0,0,0}, furCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, stifle, hock, 0.05f, 0.05f, furCol, 0);
 
-        HoundDrawForm(sphere, mat, hock, (Vector3){0.055f, 0.065f, 0.055f}, (Vector3){0,0,0}, furCol, 0);
+        HoundDrawForm(sphere, mat, hock, Vector3{0.055f, 0.065f, 0.055f}, Vector3{0,0,0}, furCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, hock, fetlock, 0.035f, 0.035f, furCol, 0);
 
-        HoundDrawForm(cube, mat, paw, (Vector3){0.07f, 0.06f, 0.10f}, (Vector3){0, dog.yaw*RAD2DEG, 0}, furCol, 0);
+        HoundDrawForm(cube, mat, paw, Vector3{0.07f, 0.06f, 0.10f}, Vector3{0, dog.yaw*RAD2DEG, 0}, furCol, 0);
 
     }
 
@@ -1529,27 +1529,27 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
 
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ 0, 0, 0 }, (Vector3){0.09f, 0.09f, 0.10f}, (Vector3){0,0,0}, furCol, 0);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ 0, 0, 0 }, Vector3{0.09f, 0.09f, 0.10f}, Vector3{0,0,0}, furCol, 0);
 
-    HoundDrawPartLocal(cube, mat, hw, (Vector3){ 0, -0.02f, 0.12f }, (Vector3){0.06f, 0.06f, 0.14f}, (Vector3){0,0,0}, furCol, 0);
+    HoundDrawPartLocal(cube, mat, hw, Vector3{ 0, -0.02f, 0.12f }, Vector3{0.06f, 0.06f, 0.14f}, Vector3{0,0,0}, furCol, 0);
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ 0, -0.01f, 0.19f }, (Vector3){0.025f, 0.02f, 0.02f}, (Vector3){0,0,0}, skinCol, 1);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ 0, -0.01f, 0.19f }, Vector3{0.025f, 0.02f, 0.02f}, Vector3{0,0,0}, skinCol, 1);
 
     
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ -0.045f, 0.02f, 0.08f }, (Vector3){0.015f, 0.015f, 0.015f}, (Vector3){0,0,0}, eyeCol, 2);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ -0.045f, 0.02f, 0.08f }, Vector3{0.015f, 0.015f, 0.015f}, Vector3{0,0,0}, eyeCol, 2);
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){  0.045f, 0.02f, 0.08f }, (Vector3){0.015f, 0.015f, 0.015f}, (Vector3){0,0,0}, eyeCol, 2);
-
-
-
-    HoundDrawPartLocal(cone, mat, hw, (Vector3){ -0.07f, 0.08f, -0.02f }, (Vector3){0.03f, 0.10f, 0.04f}, (Vector3){-15, 0, -25}, furCol, 0);
-
-    HoundDrawPartLocal(cone, mat, hw, (Vector3){  0.07f, 0.08f, -0.02f }, (Vector3){0.03f, 0.10f, 0.04f}, (Vector3){-15, 0,  25}, furCol, 0);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{  0.045f, 0.02f, 0.08f }, Vector3{0.015f, 0.015f, 0.015f}, Vector3{0,0,0}, eyeCol, 2);
 
 
 
-    HoundDrawPartLocal(cube, mat, hw, (Vector3){ 0, -0.055f, 0.14f }, (Vector3){0.045f, 0.01f, 0.08f}, (Vector3){0,0,0}, toothCol, 1);
+    HoundDrawPartLocal(cone, mat, hw, Vector3{ -0.07f, 0.08f, -0.02f }, Vector3{0.03f, 0.10f, 0.04f}, Vector3{-15, 0, -25}, furCol, 0);
+
+    HoundDrawPartLocal(cone, mat, hw, Vector3{  0.07f, 0.08f, -0.02f }, Vector3{0.03f, 0.10f, 0.04f}, Vector3{-15, 0,  25}, furCol, 0);
+
+
+
+    HoundDrawPartLocal(cube, mat, hw, Vector3{ 0, -0.055f, 0.14f }, Vector3{0.045f, 0.01f, 0.08f}, Vector3{0,0,0}, toothCol, 1);
 
 
 
@@ -1557,11 +1557,11 @@ void DrawHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh cone, M
 
     Matrix jw = dog.jawWorld;
 
-    HoundDrawPartLocal(cube, mat, jw, (Vector3){ 0, -0.03f, 0.11f }, (Vector3){0.05f, 0.04f, 0.13f}, (Vector3){0,0,0}, furCol, 0);
+    HoundDrawPartLocal(cube, mat, jw, Vector3{ 0, -0.03f, 0.11f }, Vector3{0.05f, 0.04f, 0.13f}, Vector3{0,0,0}, furCol, 0);
 
-    HoundDrawPartLocal(cube, mat, jw, (Vector3){ 0, -0.005f, 0.13f }, (Vector3){0.04f, 0.01f, 0.07f}, (Vector3){0,0,0}, toothCol, 1);
+    HoundDrawPartLocal(cube, mat, jw, Vector3{ 0, -0.005f, 0.13f }, Vector3{0.04f, 0.01f, 0.07f}, Vector3{0,0,0}, toothCol, 1);
 
-    HoundDrawPartLocal(cube, mat, jw, (Vector3){ 0, -0.01f, 0.08f }, (Vector3){0.04f, 0.02f, 0.08f}, (Vector3){0,0,0}, voidCol, 1);
+    HoundDrawPartLocal(cube, mat, jw, Vector3{ 0, -0.01f, 0.08f }, Vector3{0.04f, 0.02f, 0.08f}, Vector3{0,0,0}, voidCol, 1);
 
 }
 
@@ -1609,7 +1609,7 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         vPos = Vector3Add(vPos, Vector3Scale(up, sinf(t * PI) * 0.04f));
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), vPos, (Vector3){0.025f, 0.025f, 0.028f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), vPos, Vector3{0.025f, 0.025f, 0.028f}, Vector3{0,0,0}, boneCol, 0);
 
     }
 
@@ -1621,7 +1621,7 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         Vector3 vPos = Vector3Lerp(dog.chest, dog.neckBase, t);
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), vPos, (Vector3){0.022f, 0.022f, 0.025f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), vPos, Vector3{0.022f, 0.022f, 0.025f}, Vector3{0,0,0}, boneCol, 0);
 
     }
 
@@ -1765,7 +1765,7 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         
 
-        Vector3 pawCenter = Vector3Add(carpal, (Vector3){0, -0.05f, 0.05f});
+        Vector3 pawCenter = Vector3Add(carpal, Vector3{0, -0.05f, 0.05f});
 
         pawCenter.y = fmaxf(dog.pos.y + 0.01f, pawCenter.y);
 
@@ -1773,11 +1773,11 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         HoundDrawBoneSegment(cyl, mat, shoulderJoint, elbow, 0.02f, 0.02f, boneCol, 0);
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), elbow, (Vector3){0.025f, 0.025f, 0.025f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), elbow, Vector3{0.025f, 0.025f, 0.025f}, Vector3{0,0,0}, boneCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, elbow, carpal, 0.015f, 0.015f, boneCol, 0);
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), carpal, (Vector3){0.02f, 0.02f, 0.02f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), carpal, Vector3{0.02f, 0.02f, 0.02f}, Vector3{0,0,0}, boneCol, 0);
 
         
 
@@ -1847,7 +1847,7 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         
 
-        Vector3 pawCenter = Vector3Add(fetlock, (Vector3){0, -0.04f, 0.06f});
+        Vector3 pawCenter = Vector3Add(fetlock, Vector3{0, -0.04f, 0.06f});
 
         pawCenter.y = fmaxf(dog.pos.y + 0.01f, pawCenter.y);
 
@@ -1855,11 +1855,11 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
         HoundDrawBoneSegment(cyl, mat, hipJoint, stifle, 0.025f, 0.025f, boneCol, 0);
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), stifle, (Vector3){0.028f, 0.028f, 0.028f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), stifle, Vector3{0.028f, 0.028f, 0.028f}, Vector3{0,0,0}, boneCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, stifle, hock, 0.02f, 0.02f, boneCol, 0);
 
-        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), hock, (Vector3){0.022f, 0.022f, 0.022f}, (Vector3){0,0,0}, boneCol, 0);
+        HoundDrawPartLocal(sphere, mat, MatrixIdentity(), hock, Vector3{0.022f, 0.022f, 0.022f}, Vector3{0,0,0}, boneCol, 0);
 
         HoundDrawBoneSegment(cyl, mat, hock, fetlock, 0.015f, 0.015f, boneCol, 0);
 
@@ -1887,43 +1887,43 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
 
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ 0, 0, 0 }, (Vector3){0.07f, 0.07f, 0.08f}, (Vector3){0,0,0}, boneCol, 0);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ 0, 0, 0 }, Vector3{0.07f, 0.07f, 0.08f}, Vector3{0,0,0}, boneCol, 0);
 
-    HoundDrawPartLocal(cube, mat, hw, (Vector3){ 0, 0.07f, -0.02f }, (Vector3){0.01f, 0.02f, 0.08f}, (Vector3){0,0,0}, boneCol, 0);
-
-    
-
-    HoundDrawPartLocal(cyl, mat, hw, (Vector3){ -0.06f, -0.02f, 0.05f }, (Vector3){0.01f, 0.08f, 0.01f}, (Vector3){0,0,-85}, boneCol, 0);
-
-    HoundDrawPartLocal(cyl, mat, hw, (Vector3){  0.06f, -0.02f, 0.05f }, (Vector3){0.01f, 0.08f, 0.01f}, (Vector3){0,0, 85}, boneCol, 0);
-
-
-
-    HoundDrawPartLocal(cyl, mat, hw, (Vector3){ 0, -0.02f, 0.12f }, (Vector3){0.035f, 0.08f, 0.035f}, (Vector3){85,0,0}, boneCol, 0);
+    HoundDrawPartLocal(cube, mat, hw, Vector3{ 0, 0.07f, -0.02f }, Vector3{0.01f, 0.02f, 0.08f}, Vector3{0,0,0}, boneCol, 0);
 
     
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ 0, -0.01f, 0.17f }, (Vector3){0.02f, 0.015f, 0.02f}, (Vector3){0,0,0}, voidCol, 1);
+    HoundDrawPartLocal(cyl, mat, hw, Vector3{ -0.06f, -0.02f, 0.05f }, Vector3{0.01f, 0.08f, 0.01f}, Vector3{0,0,-85}, boneCol, 0);
+
+    HoundDrawPartLocal(cyl, mat, hw, Vector3{  0.06f, -0.02f, 0.05f }, Vector3{0.01f, 0.08f, 0.01f}, Vector3{0,0, 85}, boneCol, 0);
+
+
+
+    HoundDrawPartLocal(cyl, mat, hw, Vector3{ 0, -0.02f, 0.12f }, Vector3{0.035f, 0.08f, 0.035f}, Vector3{85,0,0}, boneCol, 0);
 
     
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ -0.04f, 0.02f, 0.07f }, (Vector3){0.025f, 0.025f, 0.02f}, (Vector3){0,0,0}, voidCol, 1);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ 0, -0.01f, 0.17f }, Vector3{0.02f, 0.015f, 0.02f}, Vector3{0,0,0}, voidCol, 1);
 
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){  0.04f, 0.02f, 0.07f }, (Vector3){0.025f, 0.025f, 0.02f}, (Vector3){0,0,0}, voidCol, 1);
+    
 
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ -0.04f, 0.02f, 0.07f }, Vector3{0.025f, 0.025f, 0.02f}, Vector3{0,0,0}, voidCol, 1);
 
-
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){ -0.04f, 0.02f, 0.075f }, (Vector3){0.010f, 0.010f, 0.010f}, (Vector3){0,0,0}, eyeCol, 2);
-
-    HoundDrawPartLocal(sphere, mat, hw, (Vector3){  0.04f, 0.02f, 0.075f }, (Vector3){0.010f, 0.010f, 0.010f}, (Vector3){0,0,0}, eyeCol, 2);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{  0.04f, 0.02f, 0.07f }, Vector3{0.025f, 0.025f, 0.02f}, Vector3{0,0,0}, voidCol, 1);
 
 
 
-    HoundDrawPartLocal(cube, mat, hw, (Vector3){ 0, -0.05f, 0.14f }, (Vector3){0.045f, 0.01f, 0.08f}, (Vector3){0,0,0}, boneCol, 0);
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{ -0.04f, 0.02f, 0.075f }, Vector3{0.010f, 0.010f, 0.010f}, Vector3{0,0,0}, eyeCol, 2);
+
+    HoundDrawPartLocal(sphere, mat, hw, Vector3{  0.04f, 0.02f, 0.075f }, Vector3{0.010f, 0.010f, 0.010f}, Vector3{0,0,0}, eyeCol, 2);
+
+
+
+    HoundDrawPartLocal(cube, mat, hw, Vector3{ 0, -0.05f, 0.14f }, Vector3{0.045f, 0.01f, 0.08f}, Vector3{0,0,0}, boneCol, 0);
 
     for(int t=-2; t<=2; t+=4) {
 
-        HoundDrawPartLocal(cone, mat, hw, (Vector3){ t*0.01f, -0.065f, 0.17f }, (Vector3){0.008f, 0.02f, 0.008f}, (Vector3){0,0,0}, toothCol, 3);
+        HoundDrawPartLocal(cone, mat, hw, Vector3{ t*0.01f, -0.065f, 0.17f }, Vector3{0.008f, 0.02f, 0.008f}, Vector3{0,0,0}, toothCol, 3);
 
     }
 
@@ -1939,17 +1939,17 @@ void DrawSkeletonHound(const DogNPC &dog, Mesh cyl, Mesh sphere, Mesh cube, Mesh
 
     
 
-    HoundDrawPartLocal(cyl, mat, jw, (Vector3){ -0.035f, -0.02f, 0.08f }, (Vector3){0.015f, 0.12f, 0.015f}, (Vector3){85,-15,0}, boneCol, 0);
+    HoundDrawPartLocal(cyl, mat, jw, Vector3{ -0.035f, -0.02f, 0.08f }, Vector3{0.015f, 0.12f, 0.015f}, Vector3{85,-15,0}, boneCol, 0);
 
-    HoundDrawPartLocal(cyl, mat, jw, (Vector3){  0.035f, -0.02f, 0.08f }, (Vector3){0.015f, 0.12f, 0.015f}, (Vector3){85, 15,0}, boneCol, 0);
+    HoundDrawPartLocal(cyl, mat, jw, Vector3{  0.035f, -0.02f, 0.08f }, Vector3{0.015f, 0.12f, 0.015f}, Vector3{85, 15,0}, boneCol, 0);
 
     
 
-    HoundDrawPartLocal(cube, mat, jw, (Vector3){ 0, -0.01f, 0.13f }, (Vector3){0.035f, 0.01f, 0.07f}, (Vector3){0,0,0}, boneCol, 0);
+    HoundDrawPartLocal(cube, mat, jw, Vector3{ 0, -0.01f, 0.13f }, Vector3{0.035f, 0.01f, 0.07f}, Vector3{0,0,0}, boneCol, 0);
 
     for(int t=-2; t<=2; t+=4) {
 
-        HoundDrawPartLocal(cone, mat, jw, (Vector3){ t*0.008f, 0.005f, 0.16f }, (Vector3){0.006f, 0.015f, 0.006f}, (Vector3){180,0,0}, toothCol, 3);
+        HoundDrawPartLocal(cone, mat, jw, Vector3{ t*0.008f, 0.005f, 0.16f }, Vector3{0.006f, 0.015f, 0.006f}, Vector3{180,0,0}, toothCol, 3);
 
     }
 

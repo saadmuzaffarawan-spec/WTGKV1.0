@@ -4,7 +4,7 @@
 #include <math.h>
 #include <vector>
 
-void DrawFirstPersonDashboard(float iCarSpd, float iShakeDec, int iJerkCount, float timeVal, float panX = 0.0f, bool isSisterPOV = false) {
+inline void DrawFirstPersonDashboard(float iCarSpd, float iShakeDec, int iJerkCount, float timeVal, float panX = 0.0f, bool isSisterPOV = false) {
 
     // -------------------------------------------------------------
 
@@ -462,7 +462,7 @@ void DrawFirstPersonDashboard(float iCarSpd, float iShakeDec, int iJerkCount, fl
 
 
 
-void Draw3DCarInterior(float iCarX, float iCarY, float iCarZ, float ccy, float timeVal, float iCarSpd, float iShakeDec, int iJerkCount,
+inline void Draw3DCarInterior(float iCarX, float iCarY, float iCarZ, float ccy, float timeVal, float iCarSpd, float iShakeDec, int iJerkCount,
                        Mesh mSeat, Mesh mSeatBack, Mesh mSteerRim, Material matSeat, Material matCabin) {
     (void)iCarY;
     // ---- SEATS ----

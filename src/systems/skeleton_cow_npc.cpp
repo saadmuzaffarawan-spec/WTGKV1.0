@@ -65,7 +65,7 @@ static void BovineDrawBoneSegment(Mesh mesh, Material *mat, Vector3 from, Vector
 
     Vector3 dir = Vector3Scale(diff, 1.0f / len);
 
-    Quaternion q = QuaternionFromVector3ToVector3((Vector3){ 0, 1, 0 }, dir);
+    Quaternion q = QuaternionFromVector3ToVector3(Vector3{ 0, 1, 0 }, dir);
 
     Matrix rot = QuaternionToMatrix(q);
 
@@ -85,7 +85,7 @@ static void BovineDrawForm(Mesh mesh, Material *mat, Vector3 center, Vector3 rad
 
     Matrix s = MatrixScale(radii.x, radii.y, radii.z);
 
-    Matrix r = MatrixRotateXYZ((Vector3){ DEG2RAD * eulerDeg.x, DEG2RAD * eulerDeg.y, DEG2RAD * eulerDeg.z });
+    Matrix r = MatrixRotateXYZ(Vector3{ DEG2RAD * eulerDeg.x, DEG2RAD * eulerDeg.y, DEG2RAD * eulerDeg.z });
 
     Matrix t = MatrixTranslate(center.x, center.y, center.z);
 
@@ -171,9 +171,9 @@ void InitBovineNPCs() {
 
     // Cow 0: East roadside verge right across from gas station (grazing, immediately visible from car!)
 
-    InitBovine(g_bovineNPCs[0], (Vector3){ 142.0f, 10.0f, 138.0f }, 1.4f);
+    InitBovine(g_bovineNPCs[0], Vector3{ 142.0f, 10.0f, 138.0f }, 1.4f);
 
-    g_bovineNPCs[0].homePos = (Vector3){ 143.0f, 10.0f, 140.0f };
+    g_bovineNPCs[0].homePos = Vector3{ 143.0f, 10.0f, 140.0f };
 
     g_bovineNPCs[0].wanderRadius = 12.0f;
 
@@ -187,9 +187,9 @@ void InitBovineNPCs() {
 
     // Cow 1: North roadside meadow along highway (standing & chewing cud, easily seen looking forward)
 
-    InitBovine(g_bovineNPCs[1], (Vector3){ 144.0f, 10.0f, 162.0f }, -0.7f);
+    InitBovine(g_bovineNPCs[1], Vector3{ 144.0f, 10.0f, 162.0f }, -0.7f);
 
-    g_bovineNPCs[1].homePos = (Vector3){ 146.0f, 10.0f, 160.0f };
+    g_bovineNPCs[1].homePos = Vector3{ 146.0f, 10.0f, 160.0f };
 
     g_bovineNPCs[1].wanderRadius = 14.0f;
 
@@ -201,9 +201,9 @@ void InitBovineNPCs() {
 
     // Cow 2: West roadside meadow across from the shop (resting, lying on side)
 
-    InitBovine(g_bovineNPCs[2], (Vector3){ 112.0f, 10.0f, 142.0f }, 2.4f);
+    InitBovine(g_bovineNPCs[2], Vector3{ 112.0f, 10.0f, 142.0f }, 2.4f);
 
-    g_bovineNPCs[2].homePos = (Vector3){ 112.0f, 10.0f, 142.0f };
+    g_bovineNPCs[2].homePos = Vector3{ 112.0f, 10.0f, 142.0f };
 
     g_bovineNPCs[2].wanderRadius = 12.0f;
 
@@ -219,9 +219,9 @@ void InitBovineNPCs() {
 
     // Cow 3: East meadow pasture near highway entrance (walking / grazing)
 
-    InitBovine(g_bovineNPCs[3], (Vector3){ 146.0f, 10.0f, 122.0f }, 0.5f);
+    InitBovine(g_bovineNPCs[3], Vector3{ 146.0f, 10.0f, 122.0f }, 0.5f);
 
-    g_bovineNPCs[3].homePos = (Vector3){ 148.0f, 10.0f, 124.0f };
+    g_bovineNPCs[3].homePos = Vector3{ 148.0f, 10.0f, 124.0f };
 
     g_bovineNPCs[3].wanderRadius = 15.0f;
 
@@ -335,9 +335,9 @@ void UpdateBovineKinematics(BovineSkeleton &cow, float dt) {
 
     float bodyRoll = cow.lieBlend * 1.35f; // Rolls over ~77 degrees onto the side
 
-    Vector3 right = BovineRotateAroundAxis((Vector3){ cosf(cow.yaw), 0, -sinf(cow.yaw) }, fwd, bodyRoll);
+    Vector3 right = BovineRotateAroundAxis(Vector3{ cosf(cow.yaw), 0, -sinf(cow.yaw) }, fwd, bodyRoll);
 
-    Vector3 up = BovineRotateAroundAxis((Vector3){ 0, 1, 0 }, fwd, bodyRoll);
+    Vector3 up = BovineRotateAroundAxis(Vector3{ 0, 1, 0 }, fwd, bodyRoll);
 
 
 
@@ -629,9 +629,9 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
     float bodyRoll = cow.lieBlend * 1.35f;
 
-    Vector3 right = BovineRotateAroundAxis((Vector3){ cosf(cow.yaw), 0, -sinf(cow.yaw) }, fwd, bodyRoll);
+    Vector3 right = BovineRotateAroundAxis(Vector3{ cosf(cow.yaw), 0, -sinf(cow.yaw) }, fwd, bodyRoll);
 
-    Vector3 up = BovineRotateAroundAxis((Vector3){ 0, 1, 0 }, fwd, bodyRoll);
+    Vector3 up = BovineRotateAroundAxis(Vector3{ 0, 1, 0 }, fwd, bodyRoll);
 
 
 
@@ -753,11 +753,11 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
     
 
-    BovineDrawForm(sphere, mat, Vector3Add(atlas, Vector3Scale(headDir, 0.15f)), (Vector3){0.18f, 0.12f, 0.22f}, (Vector3){15, cow.yaw*RAD2DEG, 0}, boneCol);
+    BovineDrawForm(sphere, mat, Vector3Add(atlas, Vector3Scale(headDir, 0.15f)), Vector3{0.18f, 0.12f, 0.22f}, Vector3{15, cow.yaw*RAD2DEG, 0}, boneCol);
 
     BovineDrawBoneSegment(cyl, mat, Vector3Add(atlas, Vector3Scale(headDir, 0.15f)), snoutEnd, 0.08f, 0.10f, boneCol);
 
-    BovineDrawForm(sphere, mat, snoutEnd, (Vector3){0.12f, 0.06f, 0.08f}, (Vector3){15, cow.yaw*RAD2DEG, 0}, boneCol);
+    BovineDrawForm(sphere, mat, snoutEnd, Vector3{0.12f, 0.06f, 0.08f}, Vector3{15, cow.yaw*RAD2DEG, 0}, boneCol);
 
 
 
@@ -775,9 +775,9 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
     Vector3 eyeR = Vector3Add(atlas, Vector3Add(Vector3Scale(headDir, 0.25f), Vector3Scale(right,  0.16f)));
 
-    BovineDrawForm(sphere, mat, eyeL, (Vector3){0.05f, 0.06f, 0.05f}, (Vector3){0,0,0}, voidCol);
+    BovineDrawForm(sphere, mat, eyeL, Vector3{0.05f, 0.06f, 0.05f}, Vector3{0,0,0}, voidCol);
 
-    BovineDrawForm(sphere, mat, eyeR, (Vector3){0.05f, 0.06f, 0.05f}, (Vector3){0,0,0}, voidCol);
+    BovineDrawForm(sphere, mat, eyeR, Vector3{0.05f, 0.06f, 0.05f}, Vector3{0,0,0}, voidCol);
 
 
 
@@ -829,7 +829,7 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
         Vector3 carpalDir  = BovineRotateAroundAxis(Vector3Normalize(Vector3Add(Vector3Scale(up, -1), Vector3Scale(fwd,  0.2f))), right, swing - carpalFlex + foldFrontRadius); 
 
-        Vector3 fetlockDir = BovineRotateAroundAxis((Vector3){0, -1, 0}, right, swing - carpalFlex + foldFrontCannon);
+        Vector3 fetlockDir = BovineRotateAroundAxis(Vector3{0, -1, 0}, right, swing - carpalFlex + foldFrontCannon);
 
 
 
@@ -849,17 +849,17 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
         BovineDrawBoneSegment(cyl, mat, shoulderJoint, elbow, 0.05f, 0.05f, boneCol);
 
-        BovineDrawForm(sphere, mat, elbow, (Vector3){0.055f, 0.055f, 0.055f}, (Vector3){0,0,0}, boneCol);
+        BovineDrawForm(sphere, mat, elbow, Vector3{0.055f, 0.055f, 0.055f}, Vector3{0,0,0}, boneCol);
 
         BovineDrawBoneSegment(cyl, mat, elbow, carpal, 0.04f, 0.035f, boneCol);
 
-        BovineDrawForm(sphere, mat, carpal, (Vector3){0.045f, 0.045f, 0.045f}, (Vector3){0,0,0}, boneCol);
+        BovineDrawForm(sphere, mat, carpal, Vector3{0.045f, 0.045f, 0.045f}, Vector3{0,0,0}, boneCol);
 
         BovineDrawBoneSegment(cyl, mat, carpal, fetlock, 0.03f, 0.025f, boneCol);
 
-        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right, -0.02f)), (Vector3){0.035f, 0.06f, 0.08f}, (Vector3){0, cow.yaw*RAD2DEG, 0}, hornCol);
+        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right, -0.02f)), Vector3{0.035f, 0.06f, 0.08f}, Vector3{0, cow.yaw*RAD2DEG, 0}, hornCol);
 
-        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right,  0.02f)), (Vector3){0.035f, 0.06f, 0.08f}, (Vector3){0, cow.yaw*RAD2DEG, 0}, hornCol);
+        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right,  0.02f)), Vector3{0.035f, 0.06f, 0.08f}, Vector3{0, cow.yaw*RAD2DEG, 0}, hornCol);
 
     }
 
@@ -895,7 +895,7 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
         Vector3 hockDir    = BovineRotateAroundAxis(Vector3Normalize(Vector3Add(Vector3Scale(up, -1), Vector3Scale(fwd, -0.3f))), right, swing + hockFlex + foldHindTibia);
 
-        Vector3 fetlockDir = BovineRotateAroundAxis((Vector3){0, -1, 0}, right, swing + hockFlex + foldHindCannon);
+        Vector3 fetlockDir = BovineRotateAroundAxis(Vector3{0, -1, 0}, right, swing + hockFlex + foldHindCannon);
 
 
 
@@ -915,21 +915,21 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
         BovineDrawBoneSegment(cyl, mat, hipJoint, stifle, 0.06f, 0.06f, boneCol);
 
-        BovineDrawForm(sphere, mat, stifle, (Vector3){0.055f, 0.055f, 0.055f}, (Vector3){0,0,0}, boneCol);
+        BovineDrawForm(sphere, mat, stifle, Vector3{0.055f, 0.055f, 0.055f}, Vector3{0,0,0}, boneCol);
 
         BovineDrawBoneSegment(cyl, mat, stifle, hock, 0.045f, 0.045f, boneCol);
 
         BovineDrawBoneSegment(cyl, mat, hock, Vector3Add(hock, Vector3Add(Vector3Scale(up, 0.1f), Vector3Scale(fwd, -0.1f))), 0.02f, 0.02f, boneCol);
 
-        BovineDrawForm(sphere, mat, hock, (Vector3){0.045f, 0.055f, 0.045f}, (Vector3){0,0,0}, boneCol);
+        BovineDrawForm(sphere, mat, hock, Vector3{0.045f, 0.055f, 0.045f}, Vector3{0,0,0}, boneCol);
 
         BovineDrawBoneSegment(cyl, mat, hock, fetlock, 0.03f, 0.025f, boneCol);
 
         
 
-        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right, -0.02f)), (Vector3){0.035f, 0.06f, 0.08f}, (Vector3){0, cow.yaw*RAD2DEG, 0}, hornCol);
+        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right, -0.02f)), Vector3{0.035f, 0.06f, 0.08f}, Vector3{0, cow.yaw*RAD2DEG, 0}, hornCol);
 
-        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right,  0.02f)), (Vector3){0.035f, 0.06f, 0.08f}, (Vector3){0, cow.yaw*RAD2DEG, 0}, hornCol);
+        BovineDrawForm(cube, mat, Vector3Add(hoof, Vector3Scale(right,  0.02f)), Vector3{0.035f, 0.06f, 0.08f}, Vector3{0, cow.yaw*RAD2DEG, 0}, hornCol);
 
     }
 
@@ -959,7 +959,7 @@ void DrawBovineSkeleton(const BovineSkeleton &cow, Mesh cyl, Mesh sphere, Mesh c
 
             };
 
-            DrawSphere(dropPos, 0.022f, (Color){ 175, 220, 255, (unsigned char)(210 * cow.shakeBlend) });
+            DrawSphere(dropPos, 0.022f, Color{ 175, 220, 255, (unsigned char)(210 * cow.shakeBlend) });
 
         }
 

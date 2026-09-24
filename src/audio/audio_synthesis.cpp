@@ -1460,9 +1460,137 @@ Sound GenerateFoilSound() {
     wave.data = data;
 
     Sound snd = LoadSoundFromWave(wave);
-
     UnloadWave(wave);
-
     return snd;
-
 }
+
+Sound GenerateStepperMotorSound() {
+    int sampleRate = 44100;
+    float duration = 0.35f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        // High-pitched 1480Hz stepper carrier with fast 70Hz step pulse modulation
+        float stepPulse = fmodf(t * 70.0f, 1.0f);
+        float stepEnv = (stepPulse < 0.45f) ? 1.0f : 0.05f;
+        float carrier = sinf(2.0f * 3.14159265f * 1480.0f * t) * 0.7f + sinf(2.0f * 3.14159265f * 2960.0f * t) * 0.3f;
+        float noise = ((float)(rand() % 2000 - 1000) / 1000.0f) * 0.15f;
+        float env = 1.0f - (t / duration) * 0.2f;
+        float mixed = (carrier * stepEnv + noise) * env * 0.55f;
+        if (mixed > 1.0f) mixed = 1.0f;
+        if (mixed < -1.0f) mixed = -1.0f;
+        data[i] = (short)(mixed * 32767.0f);
+    }
+
+    Wave wave = { 0 };
+    wave.frameCount = frameCount;
+    wave.sampleRate = sampleRate;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+    wave.data = data;
+    Sound snd = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    return snd;
+}
+
+Sound GenerateATMKeyBeep() {
+    int sampleRate = 44100;
+    float duration = 0.055f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        float env = (t < 0.005f) ? (t / 0.005f) : (1.0f - (t - 0.005f) / (duration - 0.005f));
+        float s = (sinf(2.0f * 3.14159265f * 1209.0f * t) * 0.6f + sinf(2.0f * 3.14159265f * 770.0f * t) * 0.4f) * env * 0.5f;
+        data[i] = (short)(s * 32767.0f);
+    }
+    Wave wave = { 0 };
+    wave.frameCount = frameCount; wave.sampleRate = sampleRate; wave.sampleSize = 16; wave.channels = 1; wave.data = data;
+    Sound snd = LoadSoundFromWave(wave); UnloadWave(wave); return snd;
+}
+
+Sound GenerateATMCardFeed() {
+    int sampleRate = 44100;
+    float duration = 0.38f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        float motor = sinf(2.0f * 3.14159265f * 240.0f * t) * 0.3f + sinf(2.0f * 3.14159265f * 480.0f * t) * 0.2f;
+        float friction = ((float)(rand() % 2000 - 1000) / 1000.0f) * 0.4f;
+        float env = sinf((t / duration) * 3.14159265f);
+        float s = (motor + friction) * env * 0.6f;
+        if (s > 1.0f) s = 1.0f; else if (s < -1.0f) s = -1.0f;
+        data[i] = (short)(s * 32767.0f);
+    }
+    Wave wave = { 0 }; wave.frameCount = frameCount; wave.sampleRate = sampleRate; wave.sampleSize = 16; wave.channels = 1; wave.data = data;
+    Sound snd = LoadSoundFromWave(wave); UnloadWave(wave); return snd;
+}
+
+Sound GenerateATMCardEject() {
+    int sampleRate = 44100;
+    float duration = 0.42f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        float motor = 0.0f;
+        if (t < 0.25f) {
+            motor = (sinf(2.0f * 3.14159265f * 320.0f * t) * 0.3f + ((float)(rand() % 2000 - 1000) / 1000.0f) * 0.25f) * (1.0f - t / 0.25f);
+        }
+        float chime = 0.0f;
+        if (t >= 0.15f && t < 0.28f) {
+            float ct = t - 0.15f;
+            chime += sinf(2.0f * 3.14159265f * 987.77f * ct) * expf(-ct * 18.0f) * 0.45f;
+        } else if (t >= 0.28f) {
+            float ct = t - 0.28f;
+            chime += sinf(2.0f * 3.14159265f * 1318.51f * ct) * expf(-ct * 16.0f) * 0.55f;
+        }
+        float s = (motor + chime) * 0.7f;
+        if (s > 1.0f) s = 1.0f; else if (s < -1.0f) s = -1.0f;
+        data[i] = (short)(s * 32767.0f);
+    }
+    Wave wave = { 0 }; wave.frameCount = frameCount; wave.sampleRate = sampleRate; wave.sampleSize = 16; wave.channels = 1; wave.data = data;
+    Sound snd = LoadSoundFromWave(wave); UnloadWave(wave); return snd;
+}
+
+Sound GenerateATMCashDispense() {
+    int sampleRate = 44100;
+    float duration = 0.68f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        float motor = sinf(2.0f * 3.14159265f * 185.0f * t) * 0.25f;
+        float stepPulse = fmodf(t * 32.0f, 1.0f);
+        float billTick = (stepPulse < 0.15f) ? (1.0f - stepPulse / 0.15f) : 0.0f;
+        float billClick = billTick * (((float)(rand() % 2000 - 1000) / 1000.0f) * 0.65f + sinf(2.0f * 3.14159265f * 850.0f * t) * 0.35f);
+        float env = (t < 0.05f) ? (t / 0.05f) : ((t > 0.58f) ? (1.0f - (t - 0.58f) / 0.10f) : 1.0f);
+        float s = (motor + billClick) * env * 0.75f;
+        if (s > 1.0f) s = 1.0f; else if (s < -1.0f) s = -1.0f;
+        data[i] = (short)(s * 32767.0f);
+    }
+    Wave wave = { 0 }; wave.frameCount = frameCount; wave.sampleRate = sampleRate; wave.sampleSize = 16; wave.channels = 1; wave.data = data;
+    Sound snd = LoadSoundFromWave(wave); UnloadWave(wave); return snd;
+}
+
+Sound GenerateATMCashRuffle() {
+    int sampleRate = 44100;
+    float duration = 0.18f;
+    int frameCount = (int)(sampleRate * duration);
+    short* data = (short*)MemAlloc(frameCount * sizeof(short));
+    for (int i = 0; i < frameCount; i++) {
+        float t = (float)i / (float)sampleRate;
+        float noise = ((float)(rand() % 2000 - 1000) / 1000.0f);
+        float snap = (t < 0.025f) ? (sinf(2.0f * 3.14159265f * 420.0f * t) * 0.4f) : 0.0f;
+        float env = sinf((t / duration) * 3.14159265f);
+        float s = (noise * 0.5f + snap) * env * 0.6f;
+        if (s > 1.0f) s = 1.0f; else if (s < -1.0f) s = -1.0f;
+        data[i] = (short)(s * 32767.0f);
+    }
+    Wave wave = { 0 }; wave.frameCount = frameCount; wave.sampleRate = sampleRate; wave.sampleSize = 16; wave.channels = 1; wave.data = data;
+    Sound snd = LoadSoundFromWave(wave); UnloadWave(wave); return snd;
+}
+

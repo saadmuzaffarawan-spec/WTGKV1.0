@@ -25,6 +25,9 @@ extern float g_playerCash;
 extern float g_cashPopupAmount;
 extern float g_cashPopupTimer;
 extern char  g_cashPopupText[80];
+extern bool  g_showDebugFPS;
+
+void TriggerCashPopup(float amount, const char* label = nullptr);
 
 extern float g_stationBellBannerTimer;
 extern char  g_stationBellBanner[128];

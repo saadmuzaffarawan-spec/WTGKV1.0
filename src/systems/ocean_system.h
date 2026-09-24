@@ -686,14 +686,14 @@ static void DrawOceanSurface(Camera3D camera, float timeVal, float extDayFactor,
         float sunsetGlow = Clamp((0.25f - sunElev) / 0.25f, 0.0f, 1.0f);
         Vector3 noonCol = { 1.0f, 0.95f, 0.84f };
         Vector3 duskCol = { 1.0f, 0.48f, 0.22f };
-        lColor = (Vector3){
+        lColor = Vector3{
             Lerp(noonCol.x, duskCol.x, sunsetGlow) * (0.90f + 0.35f * extDayFactor),
             Lerp(noonCol.y, duskCol.y, sunsetGlow) * (0.90f + 0.35f * extDayFactor),
             Lerp(noonCol.z, duskCol.z, sunsetGlow) * (0.90f + 0.35f * extDayFactor)
         };
     } else {
         lDir = Vector3Negate(sunDir);
-        lColor = (Vector3){ 0.35f, 0.48f, 0.68f };
+        lColor = Vector3{ 0.35f, 0.48f, 0.68f };
     }
 
     Vector3 amb = {
@@ -736,7 +736,7 @@ static void DrawOceanSurface(Camera3D camera, float timeVal, float extDayFactor,
     SetShaderValue(g_seabedShader, g_seabedLocGridSnapOffset, &nearSnap, SHADER_UNIFORM_VEC2);
 
     // 3. Draw Submerged Sandy Seabed with Sunlight Caustics
-    DrawModel(g_seabedModel, (Vector3){ 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
+    DrawModel(g_seabedModel, Vector3{ 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
 
     // 4. Draw Infinite Ocean Surfaces with Double-Sided Snell's Window & Translucent Blending Support
     rlEnableColorBlend();
@@ -744,11 +744,11 @@ static void DrawOceanSurface(Camera3D camera, float timeVal, float extDayFactor,
 
     // Inner Detailed Concentric Ring (Translucent lookdown from pier/cliffs, opaque glancing towards horizon)
     SetShaderValue(g_oceanShader, g_oceanLocGridSnapOffset, &nearSnap, SHADER_UNIFORM_VEC2);
-    DrawModel(g_oceanModelNear, (Vector3){ 0.0f, OCEAN_WATER_LEVEL, 0.0f }, 1.0f, WHITE);
+    DrawModel(g_oceanModelNear, Vector3{ 0.0f, OCEAN_WATER_LEVEL, 0.0f }, 1.0f, WHITE);
 
     // Outer Horizon Concentric Ring (stretching 1600m into atmospheric haze)
     SetShaderValue(g_oceanShader, g_oceanLocGridSnapOffset, &farSnap, SHADER_UNIFORM_VEC2);
-    DrawModel(g_oceanModelFar, (Vector3){ 0.0f, OCEAN_WATER_LEVEL - 0.04f, 1.0f }, 1.0f, WHITE);
+    DrawModel(g_oceanModelFar, Vector3{ 0.0f, OCEAN_WATER_LEVEL - 0.04f, 1.0f }, 1.0f, WHITE);
 
     rlEnableBackfaceCulling();
 }
@@ -774,67 +774,67 @@ static void DrawCoastalEnvironment(Camera3D camera, float timeVal, float extDayF
 
     // 1. Weathered Timber Pier (Spans X: 16.0 .. 36.0 at Z = 138.0, Deck Y = 10.75)
     for (float px = 18.0f; px <= 34.0f; px += 3.2f) {
-        DrawCylinder((Vector3){ px, 4.0f, 136.2f }, 0.22f, 0.24f, 6.8f, 8, woodDark);
-        DrawCylinder((Vector3){ px, 4.0f, 139.8f }, 0.22f, 0.24f, 6.8f, 8, woodDark);
-        DrawCylinder((Vector3){ px, 8.8f, 136.2f }, 0.24f, 0.24f, 1.4f, 8, woodWet);
-        DrawCylinder((Vector3){ px, 8.8f, 139.8f }, 0.24f, 0.24f, 1.4f, 8, woodWet);
-        DrawCube((Vector3){ px, 9.8f, 138.0f }, 0.12f, 0.18f, 3.8f, woodDark);
+        DrawCylinder(Vector3{ px, 4.0f, 136.2f }, 0.22f, 0.24f, 6.8f, 8, woodDark);
+        DrawCylinder(Vector3{ px, 4.0f, 139.8f }, 0.22f, 0.24f, 6.8f, 8, woodDark);
+        DrawCylinder(Vector3{ px, 8.8f, 136.2f }, 0.24f, 0.24f, 1.4f, 8, woodWet);
+        DrawCylinder(Vector3{ px, 8.8f, 139.8f }, 0.24f, 0.24f, 1.4f, 8, woodWet);
+        DrawCube(Vector3{ px, 9.8f, 138.0f }, 0.12f, 0.18f, 3.8f, woodDark);
     }
 
-    DrawCube((Vector3){ 26.0f, 10.75f, 138.0f }, 20.0f, 0.25f, 3.8f, woodPlank);
-    DrawCubeWires((Vector3){ 26.0f, 10.75f, 138.0f }, 20.05f, 0.26f, 3.85f, woodDark);
+    DrawCube(Vector3{ 26.0f, 10.75f, 138.0f }, 20.0f, 0.25f, 3.8f, woodPlank);
+    DrawCubeWires(Vector3{ 26.0f, 10.75f, 138.0f }, 20.05f, 0.26f, 3.85f, woodDark);
 
     for (float px = 16.5f; px <= 35.5f; px += 0.8f) {
-        DrawCube((Vector3){ px, 10.88f, 138.0f }, 0.04f, 0.02f, 3.75f, woodDark);
+        DrawCube(Vector3{ px, 10.88f, 138.0f }, 0.04f, 0.02f, 3.75f, woodDark);
     }
 
-    DrawCylinder((Vector3){ 17.5f, 10.88f, 136.4f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
-    DrawCylinder((Vector3){ 17.5f, 10.88f, 139.6f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
-    DrawCylinder((Vector3){ 25.0f, 10.88f, 136.4f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
-    DrawCylinder((Vector3){ 25.0f, 10.88f, 139.6f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
+    DrawCylinder(Vector3{ 17.5f, 10.88f, 136.4f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
+    DrawCylinder(Vector3{ 17.5f, 10.88f, 139.6f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
+    DrawCylinder(Vector3{ 25.0f, 10.88f, 136.4f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
+    DrawCylinder(Vector3{ 25.0f, 10.88f, 139.6f }, 0.12f, 0.14f, 0.45f, 8, ironRust);
 
-    DrawCircle3D((Vector3){ 18.2f, 10.89f, 136.6f }, 0.32f, (Vector3){ 1, 0, 0 }, 90.0f, { 140, 120, 85, 255 });
-    DrawCircle3D((Vector3){ 18.2f, 10.90f, 136.6f }, 0.20f, (Vector3){ 1, 0, 0 }, 90.0f, { 110, 95, 65, 255 });
+    DrawCircle3D(Vector3{ 18.2f, 10.89f, 136.6f }, 0.32f, Vector3{ 1, 0, 0 }, 90.0f, { 140, 120, 85, 255 });
+    DrawCircle3D(Vector3{ 18.2f, 10.90f, 136.6f }, 0.20f, Vector3{ 1, 0, 0 }, 90.0f, { 110, 95, 65, 255 });
 
     // Fog Bell Gallows at Pier Head
-    DrawCube((Vector3){ 16.5f, 11.8f, 136.6f }, 0.18f, 2.0f, 0.18f, woodDark);
-    DrawCube((Vector3){ 16.5f, 11.8f, 139.4f }, 0.18f, 2.0f, 0.18f, woodDark);
-    DrawCube((Vector3){ 16.5f, 12.7f, 138.0f }, 0.18f, 0.18f, 3.0f, woodDark);
-    DrawCylinder((Vector3){ 16.5f, 12.3f, 138.0f }, 0.08f, 0.26f, 0.38f, 10, bellBronze);
-    DrawSphere((Vector3){ 16.5f, 12.5f, 138.0f }, 0.10f, bellBronze);
+    DrawCube(Vector3{ 16.5f, 11.8f, 136.6f }, 0.18f, 2.0f, 0.18f, woodDark);
+    DrawCube(Vector3{ 16.5f, 11.8f, 139.4f }, 0.18f, 2.0f, 0.18f, woodDark);
+    DrawCube(Vector3{ 16.5f, 12.7f, 138.0f }, 0.18f, 0.18f, 3.0f, woodDark);
+    DrawCylinder(Vector3{ 16.5f, 12.3f, 138.0f }, 0.08f, 0.26f, 0.38f, 10, bellBronze);
+    DrawSphere(Vector3{ 16.5f, 12.5f, 138.0f }, 0.10f, bellBronze);
 
     // Wooden Diving Ladder
-    DrawCube((Vector3){ 16.35f, 9.4f, 136.0f }, 0.08f, 3.2f, 0.08f, woodDark);
-    DrawCube((Vector3){ 16.85f, 9.4f, 136.0f }, 0.08f, 3.2f, 0.08f, woodDark);
+    DrawCube(Vector3{ 16.35f, 9.4f, 136.0f }, 0.08f, 3.2f, 0.08f, woodDark);
+    DrawCube(Vector3{ 16.85f, 9.4f, 136.0f }, 0.08f, 3.2f, 0.08f, woodDark);
     for (float ly = 8.2f; ly <= 10.6f; ly += 0.40f) {
-        DrawCube((Vector3){ 16.6f, ly, 136.0f }, 0.45f, 0.06f, 0.06f, woodPlank);
+        DrawCube(Vector3{ 16.6f, ly, 136.0f }, 0.45f, 0.06f, 0.06f, woodPlank);
     }
 
     // 2. Sea Stacks & Coastal Rocks
-    DrawCylinder((Vector3){ 14.0f, 5.0f, 118.0f }, 3.5f, 1.8f, 7.5f, 7, rockBasalt);
-    DrawCircle3D((Vector3){ 14.0f, OCEAN_WATER_LEVEL + 0.05f, 118.0f }, 4.2f, (Vector3){ 1, 0, 0 }, 90.0f, { 220, 235, 245, 160 });
+    DrawCylinder(Vector3{ 14.0f, 5.0f, 118.0f }, 3.5f, 1.8f, 7.5f, 7, rockBasalt);
+    DrawCircle3D(Vector3{ 14.0f, OCEAN_WATER_LEVEL + 0.05f, 118.0f }, 4.2f, Vector3{ 1, 0, 0 }, 90.0f, { 220, 235, 245, 160 });
 
-    DrawCylinder((Vector3){ 8.0f, 4.5f, 165.0f }, 4.2f, 1.2f, 9.0f, 6, rockBasalt);
-    DrawCircle3D((Vector3){ 8.0f, OCEAN_WATER_LEVEL + 0.05f, 165.0f }, 4.8f, (Vector3){ 1, 0, 0 }, 90.0f, { 220, 235, 245, 160 });
+    DrawCylinder(Vector3{ 8.0f, 4.5f, 165.0f }, 4.2f, 1.2f, 9.0f, 6, rockBasalt);
+    DrawCircle3D(Vector3{ 8.0f, OCEAN_WATER_LEVEL + 0.05f, 165.0f }, 4.8f, Vector3{ 1, 0, 0 }, 90.0f, { 220, 235, 245, 160 });
 
-    DrawSphere((Vector3){ 22.0f, 9.5f, 85.0f }, 3.2f, rockWet);
-    DrawCircle3D((Vector3){ 22.0f, OCEAN_WATER_LEVEL + 0.05f, 85.0f }, 3.6f, (Vector3){ 1, 0, 0 }, 90.0f, { 210, 230, 240, 150 });
+    DrawSphere(Vector3{ 22.0f, 9.5f, 85.0f }, 3.2f, rockWet);
+    DrawCircle3D(Vector3{ 22.0f, OCEAN_WATER_LEVEL + 0.05f, 85.0f }, 3.6f, Vector3{ 1, 0, 0 }, 90.0f, { 210, 230, 240, 150 });
 
     // 3. Sunken Fishing Skiff Wreck
     rlPushMatrix();
     rlTranslatef(10.0f, 6.2f, 152.0f);
     rlRotatef(18.0f, 0.0f, 0.0f, 1.0f);
     rlRotatef(-25.0f, 0.0f, 1.0f, 0.0f);
-    DrawCube((Vector3){ 0.0f, 0.3f, 0.0f }, 1.8f, 0.5f, 6.5f, woodWet);
+    DrawCube(Vector3{ 0.0f, 0.3f, 0.0f }, 1.8f, 0.5f, 6.5f, woodWet);
     for (float rz = -2.6f; rz <= 2.6f; rz += 0.9f) {
-        DrawCube((Vector3){ -0.95f, 1.2f, rz }, 0.12f, 1.8f, 0.14f, woodDark);
-        DrawCube((Vector3){  0.95f, 1.2f, rz }, 0.12f, 1.8f, 0.14f, woodDark);
+        DrawCube(Vector3{ -0.95f, 1.2f, rz }, 0.12f, 1.8f, 0.14f, woodDark);
+        DrawCube(Vector3{  0.95f, 1.2f, rz }, 0.12f, 1.8f, 0.14f, woodDark);
     }
-    DrawCylinder((Vector3){ 0.0f, 0.5f, 0.5f }, 0.14f, 0.08f, 5.2f, 6, woodDark);
+    DrawCylinder(Vector3{ 0.0f, 0.5f, 0.5f }, 0.14f, 0.08f, 5.2f, 6, woodDark);
 
-    Color crateCol = g_salvageCrateOpened ? (Color){ 45, 52, 48, 255 } : (Color){ 160, 115, 45, 255 };
-    DrawCube((Vector3){ 0.4f, 0.55f, -1.2f }, 0.65f, 0.45f, 0.85f, crateCol);
-    DrawCubeWires((Vector3){ 0.4f, 0.55f, -1.2f }, 0.66f, 0.46f, 0.86f, ironRust);
+    Color crateCol = g_salvageCrateOpened ? Color{ 45, 52, 48, 255 } : Color{ 160, 115, 45, 255 };
+    DrawCube(Vector3{ 0.4f, 0.55f, -1.2f }, 0.65f, 0.45f, 0.85f, crateCol);
+    DrawCubeWires(Vector3{ 0.4f, 0.55f, -1.2f }, 0.66f, 0.46f, 0.86f, ironRust);
     rlPopMatrix();
 }
 
@@ -930,10 +930,10 @@ static void UpdateWaterLocomotion(Camera3D &camera, Vector3 &playerVel, Vector3 
 
         // Horizontal view vectors (pure yaw - looking down doesn't stop swimming!)
         Vector3 camDir = Vector3Subtract(camera.target, camera.position);
-        Vector3 fwdH = (Vector3){ camDir.x, 0.0f, camDir.z };
+        Vector3 fwdH = Vector3{ camDir.x, 0.0f, camDir.z };
         if (Vector3LengthSqr(fwdH) > 0.0001f) fwdH = Vector3Normalize(fwdH);
-        else fwdH = (Vector3){ 0, 0, 1 };
-        Vector3 rightH = (Vector3){ -fwdH.z, 0.0f, fwdH.x };
+        else fwdH = Vector3{ 0, 0, 1 };
+        Vector3 rightH = Vector3{ -fwdH.z, 0.0f, fwdH.x };
 
         // Swimming input vector
         Vector3 wishDir = { 0, 0, 0 };
@@ -1004,11 +1004,11 @@ static void UpdateWaterLocomotion(Camera3D &camera, Vector3 &playerVel, Vector3 
         // Full 3D Camera Look Direction
         Vector3 camDir = Vector3Subtract(camera.target, camera.position);
         if (Vector3LengthSqr(camDir) > 0.0001f) camDir = Vector3Normalize(camDir);
-        else camDir = (Vector3){ 0, 0, 1 };
+        else camDir = Vector3{ 0, 0, 1 };
 
-        Vector3 camRight = Vector3CrossProduct(camDir, (Vector3){ 0, 1, 0 });
+        Vector3 camRight = Vector3CrossProduct(camDir, Vector3{ 0, 1, 0 });
         if (Vector3LengthSqr(camRight) > 0.0001f) camRight = Vector3Normalize(camRight);
-        else camRight = (Vector3){ 1, 0, 0 };
+        else camRight = Vector3{ 1, 0, 0 };
 
         bool isFastDive = IsKeyDown(KEY_LEFT_SHIFT);
         float diveTopSpeed = isFastDive ? 5.8f : 4.0f;
@@ -1018,8 +1018,8 @@ static void UpdateWaterLocomotion(Camera3D &camera, Vector3 &playerVel, Vector3 
         if (IsKeyDown(KEY_S)) wishDir = Vector3Subtract(wishDir, camDir);
         if (IsKeyDown(KEY_D)) wishDir = Vector3Add(wishDir, camRight);
         if (IsKeyDown(KEY_A)) wishDir = Vector3Subtract(wishDir, camRight);
-        if (IsKeyDown(KEY_SPACE)) wishDir = Vector3Add(wishDir, (Vector3){ 0, 1, 0 });
-        if (IsKeyDown(KEY_C) || IsKeyDown(KEY_LEFT_CONTROL)) wishDir = Vector3Subtract(wishDir, (Vector3){ 0, 1, 0 });
+        if (IsKeyDown(KEY_SPACE)) wishDir = Vector3Add(wishDir, Vector3{ 0, 1, 0 });
+        if (IsKeyDown(KEY_C) || IsKeyDown(KEY_LEFT_CONTROL)) wishDir = Vector3Subtract(wishDir, Vector3{ 0, 1, 0 });
 
         if (Vector3LengthSqr(wishDir) > 0.001f) {
             wishDir = Vector3Normalize(wishDir);
@@ -1076,15 +1076,15 @@ static void DrawUnderwaterPostFXAndHUD(Camera3D camera, float timeVal, float dt,
 
         int myInt = (int)my;
         if (myInt < screenH) {
-            DrawRectangle(0, myInt, screenW, screenH - myInt, (Color){ 6, 28, 44, (unsigned char)(meniscusAlpha * 80.0f) });
+            DrawRectangle(0, myInt, screenW, screenH - myInt, Color{ 6, 28, 44, (unsigned char)(meniscusAlpha * 80.0f) });
         }
 
         // Dynamic undulating meniscus boundary ribbon with surface-tension refraction
         for (int x = 0; x < screenW; x += 4) {
             float waveRip = sinf((float)x * 0.016f + timeVal * 4.2f) * 3.2f + cosf((float)x * 0.035f - timeVal * 2.6f) * 1.8f;
             int ry = myInt + (int)waveRip;
-            DrawRectangle(x, ry - 2, 4, 2, (Color){ 225, 245, 255, (unsigned char)(meniscusAlpha * 160.0f) });
-            DrawRectangle(x, ry, 4, 3, (Color){ 10, 42, 60, (unsigned char)(meniscusAlpha * 130.0f) });
+            DrawRectangle(x, ry - 2, 4, 2, Color{ 225, 245, 255, (unsigned char)(meniscusAlpha * 160.0f) });
+            DrawRectangle(x, ry, 4, 3, Color{ 10, 42, 60, (unsigned char)(meniscusAlpha * 130.0f) });
         }
     }
 
@@ -1095,28 +1095,28 @@ static void DrawUnderwaterPostFXAndHUD(Camera3D camera, float timeVal, float dt,
         float pw = tw + 36.0f;
         float px = ((float)screenW - pw) * 0.5f;
         float py = (float)screenH - 46.0f;
-        DrawRectangleRounded((Rectangle){ px + 2.0f, py + 4.0f, pw, 28.0f }, 0.3f, 8, (Color){ 0, 0, 0, 110 });
-        DrawRectangleRounded((Rectangle){ px, py, pw, 28.0f }, 0.3f, 8, (Color){ 10, 24, 36, 235 });
-        DrawLine((int)(px + 10.0f), (int)(py + 1.0f), (int)(px + pw - 10.0f), (int)(py + 1.0f), (Color){ 255, 255, 255, 45 });
-        DrawRectangleRoundedLinesEx((Rectangle){ px, py, pw, 28.0f }, 0.3f, 8, 1.2f, (Color){ 55, 150, 200, 230 });
-        DrawTextSharpCentered(g_fontMenu, swimHelp, (float)screenW * 0.5f, py + 7.0f, 14.0f, (Color){ 220, 245, 255, 255 });
+        DrawRectangleRounded(Rectangle{ px + 2.0f, py + 4.0f, pw, 28.0f }, 0.3f, 8, Color{ 0, 0, 0, 110 });
+        DrawRectangleRounded(Rectangle{ px, py, pw, 28.0f }, 0.3f, 8, Color{ 10, 24, 36, 235 });
+        DrawLine((int)(px + 10.0f), (int)(py + 1.0f), (int)(px + pw - 10.0f), (int)(py + 1.0f), Color{ 255, 255, 255, 45 });
+        DrawRectangleRoundedLinesEx(Rectangle{ px, py, pw, 28.0f }, 0.3f, 8, 1.2f, Color{ 55, 150, 200, 230 });
+        DrawTextSharpCentered(g_fontMenu, swimHelp, (float)screenW * 0.5f, py + 7.0f, 14.0f, Color{ 220, 245, 255, 255 });
     }
 
     // 3. Full 3D Underwater Diving Post-FX (ONLY when diving under!)
     if (g_waterState == WATER_STATE_DIVING) {
         // Deep marine underwater chromatic tint
-        DrawRectangle(0, 0, screenW, screenH, (Color){ 8, 32, 48, 120 });
-        DrawRectangle(0, 0, screenW, screenH, (Color){ 4, 18, 28, 70 });
+        DrawRectangle(0, 0, screenW, screenH, Color{ 8, 32, 48, 120 });
+        DrawRectangle(0, 0, screenW, screenH, Color{ 4, 18, 28, 70 });
 
         // Hypoxia low-oxygen vignette pulse (only when oxygen is very low)
         if (g_playerOxygen < 7.0f) {
             float warnFrac = 1.0f - (g_playerOxygen / 7.0f);
             float pulse = 0.5f + 0.5f * sinf(timeVal * 6.0f);
             unsigned char vigA = (unsigned char)(warnFrac * (120.0f + pulse * 60.0f));
-            DrawRectangle(0, 0, screenW, 35, (Color){ 80, 8, 12, vigA });
-            DrawRectangle(0, screenH - 35, screenW, 35, (Color){ 80, 8, 12, vigA });
-            DrawRectangle(0, 0, 35, screenH, (Color){ 80, 8, 12, vigA });
-            DrawRectangle(screenW - 35, 0, 35, screenH, (Color){ 80, 8, 12, vigA });
+            DrawRectangle(0, 0, screenW, 35, Color{ 80, 8, 12, vigA });
+            DrawRectangle(0, screenH - 35, screenW, 35, Color{ 80, 8, 12, vigA });
+            DrawRectangle(0, 0, 35, screenH, Color{ 80, 8, 12, vigA });
+            DrawRectangle(screenW - 35, 0, 35, screenH, Color{ 80, 8, 12, vigA });
         }
 
         // Oxygen Gauge Bar
@@ -1126,24 +1126,24 @@ static void DrawUnderwaterPostFXAndHUD(Camera3D camera, float timeVal, float dt,
         float by = (float)screenH - 74.0f;
 
         // Ambient drop shadow & Acrylic glass panel
-        DrawRectangleRounded((Rectangle){ bx - 5.0f + 2.0f, by - 5.0f + 3.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, (Color){ 0, 0, 0, 130 });
-        DrawRectangleRounded((Rectangle){ bx - 5.0f, by - 5.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, (Color){ 10, 18, 26, 240 });
-        DrawLine((int)(bx - 2.0f), (int)(by - 4.0f), (int)(bx + barW + 2.0f), (int)(by - 4.0f), (Color){ 255, 255, 255, 40 });
-        DrawRectangleRoundedLinesEx((Rectangle){ bx - 5.0f, by - 5.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, 1.2f, (Color){ 45, 110, 150, 240 });
+        DrawRectangleRounded(Rectangle{ bx - 5.0f + 2.0f, by - 5.0f + 3.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, Color{ 0, 0, 0, 130 });
+        DrawRectangleRounded(Rectangle{ bx - 5.0f, by - 5.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, Color{ 10, 18, 26, 240 });
+        DrawLine((int)(bx - 2.0f), (int)(by - 4.0f), (int)(bx + barW + 2.0f), (int)(by - 4.0f), Color{ 255, 255, 255, 40 });
+        DrawRectangleRoundedLinesEx(Rectangle{ bx - 5.0f, by - 5.0f, (float)barW + 10.0f, (float)barH + 10.0f }, 0.25f, 8, 1.2f, Color{ 45, 110, 150, 240 });
 
         float oxRatio = Clamp(g_playerOxygen / g_maxOxygen, 0.0f, 1.0f);
-        Color oxCol = (oxRatio > 0.45f) ? (Color){ 50, 220, 245, 255 } : ((oxRatio > 0.20f) ? (Color){ 245, 185, 45, 255 } : (Color){ 255, 50, 50, 255 });
+        Color oxCol = (oxRatio > 0.45f) ? Color{ 50, 220, 245, 255 } : ((oxRatio > 0.20f) ? Color{ 245, 185, 45, 255 } : Color{ 255, 50, 50, 255 });
 
         if (oxRatio > 0.01f) {
-            DrawRectangleRounded((Rectangle){ bx, by, (float)barW * oxRatio, (float)barH }, 0.25f, 6, oxCol);
-            DrawLine((int)bx, (int)(by + 2.0f), (int)(bx + barW * oxRatio), (int)(by + 2.0f), (Color){ 255, 255, 255, 90 });
+            DrawRectangleRounded(Rectangle{ bx, by, (float)barW * oxRatio, (float)barH }, 0.25f, 6, oxCol);
+            DrawLine((int)bx, (int)(by + 2.0f), (int)(bx + barW * oxRatio), (int)(by + 2.0f), Color{ 255, 255, 255, 90 });
         }
 
         const char* oxTxt = TextFormat("DIVE OXYGEN // %d%% (%.0fs)", (int)(oxRatio * 100.0f), g_playerOxygen);
-        DrawTextSharpCentered(g_fontSmall, oxTxt, (float)screenW * 0.5f, by + 4.0f, 12.0f, (Color){ 245, 250, 255, 255 });
+        DrawTextSharpCentered(g_fontSmall, oxTxt, (float)screenW * 0.5f, by + 4.0f, 12.0f, Color{ 245, 250, 255, 255 });
 
         const char* diveSub = "[SPACE] SWIM TO SURFACE   |   [C] DESCEND";
-        DrawTextSharpCentered(g_fontSmall, diveSub, (float)screenW * 0.5f, by + barH + 9.0f, 12.0f, (Color){ 160, 215, 235, 220 });
+        DrawTextSharpCentered(g_fontSmall, diveSub, (float)screenW * 0.5f, by + barH + 9.0f, 12.0f, Color{ 160, 215, 235, 220 });
     }
 
     // 4. Screen lens water droplets when emerging from water
@@ -1159,9 +1159,9 @@ static void DrawUnderwaterPostFXAndHUD(Camera3D camera, float timeVal, float dt,
             float dy = 60.0f + fmodf(seed * 29.1f, (float)screenH * 0.6f) + runDown;
             float r = 5.0f + fmodf(seed * 3.0f, 6.0f);
 
-            DrawCircle((int)dx, (int)dy, r, (Color){ 210, 235, 255, (unsigned char)(dropA * 0.5f) });
-            DrawCircleLines((int)dx, (int)dy, r, (Color){ 240, 250, 255, dropA });
-            DrawCircle((int)(dx - r * 0.35f), (int)(dy - r * 0.35f), r * 0.25f, (Color){ 255, 255, 255, dropA });
+            DrawCircle((int)dx, (int)dy, r, Color{ 210, 235, 255, (unsigned char)(dropA * 0.5f) });
+            DrawCircleLines((int)dx, (int)dy, r, Color{ 240, 250, 255, dropA });
+            DrawCircle((int)(dx - r * 0.35f), (int)(dy - r * 0.35f), r * 0.25f, Color{ 255, 255, 255, dropA });
         }
     }
 }

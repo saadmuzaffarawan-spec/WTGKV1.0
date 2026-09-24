@@ -273,7 +273,7 @@ static Mesh GenMeshShovelBlade(int segments, float zStart, float length, float m
 
         if (len > 0.0001f) n = Vector3Scale(n, 1.0f / len);
 
-        else n = (Vector3){ 0.0f, 1.0f, 0.0f };
+        else n = Vector3{ 0.0f, 1.0f, 0.0f };
 
         mesh.normals[v*3+0] = n.x; mesh.normals[v*3+1] = n.y; mesh.normals[v*3+2] = n.z;
 
@@ -501,19 +501,19 @@ void DrawShovel(Shovel &sv, Matrix rootTransform, Vector3 viewPos, Vector3 light
 
     Color colors[7]   = {
 
-        (Color){ 88, 90, 96, 255 },     // pommel: steel
+        Color{ 88, 90, 96, 255 },     // pommel: steel
 
-        (Color){ 34, 34, 36, 255 },     // grip: dark rubber
+        Color{ 34, 34, 36, 255 },     // grip: dark rubber
 
-        (Color){ 145, 102, 60, 255 },   // shaft: warm ash wood
+        Color{ 145, 102, 60, 255 },   // shaft: warm ash wood
 
-        (Color){ 160, 162, 168, 255 },  // collar: stamped steel
+        Color{ 160, 162, 168, 255 },  // collar: stamped steel
 
-        (Color){ 145, 148, 154, 255 },  // tabL: steel step
+        Color{ 145, 148, 154, 255 },  // tabL: steel step
 
-        (Color){ 145, 148, 154, 255 },  // tabR: steel step
+        Color{ 145, 148, 154, 255 },  // tabR: steel step
 
-        (Color){ 195, 198, 204, 255 }   // blade: tool steel
+        Color{ 195, 198, 204, 255 }   // blade: tool steel
 
     };
 
@@ -533,7 +533,7 @@ void DrawShovel(Shovel &sv, Matrix rootTransform, Vector3 viewPos, Vector3 light
 
         parts[i]->model.transform = world;
 
-        DrawModel(parts[i]->model, (Vector3){0,0,0}, 1.0f, WHITE);
+        DrawModel(parts[i]->model, Vector3{0,0,0}, 1.0f, WHITE);
 
     }
 
@@ -672,7 +672,7 @@ Matrix ShovelPoseToWorldMatrix(ShovelPose pose, Vector3 basePos, Vector3 right, 
 
 {
 
-    Matrix rot = MatrixRotateXYZ((Vector3){ DEG2RAD*pose.rot.x, DEG2RAD*pose.rot.y, DEG2RAD*pose.rot.z });
+    Matrix rot = MatrixRotateXYZ(Vector3{ DEG2RAD*pose.rot.x, DEG2RAD*pose.rot.y, DEG2RAD*pose.rot.z });
 
     Vector3 offset = Vector3Add(Vector3Add(Vector3Scale(right, pose.pos.x), Vector3Scale(up, pose.pos.y)),
 
@@ -725,7 +725,7 @@ void SpawnDirtClod(Vector3 origin, Vector3 dir)
 
             g_dirtClods[i].vel = Vector3Add(Vector3Scale(dir, 2.2f + (float)GetRandomValue(0, 150)/100.0f),
 
-                (Vector3){ (float)GetRandomValue(-100, 100)/100.0f * spread, 1.6f + (float)GetRandomValue(0, 150)/100.0f, (float)GetRandomValue(-100, 100)/100.0f * spread });
+                Vector3{ (float)GetRandomValue(-100, 100)/100.0f * spread, 1.6f + (float)GetRandomValue(0, 150)/100.0f, (float)GetRandomValue(-100, 100)/100.0f * spread });
 
             g_dirtClods[i].life = 1.4f;
 
@@ -817,7 +817,7 @@ void DrawDirtClods()
 
         float a = Clamp(g_dirtClods[i].life / 1.4f, 0.0f, 1.0f);
 
-        Color c = (Color){ 68, 48, 28, (unsigned char)(255 * a) };
+        Color c = Color{ 68, 48, 28, (unsigned char)(255 * a) };
 
         DrawCube(g_dirtClods[i].pos, 0.06f, 0.06f, 0.06f, c);
 

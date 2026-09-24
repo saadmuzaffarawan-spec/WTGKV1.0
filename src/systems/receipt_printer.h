@@ -10,7 +10,7 @@ extern float g_printerProgress;
 typedef std::function<Color(Vector3 pos, Color baseAlbedo)> PrinterLightingFn;
 
 // Builds the procedurally generated authentic supermarket thermal horror receipt texture
-Texture2D BuildReceiptTexture(void);
+Texture2D BuildReceiptTexture(const char* stalkerWarning = nullptr);
 
 // Renders the 3D countertop horror receipt printer with chassis, buttons, LED, and blood trails
 void DrawPrinter(Vector3 pos, float ledGlow, float t, PrinterLightingFn lightFn = nullptr);

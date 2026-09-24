@@ -47,6 +47,29 @@ void UpdateShopWashroomMirror(Camera3D playerCam, ShopLightFn lightFn, bool ligh
 // Render haunted washroom architecture, porcelain toilet, sink, real reflection mirror, and blood stains
 void DrawShopHauntedWashroom(Camera3D camera, ShopLightFn lightFn, bool lightsOn, float timeVal);
 
+// Check if player is standing within interactive reach of the washroom ceramic sink
+bool IsPlayerNearWashroomSink(Vector3 playerPos);
+
+// Toggle washroom ceramic sink faucet ON / OFF
+void ToggleWashroomSinkFaucet();
+
+// Check if the washroom sink faucet is currently flowing water
+bool IsWashroomSinkRunning();
+
+// Render convenience superstore double-sided gondolas stocked with automotive motor oil, coolant, and road snacks
+void DrawShopSuperstoreGondolas(ShopLightFn lightFn, bool lightsOn, float timeVal);
+
 // Free all GPU textures and resources allocated by the shop atmosphere system
 void UnloadShopAtmosphere();
+
+// Interactive washroom entrance door
+extern float g_washroomDoorAngle;
+bool IsPlayerNearWashroomDoor(Vector3 playerPos);
+void ToggleWashroomDoor();
+bool IsWashroomDoorOpen();
+
+// Midnight Security Monitor (CCTV CRT on Checkout Desk)
+void UpdateCounterCCTV(Camera3D playerCam, ShopLightFn lightFn, bool lightsOn, float timeVal);
+void DrawCounterSecurityMonitor(Vector3 pos, ShopLightFn lightFn, bool lightsOn, float timeVal);
+
 

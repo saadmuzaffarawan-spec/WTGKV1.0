@@ -6,6 +6,30 @@
 #include "core/game_types.h"
 #include "systems/gas_station_system.h"
 #include "systems/receipt_printer.h"
+#include "systems/shop_lighting.h"
+
+void ToggleGameFullscreen();
+
+// --- GAME WORLD CORE RESOURCES ---
+extern Camera3D g_camera;
+extern Mesh g_mGround;
+extern Material g_matGround;
+extern Mesh g_mRoad;
+extern Material g_matRoad;
+
+// --- SHADER UNIFORM LOCATIONS ---
+extern int uvScaleLoc;
+extern int uvOffsetLoc;
+extern int timeLoc;
+extern int playerPosLoc;
+extern int trailPosLoc;
+extern int trailLifeLoc;
+extern int lightningFlashLoc;
+extern int sunDirLoc;
+extern int dayFactorLoc;
+extern int sunColorLoc;
+extern int moonDirLoc;
+extern int nightFactorLoc;
 
 // --- KINEMATIC HORROR CAMERA & VIEWMODEL INERTIA ---
 extern float g_vmSwayX;
@@ -43,8 +67,11 @@ extern Sound g_sndStoreFootstep;
 extern Sound g_sndFoil;
 extern Sound g_sndMenuNav;
 extern Sound g_sndMenuBoom;
+extern Sound g_sndJumpscare;
 extern Sound g_sndRadioStatic;
 extern Sound g_sndWaterDrip;
+extern Sound g_sndThunder;
+extern Sound g_sndRain;
 extern Sound g_sndShovelDig;
 extern Sound g_sndPhoneSlide;
 extern Sound g_sndPhoneTap;

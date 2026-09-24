@@ -257,10 +257,10 @@ Color ApplyShopLighting(Vector3 pos, Color baseAlbedo, Vector3 normal, int occlu
 
         if (g_shopLightsOn) {
 
-            // Rich indirect bounce ambient when store lights are active: fills entire store with warm, vibrant radiance
-            rAcc += 0.28f * 1.02f;
-            gAcc += 0.28f * 1.00f;
-            bAcc += 0.28f * 0.94f;
+            // Grounded Industrial Realism: contrast-heavy moody ambient that lets spotlights carve the space
+            rAcc += 0.08f * 1.02f;
+            gAcc += 0.08f * 1.00f;
+            bAcc += 0.09f * 0.94f;
 
         } else {
 
@@ -391,7 +391,7 @@ Color ApplyShopLighting(Vector3 pos, Color baseAlbedo, Vector3 normal, int occlu
 
 
 
-    return (Color){
+    return Color{
         (unsigned char)Clamp((float)outR, 0.0f, 255.0f),
         (unsigned char)Clamp((float)outG, 0.0f, 255.0f),
         (unsigned char)Clamp((float)outB, 0.0f, 255.0f),
@@ -456,7 +456,7 @@ void DrawPopcornTin(Vector3 pos, bool opened, float wobble, bool held, float dis
 
     float r = 0.13f, h = 0.22f;
 
-    Color tinRed = ApplyShopLighting(pos, (Color){ 210, 40, 40, 255 });
+    Color tinRed = ApplyShopLighting(pos, Color{ 210, 40, 40, 255 });
 
     // Body cylinder
 
@@ -476,7 +476,7 @@ void DrawPopcornTin(Vector3 pos, bool opened, float wobble, bool held, float dis
 
             float a1 = (float)(i + 1) / 8.0f * 2.0f * PI;
 
-            Color stripe = (i % 2 == 0) ? WHITE : (Color){20, 40, 160, 255};
+            Color stripe = (i % 2 == 0) ? WHITE : Color{20, 40, 160, 255};
 
             Vector3 p0 = { pos.x + cosf(a0) * (r + 0.002f), pos.y + h * 0.55f, pos.z + sinf(a0) * (r + 0.002f) };
 
@@ -494,7 +494,7 @@ void DrawPopcornTin(Vector3 pos, bool opened, float wobble, bool held, float dis
 
     Vector3 lidBase = { pos.x, pos.y + h + (opened ? (0.05f + wobble) : 0.0f), pos.z };
 
-    Color lidCol = ApplyShopLighting(lidBase, (Color){ 230, 230, 230, 255 });
+    Color lidCol = ApplyShopLighting(lidBase, Color{ 230, 230, 230, 255 });
 
     DrawCylinder(lidBase, r * 1.03f, r * 1.03f, 0.02f, 14, lidCol);
 
@@ -518,7 +518,7 @@ void DrawPopcornTin(Vector3 pos, bool opened, float wobble, bool held, float dis
 
             Vector3 popPos = { pos.x + poffX, pos.y + h + 0.025f, pos.z + poffZ };
 
-            DrawSphere(popPos, 0.026f, (i % 2 == 0) ? (Color){ 255, 248, 205, 255 } : (Color){ 245, 215, 110, 255 });
+            DrawSphere(popPos, 0.026f, (i % 2 == 0) ? Color{ 255, 248, 205, 255 } : Color{ 245, 215, 110, 255 });
 
         }
 
@@ -546,7 +546,7 @@ void DrawBottle(Vector3 pos, float bottleH, float bottleR,
 
     if (held && opened) {
 
-        Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwdDir, (Vector3){0, 1, 0}));
+        Vector3 rgt = Vector3Normalize(Vector3CrossProduct(fwdDir, Vector3{0, 1, 0}));
 
         rlRotatef(65.0f, rgt.x, rgt.y, rgt.z);
 
@@ -618,7 +618,7 @@ void DrawBottle(Vector3 pos, float bottleH, float bottleR,
 
             Color liquidTint = ApplyShopLighting(pos, WHITE);
 
-            DrawModel(liquidModel, (Vector3){ 0, 0, 0 }, 1.0f, liquidTint);
+            DrawModel(liquidModel, Vector3{ 0, 0, 0 }, 1.0f, liquidTint);
 
         rlPopMatrix();
 
@@ -646,7 +646,7 @@ void DrawBread(Vector3 pos, Model &crustModel, bool held, float distSq)
 
         rlScalef(1.7f, 0.75f, 1.0f);
 
-        DrawModel(crustModel, (Vector3){ 0, 0, 0 }, 1.0f, litTint);
+        DrawModel(crustModel, Vector3{ 0, 0, 0 }, 1.0f, litTint);
 
     rlPopMatrix();
 
@@ -662,7 +662,7 @@ void DrawBread(Vector3 pos, Model &crustModel, bool held, float distSq)
 
             rlScalef(1.25f, 0.55f, 0.8f);
 
-            DrawModel(crustModel, (Vector3){ 0, 0, 0 }, 1.0f, ApplyShopLighting(pos, Fade(WHITE, 0.95f)));
+            DrawModel(crustModel, Vector3{ 0, 0, 0 }, 1.0f, ApplyShopLighting(pos, Fade(WHITE, 0.95f)));
 
         rlPopMatrix();
 
@@ -692,13 +692,13 @@ void DrawShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float distSq)
 
 {
 
-    Color steel       = ApplyShopLighting(worldPos, (Color){ 205, 210, 215, 255 });
+    Color steel       = ApplyShopLighting(worldPos, Color{ 205, 210, 215, 255 });
 
-    Color steelDark   = ApplyShopLighting(worldPos, (Color){ 140, 145, 150, 255 });
+    Color steelDark   = ApplyShopLighting(worldPos, Color{ 140, 145, 150, 255 });
 
-    Color rubber      = ApplyShopLighting(worldPos, (Color){ 35, 35, 38, 255 });
+    Color rubber      = ApplyShopLighting(worldPos, Color{ 35, 35, 38, 255 });
 
-    Color seatPlastic = ApplyShopLighting(worldPos, (Color){ 210, 60, 50, 255 });
+    Color seatPlastic = ApplyShopLighting(worldPos, Color{ 210, 60, 50, 255 });
 
 
 
@@ -926,7 +926,7 @@ void DrawShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float distSq)
 
             DrawCylinderEx(axA, axB, radius * 1.02f, radius * 1.02f, 18, Fade(BLACK, 0.2f));
 
-            DrawCylinderEx((Vector3){0,0,0}, (Vector3){0, radius*0.9f, 0}, 0.004f, 0.004f, 6, spokeCol);
+            DrawCylinderEx(Vector3{0,0,0}, Vector3{0, radius*0.9f, 0}, 0.004f, 0.004f, 6, spokeCol);
 
         rlPopMatrix();
 
@@ -944,7 +944,7 @@ void DrawShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float distSq)
 
     // little plastic corner bumpers at the bottom corners
 
-    Color bumperCol = ApplyShopLighting(worldPos, (Color){60,60,65,255});
+    Color bumperCol = ApplyShopLighting(worldPos, Color{60,60,65,255});
 
     for (int i = 0; i < 4; i++)
 
@@ -964,13 +964,13 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
     float pulse = 0.82f + 0.18f * sinf(timeVal * 4.5f);
 
-    Color ghostSteel     = (Color){  80, 240, 215, (unsigned char)(195 * alpha * pulse) };
+    Color ghostSteel     = Color{  80, 240, 215, (unsigned char)(195 * alpha * pulse) };
 
-    Color ghostSteelDark = (Color){  45, 175, 160, (unsigned char)(210 * alpha) };
+    Color ghostSteelDark = Color{  45, 175, 160, (unsigned char)(210 * alpha) };
 
-    Color ghostGlow      = (Color){ 130, 255, 235, (unsigned char)(245 * alpha * pulse) };
+    Color ghostGlow      = Color{ 130, 255, 235, (unsigned char)(245 * alpha * pulse) };
 
-    Color ghostWheel     = (Color){  90, 255, 230, (unsigned char)(255 * alpha) };
+    Color ghostWheel     = Color{  90, 255, 230, (unsigned char)(255 * alpha) };
 
 
 
@@ -986,25 +986,25 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
     Vector3 bottomCorners[4] = {
 
-        (Vector3){ -baseW/2, basketBottomY, -baseL/2 },
+        Vector3{ -baseW/2, basketBottomY, -baseL/2 },
 
-        (Vector3){  baseW/2, basketBottomY, -baseL/2 },
+        Vector3{  baseW/2, basketBottomY, -baseL/2 },
 
-        (Vector3){  baseW/2, basketBottomY,  baseL/2 },
+        Vector3{  baseW/2, basketBottomY,  baseL/2 },
 
-        (Vector3){ -baseW/2, basketBottomY,  baseL/2 }
+        Vector3{ -baseW/2, basketBottomY,  baseL/2 }
 
     };
 
     Vector3 topCorners[4] = {
 
-        (Vector3){ -topW/2, basketTopY, -topL/2 },
+        Vector3{ -topW/2, basketTopY, -topL/2 },
 
-        (Vector3){  topW/2, basketTopY, -topL/2 },
+        Vector3{  topW/2, basketTopY, -topL/2 },
 
-        (Vector3){  topW/2, basketTopY,  topL/2 },
+        Vector3{  topW/2, basketTopY,  topL/2 },
 
-        (Vector3){ -topW/2, basketTopY,  topL/2 }
+        Vector3{ -topW/2, basketTopY,  topL/2 }
 
     };
 
@@ -1036,7 +1036,7 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
         float l = baseL + (topL - baseL) * f;
 
-        DrawCubeWires((Vector3){ 0.0f, y, 0.0f }, w, 0.01f, l, ghostSteel);
+        DrawCubeWires(Vector3{ 0.0f, y, 0.0f }, w, 0.01f, l, ghostSteel);
 
     }
 
@@ -1044,9 +1044,9 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
         float x = (float)k * 0.09f;
 
-        DrawLine3D((Vector3){ x, basketBottomY, -baseL/2 }, (Vector3){ x, basketTopY, -topL/2 }, ghostSteelDark);
+        DrawLine3D(Vector3{ x, basketBottomY, -baseL/2 }, Vector3{ x, basketTopY, -topL/2 }, ghostSteelDark);
 
-        DrawLine3D((Vector3){ x, basketBottomY,  baseL/2 }, (Vector3){ x, basketTopY,  topL/2 }, ghostSteelDark);
+        DrawLine3D(Vector3{ x, basketBottomY,  baseL/2 }, Vector3{ x, basketTopY,  topL/2 }, ghostSteelDark);
 
     }
 
@@ -1054,9 +1054,9 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
     // Handle bar
 
-    Vector3 handleLeft  = (Vector3){ -topW/2 * 1.06f, 1.05f, -topL/2 - 0.16f };
+    Vector3 handleLeft  = Vector3{ -topW/2 * 1.06f, 1.05f, -topL/2 - 0.16f };
 
-    Vector3 handleRight = (Vector3){  topW/2 * 1.06f, 1.05f, -topL/2 - 0.16f };
+    Vector3 handleRight = Vector3{  topW/2 * 1.06f, 1.05f, -topL/2 - 0.16f };
 
     DrawCylinderEx(handleLeft, handleRight, 0.024f, 0.024f, 8, ghostGlow);
 
@@ -1068,7 +1068,7 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
     // Lower chassis tubular struts
 
-    DrawCubeWires((Vector3){ 0.0f, 0.16f, 0.0f }, 0.44f, 0.12f, 0.66f, ghostSteelDark);
+    DrawCubeWires(Vector3{ 0.0f, 0.16f, 0.0f }, 0.44f, 0.12f, 0.66f, ghostSteelDark);
 
 
 
@@ -1076,13 +1076,13 @@ void DrawGhostShoppingCartLocal(float wheelSpinDeg, Vector3 worldPos, float alph
 
     Vector3 wheelOffsets[4] = {
 
-        (Vector3){ -0.21f, 0.08f, -0.28f },
+        Vector3{ -0.21f, 0.08f, -0.28f },
 
-        (Vector3){  0.21f, 0.08f, -0.28f },
+        Vector3{  0.21f, 0.08f, -0.28f },
 
-        (Vector3){ -0.21f, 0.08f,  0.28f },
+        Vector3{ -0.21f, 0.08f,  0.28f },
 
-        (Vector3){  0.21f, 0.08f,  0.28f }
+        Vector3{  0.21f, 0.08f,  0.28f }
 
     };
 
@@ -1132,15 +1132,15 @@ void UpdateGhostCart(float dt, float nightFactor) {
 
     const Waypoint wps[5] = {
 
-        { (Vector3){  97.0f, 10.02f, 142.5f }, 1.2f, 0 }, // WP 0: Materializes right in central walkway in plain sight!
+        { Vector3{  97.0f, 10.02f, 142.5f }, 1.2f, 0 }, // WP 0: Materializes right in central walkway in plain sight!
 
-        { (Vector3){  91.5f, 10.02f, 142.5f }, 2.0f, 1 }, // WP 1: Rolls down aisle to shelf, pauses & takes phantom item
+        { Vector3{  91.5f, 10.02f, 142.5f }, 2.0f, 1 }, // WP 1: Rolls down aisle to shelf, pauses & takes phantom item
 
-        { (Vector3){  97.0f, 10.02f, 137.0f }, 1.5f, 2 }, // WP 2: Turns and rolls toward checkout walkway
+        { Vector3{  97.0f, 10.02f, 137.0f }, 1.5f, 2 }, // WP 2: Turns and rolls toward checkout walkway
 
-        { (Vector3){ 104.5f, 10.02f, 135.0f }, 3.5f, 2 }, // WP 3: Pulls right up to counter & printer in front of player
+        { Vector3{ 104.5f, 10.02f, 135.0f }, 3.5f, 2 }, // WP 3: Pulls right up to counter & printer in front of player
 
-        { (Vector3){ 104.5f, 10.02f, 135.0f }, 2.0f, 2 }  // WP 4: Dissolves into floor with printer ringing up
+        { Vector3{ 104.5f, 10.02f, 135.0f }, 2.0f, 2 }  // WP 4: Dissolves into floor with printer ringing up
 
     };
 
@@ -1167,6 +1167,10 @@ void UpdateGhostCart(float dt, float nightFactor) {
             g_ghostCart.waitTimer = 0.0f;
 
             g_ghostCart.itemsInCart = 0;
+
+            g_ghostCart.rattleTimer = 0.0f;
+
+            g_ghostCart.rattleIntensity = 0.0f;
 
         }
 
@@ -1196,7 +1200,15 @@ void UpdateGhostCart(float dt, float nightFactor) {
 
     }
 
-
+    // Hook D: Violent cart rattle jitter when phantom item is stolen
+    if (g_ghostCart.rattleTimer > 0.0f) {
+        g_ghostCart.rattleTimer -= dt;
+        float rFrac = fmaxf(0.0f, g_ghostCart.rattleTimer / 2.5f);
+        float rDist = rFrac * 0.045f;
+        g_ghostCart.pos.x += (((float)rand() / (float)RAND_MAX) - 0.5f) * rDist;
+        g_ghostCart.pos.z += (((float)rand() / (float)RAND_MAX) - 0.5f) * rDist;
+        g_ghostCart.yaw   += (((float)rand() / (float)RAND_MAX) - 0.5f) * 26.0f * rFrac;
+    }
 
     if (g_ghostCart.waypoint <= 3) {
 
@@ -1316,7 +1328,7 @@ void UpdateShopParticle(ShopParticle &p, float dt, float floorY)
 
         if (fabsf(p.vel.y) < 0.6f) {
 
-            p.vel = (Vector3){ 0, 0, 0 };
+            p.vel = Vector3{ 0, 0, 0 };
 
             p.landed = true;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/game_types.h"
 #include <raylib.h>
 #include <raymath.h>
 
@@ -32,12 +33,6 @@ struct ShovelPose {
 struct ShovelKeyframe {
     float t;
     ShovelPose pose;
-};
-
-enum ShovelAnimState {
-    SHOVEL_ANIM_IDLE,
-    SHOVEL_ANIM_DIG,
-    SHOVEL_ANIM_ATTACK
 };
 
 struct DirtClod {
