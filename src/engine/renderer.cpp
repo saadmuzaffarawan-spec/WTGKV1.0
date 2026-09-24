@@ -279,7 +279,7 @@ void Renderer::ShadowPass() {
     rlDisableColorBlend();
     // --- Moon ---------------------------------------------------------------
     Vector3 md = Vector3Normalize(s.moonDir);
-    if (s.moonShadows && md.y > 0.05f) {
+    if (s.moonShadows && s.shadowsEnabled && md.y > 0.05f) {
         const float extent = 110.0f;
         Vector3 center = Vector3Add(cam.position, Vector3Scale(Vector3Normalize(Vector3Subtract(cam.target, cam.position)), 25.0f));
         center.y = cam.position.y - 1.0f;
@@ -311,7 +311,7 @@ void Renderer::ShadowPass() {
         moonShadowOn_ = true;
     }
     // --- Spot ---------------------------------------------------------------
-    if (spotShadowIndex_ >= 0) {
+    if (spotShadowIndex_ >= 0 && s.shadowsEnabled) {
         const Light& l = active_[spotShadowIndex_];
         Camera3D lc{};
         lc.position = l.pos;
@@ -469,7 +469,7 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
     // volumetric light over the opaque scene, once per pixel; transparent surfaces then blend
     // over it and add their own share (inline, as before), exactly like the single-pass order
     ScatterPass();
-    U1(lit_, "uScatter", s.scatter);
+    U1(lit_, "uScatter", s.volumetrics ? s.scatter : 0.0f);
     BeginTextureMode(hdr_);
     BeginMode3D(cam);
 
@@ -505,7 +505,7 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
 }
 
 void Renderer::ScatterPass() {
-    if (s.fogDensity * s.scatter <= 0.0f) return;
+    if (s.fogDensity * s.scatter <= 0.0f || !s.volumetrics) return;
     int w = hdr_.texture.width, h = hdr_.texture.height;
     // 1. evaluate the in-scattered light for every pixel from the depth buffer
     BeginTextureMode(scatterRT_);

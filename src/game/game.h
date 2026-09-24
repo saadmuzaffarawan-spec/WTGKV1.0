@@ -14,9 +14,13 @@
 enum class Mode { Loading, Menu, Play, Pause, Editor, Credits };
 
 struct Settings {
-    float master = 0.85f, sensitivity = 1.0f, fov = 72.0f, brightness = 1.0f, renderScale = 1.0f;
-    float grass = 1.0f, ascii = 1.0f, subtitleSize = 1.0f;
+    float master = 0.85f, sensitivity = 1.0f, fov = 72.0f, brightness = 1.0f, renderScale = 0.8f;
+    float grass = 0.6f, ascii = 1.0f, subtitleSize = 1.0f;
     bool invertY = false, subtitles = true, fullscreen = false, vsync = true, headBob = true;
+    float moveSpeed = 1.0f;       // walking/running speed multiplier
+    bool volumetrics = true;      // light shafts / glow in the fog (expensive)
+    bool shadows = true;          // moon and flashlight shadows
+    int quality = 1;              // 0 low, 1 medium, 2 high (preset for the options above)
     void Load();
     void Save() const;
 };

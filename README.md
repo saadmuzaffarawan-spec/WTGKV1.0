@@ -24,6 +24,10 @@ CMake downloads raylib 5.5 on the first configure. Each build copies `assets/` n
 executable, so changes to the scene file show up without a rebuild. It is developed on Linux
 and Windows (macOS should work too), and needs a GPU with OpenGL 3.3.
 
+## Playing
+
+See **[GUIDE.md](GUIDE.md)** (also in the game under *How to play*) for the walkthrough of every chapter and all the settings.
+
 ## Controls
 
 | Action | Keyboard / mouse | Gamepad |

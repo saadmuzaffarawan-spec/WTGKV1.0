@@ -34,6 +34,7 @@ void Polygonise(MeshBuilder& mb, const Field& f, Vector3 bmin, Vector3 bmax, flo
     auto P = [&](int x, int y, int z) { return Vector3{ bmin.x + x * cell, bmin.y + y * cell, bmin.z + z * cell }; };
     auto I = [&](int x, int y, int z) { return ((size_t)z * ny + y) * nx + x; };
     if (threads <= 0) { unsigned hw = std::thread::hardware_concurrency(); threads = hw ? (int)hw : 4; }
+    threads = std::min(threads, 8);
     threads = std::max(1, std::min(threads, nz - 1));
     // Run fn(z0, z1) over [0, n) split into `threads` contiguous slabs of z.
     auto parallel = [&](int n, const std::function<void(int, int, int)>& fn) {

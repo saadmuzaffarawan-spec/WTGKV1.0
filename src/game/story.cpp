@@ -188,7 +188,7 @@ void Story::Impl::SpawnCast(int ch) {
         Actor* gr = g.SpawnActor("grethnar", SpecGrethnar(), p, store->worldYaw * RAD2DEG);
         gr->SetPose(PoseCounterLean(0), true);
         g.actors["grethnar"].action = "talk_grethnar";
-        g.actors["grethnar"].radius = 3.2f;
+        g.actors["grethnar"].radius = 4.0f;
     }
 }
 

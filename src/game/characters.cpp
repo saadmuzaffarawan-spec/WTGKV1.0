@@ -741,46 +741,12 @@ uint32_t CharacterKey(const BodySpec& spec) {
     return HashU32(spec.seed * 131u + (uint32_t)(spec.height * 1000) + (uint32_t)spec.head * 7u + (uint32_t)spec.top * 13u);
 }
 
+// Builds the given cast now (on the main thread, using all cores), so it is ready before it
+// appears. Called while the screen is black (loading, chapter titles). The earlier background
+// thread was removed for robustness; `urgent == false` requests are ignored.
 void PrepareCharacters(const std::vector<BodySpec>& specs, bool urgent) {
-    EnsureCreatureMats();   // materials are created on the main thread, never by the worker
-    std::lock_guard<std::mutex> lk(g_cacheMx);
-    std::vector<uint32_t> add;
-    for (const BodySpec& sp : specs) {
-        uint32_t k = CharacterKey(sp);
-        if (g_ready.count(k)) continue;
-        if (g_pending.count(k)) {
-            if (urgent && !g_pending[k].started) { g_queue.erase(std::remove(g_queue.begin(), g_queue.end(), k), g_queue.end()); add.push_back(k); }
-            continue;
-        }
-        g_pending[k].spec = sp;
-        add.push_back(k);
-    }
-    g_queue.insert(urgent ? g_queue.begin() : g_queue.end(), add.begin(), add.end());
-    if (g_workerRunning || g_queue.empty()) return;
-    g_workerRunning = true;
-    if (g_worker.joinable()) g_worker.join();
-    g_worker = std::thread([]() {
-        // leave a core for the game itself
-        unsigned hw = std::thread::hardware_concurrency();
-        int threads = hw > 2 ? (int)hw - 1 : 1;
-        for (;;) {
-            uint32_t k; BodySpec sp;
-            {
-                std::lock_guard<std::mutex> lk(g_cacheMx);
-                while (!g_queue.empty() && (!g_pending.count(g_queue.front()) || g_pending[g_queue.front()].started)) g_queue.erase(g_queue.begin());
-                if (g_queue.empty()) { g_workerRunning = false; return; }
-                k = g_queue.front(); g_queue.erase(g_queue.begin());
-                g_pending[k].started = true;
-                sp = g_pending[k].spec;
-            }
-            CharBuild* cb = BuildCharacterCPU(sp, threads);
-            {
-                std::lock_guard<std::mutex> lk(g_cacheMx);
-                g_pending[k].cpu = cb;
-            }
-            g_cacheCv.notify_all();
-        }
-    });
+    if (!urgent) return;
+    for (const BodySpec& sp : specs) GetCharacter(sp);
 }
 
 void PumpCharacterUploads() {

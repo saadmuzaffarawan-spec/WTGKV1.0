@@ -37,6 +37,8 @@ struct RenderSettings {
     float scatter = 1.0f;
     bool sky = true;
     bool moonShadows = true;
+    bool shadowsEnabled = true;   // user setting: all shadow maps
+    bool volumetrics = true;      // user setting: fog scattering
     // Post
     float exposure = 1.9f, bloom = 0.5f, bloomThreshold = 1.2f, grain = 0.05f, vignette = 0.55f, ca = 0.35f;
     float ascii = 0.0f, asciiFull = 0.0f, blink = 0.0f, fade = 0.0f, white = 0.0f, desat = 0.2f;
