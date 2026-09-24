@@ -98,6 +98,22 @@ static void SetupLitLocs(Shader& sh, bool instanced) {
 
 static MaterialMap g_maps[MAX_MATERIAL_MAPS];
 
+// Level of detail for a mesh seen from `dist` metres.
+static const MeshAsset* PickLod(const MeshAsset* a, float dist) {
+    while (a->lod && dist > a->lodDist) a = a->lod;
+    return a;
+}
+static const MeshAsset* CoarsestLod(const MeshAsset* a) {
+    while (a->lod) a = a->lod;
+    return a;
+}
+
+// A mesh asset can be split into several indexed chunks; draw them all.
+static void DrawAsset(const MeshAsset* a, const Material& m, const Matrix& xf) {
+    DrawMesh(a->mesh, m, xf);
+    for (const Mesh& c : a->more) DrawMesh(c, m, xf);
+}
+
 void Renderer::Init() {
     rlSetClipPlanes(0.05, 900.0);
     std::string common = std::string("#version 330\n") + kShaderCommon;
@@ -119,6 +135,9 @@ void Renderer::Init() {
     bright_ = LoadShaderFromMemory(kPostVS, kBrightFS);
     blur_ = LoadShaderFromMemory(kPostVS, kBlurFS);
     composite_ = LoadShaderFromMemory(kPostVS, kCompositeFS);
+    std::string scatterFS = common + kScatterFS;
+    scatter_ = LoadShaderFromMemory(kPostVS, scatterFS.c_str());
+    add_ = LoadShaderFromMemory(kPostVS, kAddFS);
 
     skyBox_ = GenMeshCube(1.0f, 1.0f, 1.0f);
     skyMat_ = LoadMaterialDefault();
@@ -135,6 +154,7 @@ void Renderer::Init() {
 void Renderer::Shutdown() {
     UnloadShader(lit_); UnloadShader(litInst_); UnloadShader(depth_); UnloadShader(sky_);
     UnloadShader(bright_); UnloadShader(blur_); UnloadShader(composite_); UnloadShader(particleShader);
+    UnloadShader(scatter_); UnloadShader(add_); UnloadRT(scatterRT_);
     UnloadRT(hdr_); UnloadRT(bloomA_); UnloadRT(bloomB_); UnloadRT(bloomC_); UnloadRT(bloomD_);
     UnloadRT(moonShadow_); UnloadRT(spotShadow_);
 }
@@ -144,8 +164,9 @@ void Renderer::EnsureTargets() {
     if (w < 64) w = 64;
     if (h < 64) h = 64;
     if (w == lastW_ && h == lastH_ && hdr_.id) return;
-    UnloadRT(hdr_); UnloadRT(bloomA_); UnloadRT(bloomB_); UnloadRT(bloomC_); UnloadRT(bloomD_);
+    UnloadRT(hdr_); UnloadRT(bloomA_); UnloadRT(bloomB_); UnloadRT(bloomC_); UnloadRT(bloomD_); UnloadRT(scatterRT_);
     hdr_ = LoadRenderTextureHDR(w, h, true);
+    scatterRT_ = LoadRenderTextureHDR(w, h, false);
     bloomA_ = LoadRenderTextureHDR(w / 2, h / 2, false);
     bloomB_ = LoadRenderTextureHDR(w / 2, h / 2, false);
     bloomC_ = LoadRenderTextureHDR(w / 4, h / 4, false);
@@ -215,14 +236,15 @@ void Renderer::Draw(const Model3D* model, const Matrix& xf, Color tint, bool cas
     for (const auto& p : model->parts) DrawPart(p.mesh, p.mat, xf, tint, shadow);
 }
 
-void Renderer::DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<Matrix>& xfs, float maxDist) {
+void Renderer::DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<Matrix>& xfs, float maxDist, float minDist) {
     if (!mesh || xfs.empty()) return;
     Inst inst{ mesh, mat, {} };
     inst.xfs.reserve(xfs.size());
-    float md2 = maxDist * maxDist;
+    float md2 = maxDist * maxDist, mn2 = minDist * minDist;
     for (const Matrix& m : xfs) {
         Vector3 c{ m.m12, m.m13, m.m14 };
-        if (Vector3DistanceSqr(c, cam.position) > md2) continue;
+        float d2 = Vector3DistanceSqr(c, cam.position);
+        if (d2 > md2 || d2 < mn2) continue;
         if (!SphereVisible(Vector3Add(c, mesh->center), mesh->radius * MaxScale(m))) continue;
         inst.xfs.push_back(m);
     }
@@ -281,7 +303,7 @@ void Renderer::ShadowPass() {
             Vector3 c = Vector3Transform(it.mesh->center, it.xf);
             Vector3 dc = Vector3Subtract(c, center); dc.y = 0;
             if (Vector3LengthSqr(dc) > r2) continue;
-            DrawMesh(it.mesh->mesh, depthMat_, it.xf);
+            DrawAsset(CoarsestLod(it.mesh), depthMat_, it.xf);   // 5 cm shadow texels: fine detail can't show
         }
         EndMode3D();
         rlSetClipPlanes(0.05, 900.0);
@@ -306,7 +328,7 @@ void Renderer::ShadowPass() {
             if (!it.shadow) continue;
             Vector3 c = Vector3Transform(it.mesh->center, it.xf);
             if (Vector3Distance(c, l.pos) > l.range + it.mesh->radius * MaxScale(it.xf)) continue;
-            DrawMesh(it.mesh->mesh, depthMat_, it.xf);
+            DrawAsset(it.mesh->lod ? it.mesh->lod : it.mesh, depthMat_, it.xf);
         }
         EndMode3D();
         rlSetClipPlanes(0.05, 900.0);
@@ -378,7 +400,7 @@ void Renderer::DrawItem(const Item& it, Shader sh) {
     mat.shader = sh;
     mat.maps = g_maps;
     if (m.doubleSided) rlDisableBackfaceCulling();
-    DrawMesh(it.mesh->mesh, mat, it.xf);
+    DrawAsset(PickLod(it.mesh, sqrtf(it.d2)), mat, it.xf);
     if (m.doubleSided) rlEnableBackfaceCulling();
     drawCalls++;
 }
@@ -392,6 +414,9 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
     BeginMode3D(cam);
 
     for (Shader sh : { lit_, litInst_, sky_, particleShader }) ApplyCommonUniforms(sh);
+    // scattering is added afterwards, once per pixel (ScatterPass)
+    for (Shader sh : { lit_, litInst_, sky_ }) U1(sh, "uScatter", 0.0f);
+    sceneVP_ = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
     for (Shader sh : { lit_, litInst_ }) {
         U3(sh, "uMoonDir", Vector3Normalize(s.moonDir));
         U3(sh, "uMoonCol", Vector3Scale(s.moonColor, s.moonBright));
@@ -433,10 +458,20 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
         Material mat{}; mat.shader = litInst_; mat.maps = g_maps;
         if (m.doubleSided) rlDisableBackfaceCulling();
         DrawMeshInstanced(in.mesh->mesh, mat, in.xfs.data(), (int)in.xfs.size());
+        for (const Mesh& c : in.mesh->more) DrawMeshInstanced(c, mat, in.xfs.data(), (int)in.xfs.size());
         if (m.doubleSided) rlEnableBackfaceCulling();
         drawCalls++;
     }
     if (customOpaque) customOpaque();
+    EndMode3D();
+    EndTextureMode();
+
+    // volumetric light over the opaque scene, once per pixel; transparent surfaces then blend
+    // over it and add their own share (inline, as before), exactly like the single-pass order
+    ScatterPass();
+    U1(lit_, "uScatter", s.scatter);
+    BeginTextureMode(hdr_);
+    BeginMode3D(cam);
 
     std::sort(transparent_.begin(), transparent_.end(), [](const Item& a, const Item& b) { return a.d2 > b.d2; });
     rlDisableDepthMask();
@@ -467,6 +502,33 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
     U2(blur_, "uDir", Vector2{ 0, 1 }); pass(bloomC_, bloomD_.texture, blur_);
     U2(blur_, "uDir", Vector2{ 2, 0 }); pass(bloomD_, bloomC_.texture, blur_);
     U2(blur_, "uDir", Vector2{ 0, 2 }); pass(bloomC_, bloomD_.texture, blur_);
+}
+
+void Renderer::ScatterPass() {
+    if (s.fogDensity * s.scatter <= 0.0f) return;
+    int w = hdr_.texture.width, h = hdr_.texture.height;
+    // 1. evaluate the in-scattered light for every pixel from the depth buffer
+    BeginTextureMode(scatterRT_);
+    ClearBackground(BLACK);
+    ApplyCommonUniforms(scatter_);
+    UM(scatter_, "uInvVP", MatrixInvert(sceneVP_));
+    U2(scatter_, "uSize", Vector2{ (float)w, (float)h });
+    U1(scatter_, "uHasSky", s.sky ? 1.0f : 0.0f);
+    BeginShaderMode(scatter_);
+    SetShaderValueTexture(scatter_, L(scatter_, "uDepth"), hdr_.depth);
+    SetShaderValueTexture(scatter_, L(scatter_, "texture1"), spotShadow_.depth);
+    DrawRectangle(0, 0, w, h, WHITE);
+    EndShaderMode();
+    EndTextureMode();
+    // 2. add it to the scene (before bloom, as before)
+    BeginTextureMode(hdr_);
+    BeginBlendMode(BLEND_ADDITIVE);
+    BeginShaderMode(add_);
+    SetShaderValueTexture(add_, L(add_, "uSrc"), scatterRT_.texture);
+    DrawRectangle(0, 0, w, h, WHITE);
+    EndShaderMode();
+    EndBlendMode();
+    EndTextureMode();
 }
 
 void Renderer::Present() {

@@ -1,5 +1,6 @@
 #include "mesh_builder.h"
 #include <cstring>
+#include <unordered_map>
 
 static std::vector<std::unique_ptr<MeshAsset>> g_meshes;
 static std::vector<std::unique_ptr<Model3D>> g_models;
@@ -283,28 +284,100 @@ void MeshBuilder::Append(const MeshBuilder& o) {
     col.insert(col.end(), o.col.begin(), o.col.end());
 }
 
+// Vertices are welded (exactly identical position, normal, uv and colour become one vertex)
+// and drawn indexed. The triangles and every attribute value are unchanged, so the result
+// renders the same, but a vertex shared by N triangles is stored and transformed once instead
+// of N times. raylib uses 16-bit indices, so large meshes are split into chunks.
+namespace {
+struct VKey {
+    float p[8];
+    uint32_t c;
+    bool operator==(const VKey& o) const { return memcmp(this, &o, sizeof(VKey)) == 0; }
+};
+struct VKeyHash {
+    size_t operator()(const VKey& k) const {
+        const unsigned char* b = (const unsigned char*)&k;
+        uint64_t h = 1469598103934665603ull;
+        for (size_t i = 0; i < sizeof(VKey); i++) { h ^= b[i]; h *= 1099511628211ull; }
+        return (size_t)h;
+    }
+};
+}
+
+static unsigned short g_indexedMarker[1] = { 0 };
+
+static Mesh UploadChunk(const std::vector<float>& P, const std::vector<float>& N, const std::vector<float>& T,
+                        const std::vector<unsigned char>& C, const std::vector<unsigned short>& I) {
+    Mesh m{};
+    m.vertexCount = (int)(P.size() / 3);
+    m.triangleCount = (int)(I.size() / 3);
+    m.vertices = (float*)P.data();
+    m.normals = (float*)N.data();
+    m.texcoords = (float*)T.data();
+    m.colors = (unsigned char*)C.data();
+    m.indices = (unsigned short*)I.data();
+    UploadMesh(&m, false);
+    // The GPU has its own copy; nothing reads mesh data on the CPU afterwards. raylib only checks
+    // `indices != NULL` to choose indexed drawing, so it points at a shared marker instead of a copy.
+    m.vertices = nullptr; m.normals = nullptr; m.texcoords = nullptr; m.colors = nullptr;
+    m.indices = g_indexedMarker;
+    return m;
+}
+
 MeshAsset* MeshBuilder::Upload() {
     auto ma = std::make_unique<MeshAsset>();
-    Mesh m{};
     int vc = (int)VertexCount();
     if (vc == 0) return nullptr;
-    m.vertexCount = vc;
-    m.triangleCount = vc / 3;
-    m.vertices = (float*)MemAlloc(sizeof(float) * pos.size());
-    m.normals = (float*)MemAlloc(sizeof(float) * nrm.size());
-    m.texcoords = (float*)MemAlloc(sizeof(float) * uv.size());
-    m.colors = (unsigned char*)MemAlloc(col.size());
-    memcpy(m.vertices, pos.data(), sizeof(float) * pos.size());
-    memcpy(m.normals, nrm.data(), sizeof(float) * nrm.size());
-    memcpy(m.texcoords, uv.data(), sizeof(float) * uv.size());
-    memcpy(m.colors, col.data(), col.size());
-    UploadMesh(&m, false);
+    // 1. weld
+    std::unordered_map<VKey, uint32_t, VKeyHash> map;
+    map.reserve((size_t)vc);
+    std::vector<uint32_t> uniq;       // source vertex of each unique vertex
+    std::vector<uint32_t> idx((size_t)vc);
+    for (int i = 0; i < vc; i++) {
+        VKey k{};
+        memcpy(k.p, &pos[i * 3], 12); memcpy(k.p + 3, &nrm[i * 3], 12); memcpy(k.p + 6, &uv[i * 2], 8);
+        memcpy(&k.c, &col[i * 4], 4);
+        auto it = map.emplace(k, (uint32_t)uniq.size());
+        if (it.second) uniq.push_back((uint32_t)i);
+        idx[i] = it.first->second;
+    }
+    map = {};
+    // 2. split into chunks of at most 65535 vertices, keeping triangle order
+    std::vector<int> local(uniq.size(), -1);
+    std::vector<uint32_t> touched;
+    std::vector<float> P, N, T; std::vector<unsigned char> C; std::vector<unsigned short> I;
+    bool first = true;
+    auto flush = [&]() {
+        if (I.empty()) return;
+        Mesh m = UploadChunk(P, N, T, C, I);
+        if (first) { ma->mesh = m; first = false; } else ma->more.push_back(m);
+        for (uint32_t g : touched) local[g] = -1;
+        touched.clear(); P.clear(); N.clear(); T.clear(); C.clear(); I.clear();
+    };
+    for (int t = 0; t + 2 < vc; t += 3) {
+        int need = 0;
+        for (int k = 0; k < 3; k++) if (local[idx[t + k]] < 0) need++;
+        if ((int)(P.size() / 3) + need > 65535) flush();
+        for (int k = 0; k < 3; k++) {
+            uint32_t g = idx[t + k];
+            if (local[g] < 0) {
+                local[g] = (int)(P.size() / 3);
+                touched.push_back(g);
+                uint32_t s = uniq[g];
+                P.insert(P.end(), &pos[s * 3], &pos[s * 3] + 3);
+                N.insert(N.end(), &nrm[s * 3], &nrm[s * 3] + 3);
+                T.insert(T.end(), &uv[s * 2], &uv[s * 2] + 2);
+                C.insert(C.end(), &col[s * 4], &col[s * 4] + 4);
+            }
+            I.push_back((unsigned short)local[g]);
+        }
+    }
+    flush();
     Vector3 mn{ 1e9f, 1e9f, 1e9f }, mx{ -1e9f, -1e9f, -1e9f };
     for (int i = 0; i < vc; i++) {
         Vector3 p{ pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2] };
         mn = Vector3Min(mn, p); mx = Vector3Max(mx, p);
     }
-    ma->mesh = m;
     ma->bmin = mn; ma->bmax = mx;
     ma->center = Vector3Scale(Vector3Add(mn, mx), 0.5f);
     ma->radius = Vector3Length(Vector3Subtract(mx, mn)) * 0.5f;
@@ -355,7 +428,11 @@ Model3D* ModelBuilder::Build(bool castShadow) {
 }
 
 void UnloadAllMeshes() {
-    for (auto& m : g_meshes) UnloadMesh(m->mesh);
+    for (auto& m : g_meshes) {
+        m->mesh.indices = nullptr;   // the marker is not owned
+        UnloadMesh(m->mesh);
+        for (auto& c : m->more) { c.indices = nullptr; UnloadMesh(c); }
+    }
     g_meshes.clear();
     g_models.clear();
 }
@@ -382,3 +459,4 @@ void ModelBuilder::Deform(const std::function<Vector3(Vector3)>& fn, bool flatNo
         }
     }
 }
+

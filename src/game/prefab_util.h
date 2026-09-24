@@ -12,6 +12,8 @@ int SignMaterial(const std::string& key, const char* text, ui::FontId font, floa
                  int w, int h, float weather, bool emissive = false, float strength = 1.0f);
 
 // Recursive branch generator for dead trees and bushes
+// Branches at this depth and deeper are not emitted (used to build distance LODs).
+extern int g_branchLodSkip;
 void GrowBranch(ModelBuilder& mb, Rng& rng, Vector3 base, Vector3 dir, float len, float rad, int depth, int maxDepth, int mat);
 
 // Catenary points between two anchors

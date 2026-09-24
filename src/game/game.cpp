@@ -51,13 +51,41 @@ void Game::ApplySettings() {
 }
 
 // ---------------------------------------------------------------------------
+// The cast each chapter needs, so it can be sculpted in the background before it appears
+// ---------------------------------------------------------------------------
+static std::vector<BodySpec> CastFor(int ch) {
+    std::vector<BodySpec> c;
+    auto customers = [&]() { for (uint32_t s = 3; s <= 6; s++) c.push_back(SpecCustomer(s)); c.push_back(SpecCustomer(71)); };
+    switch (ch) {
+    case 0: c = { SpecAdam(), SpecZain(), SpecDragger() }; break;
+    case 1: c = { SpecDragger(), SpecGrethnar() }; break;
+    case 2: case 3: c = { SpecGrethnar() }; customers(); break;
+    case 4: c = { SpecGrethnar(), SpecOldMan() }; break;
+    case 5: c = { SpecGrethnar(), SpecOldMan() }; break;
+    case 6:
+        c = { SpecOldMan(), SpecCrawler(1), SpecCrawler(2), SpecCrawler(3), SpecZain(), SpecDragger(), SpecGoatMan(3), SpecPigMan(4) };
+        for (uint32_t s : { 5u, 6u, 7u, 8u, 9u, 40u, 41u, 42u, 43u }) c.push_back(SpecCustomer(s));
+        break;
+    case 7: c = { SpecZain(), SpecAdam(), SpecCrawler(1), SpecCrawler(2), SpecCrawler(3) }; break;
+    default: c = { SpecZain() }; break;
+    }
+    return c;
+}
+// Only this chapter's and the next chapter's cast are prepared, so memory holds what is about
+// to be used rather than the whole game's cast.
+static int g_castPrepared = -1;
+void PrepareCastFrom(int chapter) {
+    if (chapter == g_castPrepared) return;
+    g_castPrepared = chapter;
+    PrepareCharacters(CastFor(chapter), true);            // needed now
+    if (chapter < 8) PrepareCharacters(CastFor(chapter + 1));   // needed next
+}
+
+// ---------------------------------------------------------------------------
 // Actors, items, tags
 // ---------------------------------------------------------------------------
 Actor* Game::SpawnActor(const std::string& name, const BodySpec& spec, Vector3 pos, float yawDeg) {
-    static std::map<uint32_t, CharModel*> cache;
-    uint32_t key = HashU32(spec.seed * 131u + (uint32_t)(spec.height * 1000) + (uint32_t)spec.head * 7u + (uint32_t)spec.top * 13u);
-    CharModel*& cm = cache[key];
-    if (!cm) cm = BuildCharacter(spec);
+    CharModel* cm = GetCharacter(spec);
     ActorSlot slot;
     slot.actor = std::make_unique<Actor>();
     slot.actor->name = name;
@@ -197,6 +225,8 @@ bool Game::Init(int argc, char** argv) {
     ApplySettings();
     story = std::make_unique<Story>();
     LoadingProgress(1.0f, "the ground keeps");
+    // start sculpting the cast in the background while the menu is up
+    PrepareCastFrom(testMode == "play" || testMode == "chapter" ? chapter : 0);
     if (testMode == "play" || testMode == "chapter") {
         mode = Mode::Play;
         story->Begin(chapter);
@@ -242,6 +272,7 @@ void Game::StartNewGame() {
 }
 void Game::ContinueGame() {
     if (!LoadGame()) { StartNewGame(); return; }
+    PrepareCastFrom(chapter);
     story = std::make_unique<Story>();
     mode = Mode::Play;
     story->Begin(chapter);
@@ -280,6 +311,8 @@ void Game::Run() {
         default: break;
         }
         hud.Update(rawDt);
+        if (mode == Mode::Play) PrepareCastFrom(chapter);   // a new chapter queues the next one's cast
+        PumpCharacterUploads();
 
         // test harness: fast-forward without rendering until the last frames
         frameCount++;
@@ -533,6 +566,7 @@ void Game::Shutdown() {
     story.reset();
     actors.clear();
     audio::Shutdown();
+    ShutdownCharacters();
     Rdr().Shutdown();
     ui::Shutdown();
     CloseWindow();

@@ -120,12 +120,16 @@ void Terrain::Build(const std::vector<TerrainPad>& padsIn, const std::vector<Rec
                     Vector3 p[4], n[4]; Color c[4];
                     for (int k = 0; k < 4; k++) { p[k] = V(vx[k], vz[k]); n[k] = Nn(vx[k], vz[k]); c[k] = C(vx[k], vz[k]); }
                     // diagonal 00-11 (matches CHeightField::Sample), wound CCW seen from above
-                    b.color = c[0]; b.Vert(p[0], n[0], { 0, 0 });
-                    b.color = c[2]; b.Vert(p[2], n[2], { 1, 1 });
-                    b.color = c[1]; b.Vert(p[1], n[1], { 1, 0 });
-                    b.color = c[0]; b.Vert(p[0], n[0], { 0, 0 });
-                    b.color = c[3]; b.Vert(p[3], n[3], { 0, 1 });
-                    b.color = c[2]; b.Vert(p[2], n[2], { 1, 1 });
+                    // the terrain shader maps textures from world position; UV = grid coordinate
+                    // is only there so neighbouring cells share (weld) their corner vertices
+                    Vector2 t[4];
+                    for (int k = 0; k < 4; k++) t[k] = { (float)vx[k], (float)vz[k] };
+                    b.color = c[0]; b.Vert(p[0], n[0], t[0]);
+                    b.color = c[2]; b.Vert(p[2], n[2], t[2]);
+                    b.color = c[1]; b.Vert(p[1], n[1], t[1]);
+                    b.color = c[0]; b.Vert(p[0], n[0], t[0]);
+                    b.color = c[3]; b.Vert(p[3], n[3], t[3]);
+                    b.color = c[2]; b.Vert(p[2], n[2], t[2]);
                 }
             Model3D* m = mb.Build(true);
             chunks_.push_back({ m });

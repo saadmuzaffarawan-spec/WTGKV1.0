@@ -91,6 +91,12 @@ void Vegetation::Build(const std::vector<TerrainPad>& pads, const std::vector<Ex
             if (it == groupIndex.end()) {
                 Model3D* m = GetPrefabModel(k->prefab, { { "variant", std::to_string(variant) } });
                 groups_.push_back({ m, {} });
+                // branchy trees and bushes get lighter versions for distance (sub-pixel twigs dropped)
+                std::string pf = k->prefab;
+                if (pf == "dead_tree" || pf == "bush") {
+                    groups_.back().lod[0] = GetPrefabModel(pf, { { "variant", std::to_string(variant) }, { "lod", "1" } });
+                    groups_.back().lod[1] = pf == "dead_tree" ? GetPrefabModel(pf, { { "variant", std::to_string(variant) }, { "lod", "2" } }) : groups_.back().lod[0];
+                }
                 it = groupIndex.emplace(key, (int)groups_.size() - 1).first;
             }
             float y = World().Height(x, z);
@@ -132,9 +138,18 @@ void Vegetation::RebuildGrass(Vector3 cam) {
 }
 
 void Vegetation::Draw(Vector3 cam) {
-    for (const Group& g : groups_)
-        for (const ModelPart& p : g.model->parts)
-            Rdr().DrawInstanced(p.mesh, p.mat, g.xfs, 320.0f);
+    // Level of detail by distance. At 40 m a pixel is ~8 cm wide, so the thinnest twigs are a
+    // small fraction of a pixel; beyond 90 m the small branches are too.
+    const float kLod1 = 40.0f, kLod2 = 90.0f;
+    for (const Group& g : groups_) {
+        if (!g.lod[0]) {
+            for (const ModelPart& p : g.model->parts) Rdr().DrawInstanced(p.mesh, p.mat, g.xfs, 320.0f);
+            continue;
+        }
+        for (const ModelPart& p : g.model->parts) Rdr().DrawInstanced(p.mesh, p.mat, g.xfs, kLod1);
+        for (const ModelPart& p : g.lod[0]->parts) Rdr().DrawInstanced(p.mesh, p.mat, g.xfs, kLod2, kLod1);
+        for (const ModelPart& p : g.lod[1]->parts) Rdr().DrawInstanced(p.mesh, p.mat, g.xfs, 320.0f, kLod2);
+    }
     if (Vector3Distance(cam, lastCam_) > 3.0f) { RebuildGrass(cam); lastCam_ = cam; }
     Rdr().DrawInstanced(grassMesh_, MAT_GRASS_BLADE, grassNear_, 21.0f);
     Rdr().DrawInstanced(grassMeshFar_, MAT_GRASS_BLADE, grassFar_, 50.0f);

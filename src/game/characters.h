@@ -76,6 +76,15 @@ struct CharModel {
 
 CharModel* BuildCharacter(const BodySpec& spec);
 
+// Character cache. Sculpting a character takes seconds of CPU, so the cast is prepared on a
+// background thread (PrepareCharacters) and uploaded a little each frame (PumpCharacterUploads).
+// GetCharacter returns the cached model, finishing or building it on the spot if needed.
+uint32_t CharacterKey(const BodySpec& spec);
+void PrepareCharacters(const std::vector<BodySpec>& specs, bool urgent = false);   // urgent: jump the queue
+void PumpCharacterUploads();
+CharModel* GetCharacter(const BodySpec& spec);
+void ShutdownCharacters();
+
 class Actor {
 public:
     std::string name;

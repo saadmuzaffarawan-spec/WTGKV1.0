@@ -1,5 +1,12 @@
 #include "characters.h"
 #include "engine/sdf.h"
+#include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 using namespace sdf;
 
@@ -282,15 +289,44 @@ Pose PoseHarnessed(float phase) {
 // ---------------------------------------------------------------------------
 // Sculpting
 // ---------------------------------------------------------------------------
+// Parts are collected as jobs, polygonised with the work split across cores (the SDF fields
+// capture by value, so they are safe to evaluate concurrently) and uploaded afterwards on the
+// main thread, in the original order.
+struct SculptJob {
+    int bone, mat;
+    Field f;
+    Vector3 bmin, bmax;
+    float cell;
+    MeshBuilder mb;
+    MeshBuilder lod[2];   // same surface at 2.5x and 6x the cell size, for distance and shadows
+};
+
+// Beyond these distances a level's triangles are smaller than a pixel at 720p, so the next,
+// coarser level looks the same.
+static const float kLodCell[2] = { 2.5f, 6.0f };
+static const float kLodDist[2] = { 5.0f, 14.0f };
+
+struct CharBuild {
+    CharModel* cm = nullptr;
+    std::vector<std::unique_ptr<SculptJob>> jobs;
+};
+
 struct Sculptor {
-    CharModel* cm;
+    CharBuild* cb;
     void Part(int bone, int mat, const Field& f, Vector3 bmin, Vector3 bmax, float cell) {
-        MeshBuilder mb;
-        Polygonise(mb, f, bmin, bmax, cell);
-        const MeshAsset* ma = mb.Upload();
-        if (ma) cm->parts.push_back({ bone, ma, mat });
+        auto j = std::make_unique<SculptJob>();
+        j->bone = bone; j->mat = mat; j->f = f; j->bmin = bmin; j->bmax = bmax; j->cell = cell;
+        cb->jobs.push_back(std::move(j));
     }
 };
+
+static void RunSculptJobs(CharBuild* b, int maxThreads) {
+    for (auto& j : b->jobs) {
+        Polygonise(j->mb, j->f, j->bmin, j->bmax, j->cell, maxThreads);
+        for (int l = 0; l < 2; l++) Polygonise(j->lod[l], j->f, j->bmin, j->bmax, j->cell * kLodCell[l], maxThreads);
+        j->f = nullptr;
+    }
+}
 
 static int g_pigMat = -1, g_goatMat = -1, g_hornMat = -1;
 static void EnsureCreatureMats() {
@@ -303,9 +339,8 @@ static void EnsureCreatureMats() {
     g_hornMat = AddMaterial(horn);
 }
 
-CharModel* BuildCharacter(const BodySpec& sp) {
-    EnsureCreatureMats();
-    CharModel* cm = new CharModel();
+static void SculptCharacter(CharBuild* cb, const BodySpec& sp) {
+    CharModel* cm = cb->cm;
     cm->spec = sp;
     const float s = sp.height / 1.75f;
     const float L = sp.limbLen;
@@ -328,7 +363,7 @@ CharModel* BuildCharacter(const BodySpec& sp) {
     cm->offset[B_LSHIN] = cm->offset[B_RSHIN] = { 0, -thighL, 0 };
     cm->offset[B_LFOOT] = cm->offset[B_RFOOT] = { 0, -shinL, 0 };
 
-    Sculptor sc{ cm };
+    Sculptor sc{ cb };
     const float cBody = 0.013f * s, cFine = 0.0055f * s;
     bool clothedTop = sp.top != TOP_BARE;
     int topMat = clothedTop ? sp.topMat : sp.skinMat;
@@ -652,7 +687,141 @@ CharModel* BuildCharacter(const BodySpec& sp) {
                 return fmaxf(fmaxf(d, -(p.y + 0.085f * s)), p.y + 0.068f * s);
             }, { -0.07f * s, -0.1f * s, -0.1f * s }, { 0.07f * s, -0.05f * s, 0.21f * s }, cFine * 1.3f);
     }
+}
+
+// CPU half: sculpt every part (thread-safe; no GPU calls).
+static CharBuild* BuildCharacterCPU(const BodySpec& sp, int maxThreads) {
+    CharBuild* cb = new CharBuild();
+    cb->cm = new CharModel();
+    cb->cm->spec = sp;
+    SculptCharacter(cb, sp);
+    RunSculptJobs(cb, maxThreads);
+    return cb;
+}
+
+// GPU half: upload the meshes (main thread only).
+static CharModel* FinishCharacter(CharBuild* cb) {
+    CharModel* cm = cb->cm;
+    for (auto& j : cb->jobs) {
+        MeshAsset* ma = j->mb.Upload();
+        if (!ma) continue;
+        MeshAsset* prev = ma;
+        for (int l = 0; l < 2; l++) {
+            MeshAsset* lo = j->lod[l].Upload();
+            if (!lo) break;   // tiny parts (eyes, teeth) keep their last level
+            prev->lod = lo; prev->lodDist = kLodDist[l];
+            prev = lo;
+        }
+        cm->parts.push_back({ j->bone, ma, j->mat });
+    }
+    delete cb;
     return cm;
+}
+
+CharModel* BuildCharacter(const BodySpec& sp) {
+    EnsureCreatureMats();
+    return FinishCharacter(BuildCharacterCPU(sp, 16));
+}
+
+// ---------------------------------------------------------------------------
+// Character cache with background preparation
+// ---------------------------------------------------------------------------
+namespace {
+struct Pending { BodySpec spec; CharBuild* cpu = nullptr; bool started = false; };
+std::mutex g_cacheMx;
+std::condition_variable g_cacheCv;
+std::map<uint32_t, CharModel*> g_ready;       // uploaded, ready to draw
+std::map<uint32_t, Pending> g_pending;        // queued or being sculpted in the background
+std::vector<uint32_t> g_queue;                // background order
+std::thread g_worker;
+bool g_workerRunning = false;
+}
+
+uint32_t CharacterKey(const BodySpec& spec) {
+    return HashU32(spec.seed * 131u + (uint32_t)(spec.height * 1000) + (uint32_t)spec.head * 7u + (uint32_t)spec.top * 13u);
+}
+
+void PrepareCharacters(const std::vector<BodySpec>& specs, bool urgent) {
+    EnsureCreatureMats();   // materials are created on the main thread, never by the worker
+    std::lock_guard<std::mutex> lk(g_cacheMx);
+    std::vector<uint32_t> add;
+    for (const BodySpec& sp : specs) {
+        uint32_t k = CharacterKey(sp);
+        if (g_ready.count(k)) continue;
+        if (g_pending.count(k)) {
+            if (urgent && !g_pending[k].started) { g_queue.erase(std::remove(g_queue.begin(), g_queue.end(), k), g_queue.end()); add.push_back(k); }
+            continue;
+        }
+        g_pending[k].spec = sp;
+        add.push_back(k);
+    }
+    g_queue.insert(urgent ? g_queue.begin() : g_queue.end(), add.begin(), add.end());
+    if (g_workerRunning || g_queue.empty()) return;
+    g_workerRunning = true;
+    if (g_worker.joinable()) g_worker.join();
+    g_worker = std::thread([]() {
+        // leave a core for the game itself
+        unsigned hw = std::thread::hardware_concurrency();
+        int threads = hw > 2 ? (int)hw - 1 : 1;
+        for (;;) {
+            uint32_t k; BodySpec sp;
+            {
+                std::lock_guard<std::mutex> lk(g_cacheMx);
+                while (!g_queue.empty() && (!g_pending.count(g_queue.front()) || g_pending[g_queue.front()].started)) g_queue.erase(g_queue.begin());
+                if (g_queue.empty()) { g_workerRunning = false; return; }
+                k = g_queue.front(); g_queue.erase(g_queue.begin());
+                g_pending[k].started = true;
+                sp = g_pending[k].spec;
+            }
+            CharBuild* cb = BuildCharacterCPU(sp, threads);
+            {
+                std::lock_guard<std::mutex> lk(g_cacheMx);
+                g_pending[k].cpu = cb;
+            }
+            g_cacheCv.notify_all();
+        }
+    });
+}
+
+void PumpCharacterUploads() {
+    // upload at most one finished character per frame (a few milliseconds)
+    CharBuild* cb = nullptr; uint32_t k = 0;
+    {
+        std::lock_guard<std::mutex> lk(g_cacheMx);
+        for (auto& kv : g_pending) if (kv.second.cpu) { k = kv.first; cb = kv.second.cpu; g_pending.erase(kv.first); break; }
+    }
+    if (cb) g_ready[k] = FinishCharacter(cb);
+}
+
+CharModel* GetCharacter(const BodySpec& spec) {
+    uint32_t k = CharacterKey(spec);
+    auto it = g_ready.find(k);
+    if (it != g_ready.end()) return it->second;
+    CharBuild* cb = nullptr;
+    {
+        std::unique_lock<std::mutex> lk(g_cacheMx);
+        auto pit = g_pending.find(k);
+        if (pit != g_pending.end() && pit->second.started) {
+            // the worker is sculpting it right now: wait for it
+            g_cacheCv.wait(lk, [&]() { return g_pending[k].cpu != nullptr; });
+            cb = g_pending[k].cpu;
+            g_pending.erase(k);
+        } else if (pit != g_pending.end()) {
+            g_pending.erase(pit);   // queued but not started: take it and build it here
+        }
+    }
+    if (!cb) { EnsureCreatureMats(); cb = BuildCharacterCPU(spec, 16); }
+    CharModel* cm = FinishCharacter(cb);
+    g_ready[k] = cm;
+    return cm;
+}
+
+void ShutdownCharacters() {
+    {
+        std::lock_guard<std::mutex> lk(g_cacheMx);
+        g_queue.clear();
+    }
+    if (g_worker.joinable()) g_worker.join();
 }
 
 // ---------------------------------------------------------------------------

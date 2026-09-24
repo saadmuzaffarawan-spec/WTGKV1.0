@@ -74,6 +74,8 @@ int SignMaterial(const std::string& key, const char* text, ui::FontId font, floa
     return m;
 }
 
+int g_branchLodSkip = 99;
+
 void GrowBranch(ModelBuilder& mb, Rng& rng, Vector3 base, Vector3 dir, float len, float rad, int depth, int maxDepth, int mat) {
     const int segs = depth == 0 ? 7 : 5;
     std::vector<Vector3> pts;
@@ -92,7 +94,9 @@ void GrowBranch(ModelBuilder& mb, Rng& rng, Vector3 base, Vector3 dir, float len
         radii.push_back(rad * (1.0f - t * 0.82f) + 0.004f);
     }
     mb.Flex(depth == 0 ? 0.0f : (depth == 1 ? 0.12f : (depth == 2 ? 0.45f : 0.85f)));
-    mb.M(mat).Tube(pts, radii, depth == 0 ? 10 : (depth == 1 ? 7 : 5), true);
+    // distance LODs leave out the finest twigs (the recursion and random draws are unchanged,
+    // so every branch that is kept is exactly the same)
+    if (depth < g_branchLodSkip) mb.M(mat).Tube(pts, radii, depth == 0 ? 10 : (depth == 1 ? 7 : 5), true);
     if (depth >= maxDepth) return;
     int kids = depth == 0 ? rng.RangeI(3, 5) : rng.RangeI(2, 4);
     float golden = rng.Range(0, 6.28f);

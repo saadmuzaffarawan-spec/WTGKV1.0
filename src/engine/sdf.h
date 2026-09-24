@@ -30,6 +30,7 @@ using Field = std::function<float(Vector3)>;
 
 // Polygonise `f` inside [bmin, bmax] with the given cell size into `mb`.
 // `color` sets vertex tint; `displace` adds optional surface noise (wrinkles).
-void Polygonise(MeshBuilder& mb, const Field& f, Vector3 bmin, Vector3 bmax, float cell);
+// Work is split across `threads` worker threads (0 = all cores); the output is identical.
+void Polygonise(MeshBuilder& mb, const Field& f, Vector3 bmin, Vector3 bmax, float cell, int threads = 0);
 
 }  // namespace sdf
