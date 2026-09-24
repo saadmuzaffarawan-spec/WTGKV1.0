@@ -436,6 +436,7 @@ void Story::Impl::BuildAwakening(Script& s) {
         gg.hud.Title("AWAKENING", "the ground keeps what it is given", 5.0f);
     });
     s.Wait(3.0f).Say("ADAM", "Zain...?", 2.0f).Objective("Follow the marks.");
+    s.Do([&gg]() { gg.hud.Hint("Your torch is still in your jacket.   [F]", 6.0f); });
     // wait until the player walks south along the trail
     s.Until([&gg]() { return gg.player.feet.z < 98.0f; });
     s.Do([this, &gg]() {

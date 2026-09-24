@@ -24,7 +24,7 @@ void InitMaterials() {
         t.mode = MODE_TERRAIN; t.texB = TX_DIRT; t.texC = TX_GRAVEL;
         set(MAT_TERRAIN, t);
     }
-    set(MAT_ROAD, Mk("road", TX_ASPHALT, Color{ 235, 235, 235, 255 }, 0.22f, 1.0f, 0, 1.0f));
+    set(MAT_ROAD, Mk("road", TX_ASPHALT, Color{ 235, 235, 235, 255 }, 0.55f, 1.0f, 0, 0.45f));
     set(MAT_ASPHALT, Mk("asphalt", TX_ASPHALT, WHITE, 0.3f));
     set(MAT_CONCRETE, Mk("concrete", TX_CONCRETE, WHITE, 0.35f));
     set(MAT_CONCRETE_DARK, Mk("concrete_dark", TX_CONCRETE, Color{ 150, 145, 138, 255 }, 0.35f));
@@ -95,8 +95,9 @@ void InitMaterials() {
     set(MAT_BULB_RED, Emissive("bulb_red", { 1.0f, 0.06f, 0.03f }, 20.0f));
     set(MAT_BULB_AMBER, Emissive("bulb_amber", { 1.0f, 0.5f, 0.05f }, 10.0f));
     set(MAT_SCREEN_GREEN, Emissive("screen_green", { 0.3f, 1.0f, 0.5f }, 2.0f));
-    { SurfaceMat b = Mk("blood", TX_FLESH, Color{ 120, 10, 8, 255 }, 1.0f, 0.3f); b.wet = 0.8f; set(MAT_BLOOD, b); }
+    { SurfaceMat b = Mk("blood", TX_FLESH, Color{ 150, 14, 10, 255 }, 1.0f, 0.25f); b.wet = 0.9f; set(MAT_BLOOD, b); }
     set(MAT_BLOOD_DRY, Mk("blood_dry", TX_RUST, Color{ 80, 18, 14, 255 }, 1.5f, 0.8f));
+    { SurfaceMat b = Mk("blood_smear", TX_FLESH, Color{ 120, 10, 8, 205 }, 1.2f, 0.3f); b.wet = 0.8f; b.transparent = true; b.castShadow = false; set(MAT_BLOOD_SMEAR, b); }
     { SurfaceMat e = Mk("eye", TX_BONE, Color{ 235, 225, 210, 255 }, 4.0f, 0.1f); e.wet = 1.0f; set(MAT_EYE, e); }
     set(MAT_TEETH, Mk("teeth", TX_BONE, Color{ 215, 200, 160, 255 }, 4.0f, 0.4f));
     { SurfaceMat p = Mk("pine", TX_BARK, Color{ 40, 58, 42, 255 }, 3.0f, 1.0f, 0, 0.5f); p.wrap = 0.5f; p.doubleSided = true; set(MAT_PINE, p); }

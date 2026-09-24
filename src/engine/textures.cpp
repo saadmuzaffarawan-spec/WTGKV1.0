@@ -92,9 +92,9 @@ Pixel GenDirt(const GenCtx& c, float u, float v) {
     float moist = SmoothStep(0.1f, 0.5f, c.N(u, v, 3, 3, 66));
     Mul(p, 1.0f - moist * 0.35f);
     p.rough = Lerp(p.rough, 0.7f, moist);
-    uint32_t id; float w = c.W(u, v, 36, 17, nullptr, &id);
-    float peb = SmoothStep(0.3f, 0.12f, w) * (Hash01(id) > 0.55f ? 1.0f : 0.0f);
-    float pg = 0.28f + Hash01(id * 7) * 0.2f;
+    uint32_t id; float w = c.W(u, v, 70, 17, nullptr, &id);
+    float peb = SmoothStep(0.3f, 0.12f, w) * (Hash01(id) > 0.7f ? 1.0f : 0.0f);
+    float pg = 0.2f + Hash01(id * 7) * 0.1f;
     Mix(p, pg, pg * 0.95f, pg * 0.88f, peb * 0.8f);
     p.h = 0.45f + c.N(u, v, 12, 4, 2) * 0.2f + peb * 0.3f;
     // twigs / dead fibres
@@ -134,7 +134,7 @@ Pixel GenGravel(const GenCtx& c, float u, float v) {
     uint32_t id; float f2;
     float w = c.W(u, v, 28, 5, &f2, &id);
     float stone = SmoothStep(0.62f, 0.4f, w) * SmoothStep(0.0f, 0.08f, f2 - w);
-    float g = 0.25f + Hash01(id) * 0.3f;
+    float g = 0.16f + Hash01(id) * 0.16f;
     float warm = Hash01(id * 3);
     Mix(p, g * (1.0f + warm * 0.15f), g, g * (1.0f - warm * 0.12f), stone);
     Mul(p, 1.0f + c.N(u, v, 90, 2, 7) * 0.12f * stone);
@@ -424,8 +424,8 @@ typedef Pixel (*GenFn)(const GenCtx&, float, float);
 struct MatDef { const char* name; GenFn fn; float normalStrength; };
 
 const MatDef kDefs[TX_COUNT] = {
-    { "asphalt", GenAsphalt, 3.0f }, { "concrete", GenConcrete, 2.0f }, { "dirt", GenDirt, 3.5f },
-    { "grass", GenGrass, 3.0f }, { "gravel", GenGravel, 5.0f }, { "brick", GenBrick, 4.0f },
+    { "asphalt", GenAsphalt, 1.6f }, { "concrete", GenConcrete, 2.0f }, { "dirt", GenDirt, 3.5f },
+    { "grass", GenGrass, 3.0f }, { "gravel", GenGravel, 2.2f }, { "brick", GenBrick, 4.0f },
     { "wood", GenWood, 3.0f }, { "paint", GenPaint, 2.0f }, { "rust", GenRust, 4.0f },
     { "tile", GenTile, 2.5f }, { "plaster", GenPlaster, 1.5f }, { "cloth", GenCloth, 1.5f },
     { "skin", GenSkin, 1.0f }, { "bark", GenBark, 6.0f }, { "rubber", GenRubber, 2.0f },

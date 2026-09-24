@@ -162,8 +162,8 @@ void Story::Impl::SetupWorldForChapter(int ch) {
         drag.push_back({ 16.0f, 0, -6.0f });
         drag.push_back({ 22.0f, 0, -10.0f });
         drag.push_back({ 26.4f, 0, -12.4f });
-        decals.Trail(drag, 0.55f, MAT_BLOOD_DRY, 99, 0.5f);
-        decals.Pool({ 26.4f, 0, -12.45f }, 0.7f, MAT_BLOOD_DRY, 13);
+        decals.Trail(drag, 0.5f, MAT_BLOOD_SMEAR, 99, 0.5f);
+        decals.Pool({ 26.4f, 0, -12.45f }, 0.7f, MAT_BLOOD, 13);
     }
     // world mood per chapter
     Weather& w = g.weather;

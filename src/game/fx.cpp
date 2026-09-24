@@ -192,25 +192,27 @@ void Decals::Trail(const std::vector<Vector3>& pts, float width, int mat, uint32
     }
     P.push_back(pts.back());
     for (size_t i = 0; i + 1 < P.size(); i++) {
-        float n = Fbm2(i * 0.08f, 0.5f, 3, 0, seed);
-        if (n < -0.5f + gaps * 0.5f) continue;   // the smear breaks up
-        float w0 = width * (0.5f + 0.6f * (n * 0.5f + 0.5f));
-        float w1 = width * (0.5f + 0.6f * (Fbm2((i + 1) * 0.08f, 0.5f, 3, 0, seed) * 0.5f + 0.5f));
+        float n = Fbm2(i * 0.05f, 0.5f, 3, 0, seed);
+        if (n < -0.55f + gaps * 0.5f) continue;   // the smear breaks up where the body lifted
+        auto wAt = [&](size_t k) { return width * (0.35f + 0.75f * Saturate(Fbm2(k * 0.07f, 3.5f, 3, 0, seed) * 0.5f + 0.55f)); };
         Vector3 d = Vector3Subtract(P[i + 1], P[i]); d.y = 0;
         Vector3 side = Vector3Normalize({ -d.z, 0, d.x });
-        for (int lane = -1; lane <= 1; lane += 2) {   // two streaks (heels / body edges)
-            float off = lane * width * 0.35f + Fbm2(i * 0.3f, lane * 3.0f, 2, 0, seed) * 0.05f;
-            Vector3 a = Vector3Add(P[i], Vector3Scale(side, off - w0 * 0.3f)), b = Vector3Add(P[i], Vector3Scale(side, off + w0 * 0.3f));
-            Vector3 c = Vector3Add(P[i + 1], Vector3Scale(side, off + w1 * 0.3f)), e = Vector3Add(P[i + 1], Vector3Scale(side, off - w1 * 0.3f));
-            for (Vector3* v : { &a, &b, &c, &e }) v->y = SurfaceY(v->x, v->z, v->y + 0.6f) + 0.013f;
+        auto strip = [&](float off0, float off1, float w0, float w1) {
+            Vector3 a = Vector3Add(P[i], Vector3Scale(side, off0 - w0 * 0.5f)), b = Vector3Add(P[i], Vector3Scale(side, off0 + w0 * 0.5f));
+            Vector3 c = Vector3Add(P[i + 1], Vector3Scale(side, off1 + w1 * 0.5f)), e = Vector3Add(P[i + 1], Vector3Scale(side, off1 - w1 * 0.5f));
+            for (Vector3* v : { &a, &b, &c, &e }) v->y = SurfaceY(v->x, v->z, v->y + 0.6f) + 0.014f;
             m.TriN(a, c, e, { 0, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 });
             m.TriN(a, b, c, { 0, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 });
-        }
-        // drips and palm smears
-        if (r.Chance(0.04f)) {
+        };
+        // main body smear wanders a little, plus two thin heel lines at the edges
+        float wob0 = Fbm2(i * 0.11f, 9.0f, 2, 0, seed) * 0.12f, wob1 = Fbm2((i + 1) * 0.11f, 9.0f, 2, 0, seed) * 0.12f;
+        strip(wob0, wob1, wAt(i), wAt(i + 1));
+        if (Fbm2(i * 0.2f, 1.0f, 2, 0, seed + 5) > -0.2f) strip(wob0 + width * 0.55f, wob1 + width * 0.55f, 0.025f, 0.025f);
+        if (Fbm2(i * 0.2f, 2.0f, 2, 0, seed + 9) > -0.1f) strip(wob0 - width * 0.5f, wob1 - width * 0.5f, 0.02f, 0.02f);
+        if (r.Chance(0.05f)) {
             Vector3 p = Vector3Add(P[i], Vector3Scale(side, r.Range(-width, width)));
-            float s = r.Range(0.03f, 0.08f);
-            p.y = SurfaceY(p.x, p.z, p.y + 0.6f) + 0.013f;
+            float s = r.Range(0.03f, 0.09f);
+            p.y = SurfaceY(p.x, p.z, p.y + 0.6f) + 0.014f;
             for (int k = 0; k < 6; k++) {
                 float a0 = k * PI / 3, a1 = (k + 1) * PI / 3;
                 m.TriN(p, { p.x + cosf(a1) * s, p.y, p.z + sinf(a1) * s }, { p.x + cosf(a0) * s, p.y, p.z + sinf(a0) * s }, { 0, 1, 0 }, { 0, 1, 0 }, { 0, 1, 0 });

@@ -210,11 +210,11 @@ Light Player::FlashLight() const {
     // the beam lags slightly behind the view like a hand-held torch
     l.dir = Vector3Normalize(Vector3Add(fwd, Vector3{ -sway.x * 0.05f, -sway.y * 0.05f - 0.03f, 0 }));
     l.color = { 1.0f, 0.9f, 0.76f };
-    l.intensity = 34.0f * flashFlicker * (0.55f + 0.45f * SmoothStep(0.0f, 0.3f, battery));
+    l.intensity = 19.0f * flashFlicker * (0.55f + 0.45f * SmoothStep(0.0f, 0.3f, battery));
     l.range = 30.0f;
     l.innerDeg = 9.0f; l.outerDeg = 25.0f;
     l.shadow = true;
-    l.volumetric = 0.12f;
+    l.volumetric = 0.05f;
     l.priority = 1.0f;
     return l;
 }

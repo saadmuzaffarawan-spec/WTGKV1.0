@@ -297,6 +297,7 @@ void Game::UpdatePlay(float dt) {
     gameTime += dt;
     if (mode == Mode::Play && !IsCursorHidden() && !shotFile) DisableCursor();
     PlayerInput in = shotFile ? PlayerInput{} : ReadPlayerInput(settings.sensitivity, settings.invertY);
+
     bool cut = story && story->InCutscene();
     if (cut) { in.move = { 0, 0 }; in.interact = in.flashlight = in.use = false; }
     player.Update(in, dt);
@@ -304,6 +305,19 @@ void Game::UpdatePlay(float dt) {
     else { focus = nullptr; focusActor.clear(); hud.SetFocus(false); }
     hud.ShowTasks(IsKeyDown(KEY_TAB) && !cut);
     if (story) story->Update(dt);
+    // test hook: WTGK_WARP="x,z,yawDeg[,pitchDeg]" teleports once the story releases the camera
+    static bool warped = false;
+    if (!warped && !camOverride && gameTime > 0.5f) {
+        if (const char* w = getenv("WTGK_WARP")) {
+            float x = 0, z = 0, yw = 0, pt = 0;
+            if (sscanf(w, "%f,%f,%f,%f", &x, &z, &yw, &pt) >= 3) {
+                player.Spawn({ x, World().Height(x, z) + 1.0f, z }, yw);
+                player.pitch = pt * DEG2RAD;
+            }
+            if (getenv("WTGK_FLASH")) player.flashOn = true;
+        }
+        warped = true;
+    }
     Scn().Update(dt);
     for (auto& kv : actors) kv.second.actor->Update(dt);
     UpdateWeather(dt);

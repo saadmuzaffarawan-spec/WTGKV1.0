@@ -237,7 +237,11 @@ void Terrain::RegisterCollision() {
     for (int iz = 0; iz < kN; iz++)
         for (int ix = 0; ix < kN; ix++) {
             float x = -kHalf + ix * kCell, z = -kHalf + iz * kCell;
-            if (fabsf(x - RoadX(z)) < RoadHalfWidth()) hf.h[(size_t)iz * kN + ix] = RoadY(z) + 0.05f;
+            float u = x - RoadX(z);
+            if (fabsf(u) < RoadHalfWidth()) {
+                float crown = 0.04f * (1.0f - (u / RoadHalfWidth()) * (u / RoadHalfWidth()));
+                hf.h[(size_t)iz * kN + ix] = RoadY(z) + 0.03f + crown;   // matches the rendered road surface
+            }
         }
     hf.holes = holes_;
     hf.surfaceAt = [this](float x, float z) { return SurfaceAt(x, z); };

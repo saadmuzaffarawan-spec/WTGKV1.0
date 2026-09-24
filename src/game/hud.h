@@ -49,7 +49,7 @@ private:
     bool showTasks_ = false;
     float tasksAnim_ = 0.0f;
     std::vector<std::pair<std::string, bool>> tasks_;
-    float money_ = 0.0f, moneyShown_ = 0.0f, moneyT_ = 0.0f;
+    float money_ = 0.0f, moneyShown_ = 0.0f, moneyT_ = 99.0f;
     float battery_ = 1.0f;
     bool flashOn_ = false;
     std::string hint_;
