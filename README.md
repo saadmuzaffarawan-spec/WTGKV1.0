@@ -1,117 +1,154 @@
-﻿# What The Ground Keeps (WTGKV1.0)
+# What The Ground Keeps
 
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://isocpp.org/)
-[![Raylib](https://img.shields.io/badge/Raylib-5.5-red.svg)](https://www.raylib.com/)
-[![CMake](https://img.shields.io/badge/CMake-3.21+-green.svg)](https://cmake.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-lightgrey.svg)]()
+A first-person horror game in C++17 and raylib 5.5. Everything you see and hear is made by
+code: the textures, the meshes, the characters and every sound. The game has no music.
 
-> **"What The Ground Keeps"** is a highly atmospheric, psychological horror and survival simulation game built entirely from scratch using a custom C++ engine powered by Raylib. 
+> Two brothers are driving home on Route 9. The car wraps around a radio tower and Adam
+> dies. His soul watches a tall, wet man pull his little brother out of the wreck and drag
+> him into the dark. Adam wakes up on the road. The blood is still there, and the drag
+> marks end at a gas station hatch. The man behind the counter can see him.
 
-This document serves as an **honest, highly detailed technical and feature breakdown** of everything currently implemented in V1.0 of the game.
-
----
-
-## 🏗️ Core Engine & Architecture
-Unlike games built in Unity or Unreal, every system in *WTGK* is coded at a low level in C++17.
-*   **Custom Rendering Pipeline:** Built on top of Raylib, utilizing lgl for immediate mode and batched 3D rendering. Features complex render-to-texture pipelines (used for CCTVs and CRT screens) that seamlessly integrate into the 3D world.
-*   **Procedural Audio Engine (udio_synthesis.cpp):** The game does **not load external audio files** (no .wav or .mp3). 100% of the game's sound effects—from ambient night drones and jumpscare stingers to ATM stepper motors and UI beeps—are synthesized mathematically at runtime using oscillators (sine, square, sawtooth, noise).
-*   **Sharp Typography (ui_helpers.cpp):** Custom implementations for rendering high-fidelity TrueType fonts (IBMPlexMono, lagard) avoiding native scaling artifacts, resulting in crisp AAA-quality HUDs and panels.
+The story, the clue trail and the rated feature list are in [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md).
 
 ---
 
-## 🌍 The World & Environments
-The world is an open, eerie expanse composed of distinct procedural and handcrafted setpieces:
+## Build and run
 
-### 1. The Summit Valley Gas Station & Shop
-The focal point of the environment.
-*   **Procedural Shop Assets:** Gondolas, shelving, and checkout counters are procedurally assembled and populated (procedural_shop_assets.cpp).
-*   **Dynamic Lighting:** A claustrophobic mix of warm spotlights and ambient darkness (shop_lighting.cpp), reacting to the player's presence.
-*   **Seamless Culling:** A custom rendering pipeline ensures that when the player enters the shop, massive outdoor geometry (like the college and ground plane) is managed cleanly to prevent Z-fighting and matrix projection bugs.
+```bash
+cmake --preset default          # or: cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+cd build && ./WhatTheGroundKeeps
+```
 
-### 2. Blackwood College
-A massive, foreboding architectural setpiece looming in the distance. It utilizes intense, warm lanterns that pierce through the pitch-black volumetric fog, serving as a beacon in the wasteland (lackwood_college.cpp).
+CMake downloads raylib 5.5 on the first configure. Each build copies `assets/` next to the
+executable, so changes to the scene file show up without a rebuild. It is developed on Linux
+and Windows (macOS should work too), and needs a GPU with OpenGL 3.3.
 
-### 3. The Highway & Crashed Sedan
-Long stretches of procedural roads (world_structures.inl) peppered with environmental storytelling, including a wrecked sedan site (crashed_sedan_site.cpp).
+## Controls
 
-### 4. The Procedural Ocean
-A camera-relative dynamic body of water (ocean_system.h). It calculates a multi-wave Gerstner spectrum on the CPU/GPU, complete with underwater diving mechanics, atmospheric underwater post-processing, and Snell's window refraction.
+| Action | Keyboard / mouse | Gamepad |
+|---|---|---|
+| Move / look | WASD / mouse | left stick / right stick |
+| Sprint, crouch, jump | Shift, Ctrl or C, Space | L3, R3, — |
+| Interact (tap or hold) | E | A |
+| Flashlight | F | Y |
+| Use held item (pour fuel) | left mouse button | RT |
+| Tonight's task list | hold Tab | — |
+| Pause | Esc | Start |
+| World editor | F10 | — |
 
----
+## Chapters
 
-## 🌦️ Weather, Skybox, & Atmosphere
-The dread of the game is driven by its dynamic weather systems:
-*   **Cloud Layers (cloud_system.inl):** Dynamic moving cloud coverage (ranging from clear skies to dense overcast) that masks the moonlight.
-*   **Plasma Lightning (plasma_lightning.inl):** Procedural, branching lightning strikes that flash and dynamically illuminate the entire world geometry.
-*   **Atmospheric Particles (tmospheric_particles.cpp):** Floating ash, dust, or snow that reacts to the environment.
-*   **Volumetric Fog & Night Sky:** A heavily fog-occluded world contrasted against a starry sky and glowing moon.
+| # | Chapter | What happens |
+|---|---|---|
+| 0 | Prologue | The drive, the figure in the road, the crash. You rise out of your body and watch the Dragger take Zain. |
+| 1 | Awakening | You wake on the road and follow the blood trail to the hatch. Grethnar offers a deal. |
+| 2 | Night One | Pumps, restocking, mopping, the trash. A car arrives with nobody inside. |
+| 3 | Night Two | Rain. You fetch the ledger from Blackwood College. The payphone rings. You get the Polaroid. |
+| 4 | Night Three | Fog, a power cut, and the college boiler. Something is scratching behind the bookshelf. |
+| 5 | The Key | The key is buried beside the third cow from the fence. She gets up when you take it. |
+| 6 | Below | The iron door opens and they come up past you. Underneath is the procession, the dead along the road, and Zain. |
+| 7 | Burn | You fill a can, soak the hatch, the pumps and the store, and strike the old man's match. |
+| 8 | Dawn | The ending, then the credits. |
 
----
-
-## 👁️ Entities & NPCs
-### 1. Mr. Grethnar Woule (The Shopkeeper)
-An intensely creepy, interactive horror entity standing behind the checkout counter (grethnar_system.cpp).
-*   **Dynamic Staring Mechanic:** He tracks the player's camera dot-product. If you stare at him, he stares back.
-*   **Procedural Blood Physics:** If you hold eye contact too long, his eyes engorge and drip procedural blood particles that possess gravity, velocity, and collision—splattering directly onto the shop counter.
-*   **Jumpscare State Machine:** If you prime him by staring, look away to an empty counter, and look back, he triggers a brutal jumpscare utilizing synthesized audio, violent camera shake, and FOV manipulation.
-
-### 2. The Wasteland Fauna
-*   **The Hound (hound_npc.cpp)**: A stalking entity in the darkness.
-*   **The Skeleton Cow (skeleton_cow_npc.cpp)**: Macabre, surreal environmental setpieces.
-
----
-
-## 🕹️ Interactive Mechanics & Systems
-
-### 1. The 1980s ATM Terminal (tm_system.cpp)
-A breathtakingly detailed, fully interactive banking terminal ("Summit Valley Trust"):
-*   **State Machine:** Insert Card $\rightarrow$ Read Chip $\rightarrow$ PIN Entry (masking digits) $\rightarrow$ Central Host Authentication $\rightarrow$ Withdrawal Menu $\rightarrow$ Dispense / Error.
-*   **CRT Simulation:** Renders to a 2D texture mapped onto 3D geometry. Features heavy visual post-processing: dark vignette edges, phosphor scanlines, and a scrolling translucent V-Sync glitch bar.
-*   **Economy & Feedback:** Fully functional account balances. If the player attempts to withdraw more than their $840.00 balance, the ATM triggers an ATM_INSUFFICIENT_FUNDS state, buzzing an error and flashing a red "TRANSACTION DECLINED" screen.
-*   **AAA UI Prompts:** Uses DrawAAAPanel for sleek, floating, screen-space contextual interaction prompts (e.g., "[E] COLLECT CASH").
-
-### 2. CCTV Surveillance (cctv_surveillance.cpp)
-Working security cameras that render alternate viewpoints of the shop and the player to off-screen framebuffers, displaying them on monitors inside the game world.
-
-### 3. Player Mechanics
-*   **Footprint Decals (ootprint_decals.cpp):** The player leaves physical footprints mapped to the ground geometry as they walk.
-*   **Shovel & Hand Items (shovel_system.cpp, hand_item_ui.inl):** A first-person viewmodel system allowing the player to wield items with procedural view-bobbing and interaction logic.
-*   **Phone System (phone_system.cpp):** Interactive telephone mechanics.
-*   **Receipt Printer (eceipt_printer.cpp):** Dynamically prints physical receipts for transactions.
-
-### 4. Cinematics
-*   **Intro & Main Menu (intro_cinematic.cpp, main_menu_system.cpp):** Fully scripted opening sequences.
-*   **Car Cockpit (car_cockpit_cinematic.inl):** A cinematic driving sequence from inside the vehicle's interior.
+The game saves at the start of every chapter (`wtgk.sav`). *Continue* on the main menu
+resumes from the last save.
 
 ---
 
-## 🛠️ Building and Running
+## The engine
 
-### Prerequisites
-- **Compiler**: Visual Studio 2022 / Build Tools with MSVC (C++17)
-- **Build System**: CMake 3.21 or higher
-- **Graphics**: OpenGL 3.3 compatible GPU
+```
+src/engine/   renderer, lit/sky/post shaders, procedural textures and materials, mesh builder,
+              collision, terrain, SDF sculpting, audio synthesis, UI, entity/prefab/scene system
+src/game/     prefabs (world objects), characters, player, HUD, menus, editor, story chapters
+assets/       scenes/world.scene, fonts, images, plus optional texture and sound overrides
+docs/         design document
+```
 
-### Build Instructions
+### Rendering
 
-1. **Configure with CMake**:
-   `powershell
-   cmake -B build -S .
-   `
+- Forward HDR rendering with triplanar, GGX-lit materials and up to 16 dynamic lights.
+- Shadows from the moon (orthographic) and from one spotlight, usually your flashlight.
+- Height fog and volumetric scattering on lights.
+- Post-processing: bloom, ACES tonemapping, grain, vignette, chromatic aberration, FXAA and
+  eyelid blinks.
+- An **ASCII "spirit sight"** pass that creeps in from the edges of the screen as the ground
+  claims more of you.
+- Procedural texture sets, generated on worker threads at startup: asphalt, concrete, brick,
+  wood, rust, rock, skin, bone and more.
 
-2. **Compile the Game**:
-   `powershell
-   cmake --build build --config RelWithDebInfo
-   `
+### Objects are objects: the scene and prefab system
 
-3. **Launch**:
-   `powershell
-   .\build\RelWithDebInfo\WhatTheGroundKeeps.exe
-   `
+Every object in the world is an **entity** made from a named **prefab**. A car is a `sedan`
+and a door is a `door_wood`. The whole map is one plain-text file, `assets/scenes/world.scene`,
+with one line per object:
 
-*(Alternatively, open the directory in **Visual Studio Code** and press Ctrl+Shift+B to build, followed by F5 to run with debugging).*
+```
+# prefab      x      y     z      yaw  [pitch roll]  key=value ...
+gas_pump      2.4    0.21  1.6    0    parent=canopy name=pump_1
+sedan         19.2   0     166.2  52   0 -2 state=wrecked color=blue name=wreck tag=after_crash
+door_iron     0.0   -3.0  -7.5    90   parent=college name=iron_door w=1.3 h=2.3 locked=1
+cavern       -120   -60   -40     0    abs=1 name=cavern
+```
 
----
+- `y` is measured from the terrain surface unless you set `abs=1`.
+- `parent=<name>` places the object relative to another entity. For example, the store's
+  shelves move with the store.
+- `name=` lets story code find an object (`Scn().Find("pump_1")`). `tag=` groups objects so a
+  chapter can show or hide them together.
+- Any other `key=value` pair is a prefab property, such as `len`, `variant`, `color`, `locked`
+  or `text`.
 
-## 📜 License & Credits
-Developed by Saad Muzaffar Awan. Powered by [Raylib](https://www.raylib.com/).
+A prefab is a C++ function that builds geometry, colliders, lights and an interaction point,
+and can attach a **behaviour**: doors swing, the bookshelf slides and the windmill turns.
+Prefabs are registered by family in `src/game/prefabs_*.cpp`. To add one, write a builder,
+register it, and place it in the scene file.
+
+### In-game editor (F10)
+
+Press F10 to open the editor. From there you can:
+
+- Fly with WASD and Q/E, and click an object to select it.
+- Move the selection with the arrow keys and PgUp/PgDn, rotate it with R, and cycle its
+  variant with V.
+- Grab it with G, duplicate it with Ctrl+D, and delete it with Del.
+- Resize it with = and -.
+- Choose a prefab from the palette with Tab, then place it with P.
+- Save back to `world.scene` with Ctrl+S.
+
+### Sound: 100% synthesized, no music
+
+Every sound is synthesized when the game starts. Footsteps on each surface, doors, pumps,
+the register, rain and wind, fire, breathing and the heartbeat are all built from modal
+resonators, noise grains and stick-slip friction, then passed through a small room reverb.
+A live mixer blends the ambience beds (crickets, wind, the hum of the store, drips below
+ground) from the game state, and the crickets fall silent when something is near. Sounds are
+positioned in 3D and muffled by walls.
+
+### Overriding generated content
+
+- **Sounds:** drop `assets/sounds/<id>_<n>.wav` next to the build, for example
+  `door_wood_open_0.wav` or `step_gravel_2.wav`. The game uses your files for that id instead
+  of synthesizing it.
+- **Textures:** `assets/textures/<set>_albedo.png` and an optional `<set>_normal.png` replace
+  a generated texture set, such as `asphalt`, `brick` or `rust`.
+
+### Headless testing
+
+The game can render a single frame to an image, which is how it was developed and checked:
+
+```bash
+xvfb-run -a ./WhatTheGroundKeeps --mode chapter --chapter 6 --frames 300 --shot out.png
+```
+
+`--frames` runs the simulation at a fixed 30 fps and renders only the last frames, so it is
+fast. These environment variables help:
+
+| Variable | Effect |
+|---|---|
+| `WTGK_CAM=x,y,z,yaw,pitch` | fixed camera |
+| `WTGK_WARP=x,z,yaw[,pitch[,y]]` | teleport the player once the chapter starts |
+| `WTGK_FLASH=1` | flashlight on |
+| `WTGK_BRIGHT=4` | inspection exposure (see detail in the dark) |
+| `WTGK_TEST=cow\|fire\|polaroid` | trigger a set-piece for a screenshot |

@@ -320,6 +320,52 @@ void Story::DrawOverlay() {
         }
     }
     impl->DrawChoice();
+    // the Polaroid Grethnar hands over after night two
+    if (impl->showPolaroid > 0.0f) {
+        static RenderTexture2D photo{};
+        if (photo.id == 0) {
+            const int PW = 420, PH = 500;
+            photo = LoadRenderTexture(PW, PH);
+            // the picture itself is drawn small and scaled up: soft, like a cheap lens
+            const float k = 0.3f;
+            RenderTexture2D pic = LoadRenderTexture((int)((PW - 52) * k), (int)((PW - 52) * k));
+            SetTextureFilter(pic.texture, TEXTURE_FILTER_BILINEAR);
+            BeginTextureMode(pic);
+            ClearBackground(BLACK);
+            auto R = [k](float x, float y, float w, float h, Color c) { DrawRectangle((int)(x * k), (int)(y * k), (int)(w * k), (int)(h * k), c); };
+            auto E = [k](float x, float y, float rx, float ry, Color c) { DrawEllipse((int)(x * k), (int)(y * k), rx * k, ry * k, c); };
+            DrawRectangleGradientV(0, 0, pic.texture.width, pic.texture.height, Color{ 92, 78, 62, 255 }, Color{ 58, 48, 40, 255 });
+            R(30, 40, 200, 150, Color{ 150, 132, 96, 255 });   // the store front: a lit window behind them
+            R(36, 46, 188, 138, Color{ 176, 158, 118, 255 });
+            E(190, 92, 13, 17, Color{ 205, 190, 160, 255 });   // the man in the window, watching them
+            R(176, 108, 28, 60, Color{ 70, 60, 50, 255 });
+            E(110, 150, 22, 27, Color{ 150, 118, 96, 255 });   // mother
+            E(110, 132, 25, 20, Color{ 40, 30, 26, 255 });
+            R(80, 176, 62, 190, Color{ 96, 70, 64, 255 });
+            E(190, 214, 19, 23, Color{ 160, 126, 104, 255 });  // Zain, in the red hoodie
+            E(190, 198, 21, 14, Color{ 30, 24, 20, 255 });
+            R(166, 236, 50, 140, Color{ 140, 44, 40, 255 });
+            EndTextureMode();
+            BeginTextureMode(photo);
+            ClearBackground(Color{ 232, 226, 212, 255 });
+            Rectangle img{ 26, 26, PW - 52.0f, PW - 52.0f };
+            DrawTexturePro(pic.texture, { 0, 0, (float)pic.texture.width, -(float)pic.texture.height }, img, { 0, 0 }, 0, WHITE);
+            // age: grain, a light leak, a crease
+            Rng r(9);
+            for (int i = 0; i < 2600; i++) DrawPixel((int)(img.x + r.F() * img.width), (int)(img.y + r.F() * img.height), Color{ 255, 240, 210, (unsigned char)r.RangeI(10, 40) });
+            DrawRectangleGradientH((int)img.x, (int)img.y, 90, (int)img.height, Color{ 255, 180, 120, 60 }, Color{ 255, 180, 120, 0 });
+            DrawLineEx({ img.x, img.y + 250 }, { img.x + img.width, img.y + 230 }, 2, Color{ 230, 220, 200, 70 });
+            EndTextureMode();
+            UnloadRenderTexture(pic);
+        }
+        float a = Saturate(impl->showPolaroid * 1.5f) * Saturate((6.0f - impl->showPolaroid) * 3.0f);
+        float sc = H * 0.62f / 500.0f;
+        Rectangle src{ 0, 0, (float)photo.texture.width, -(float)photo.texture.height };
+        Rectangle dst{ W * 0.5f, H * 0.47f, 420 * sc, 500 * sc };
+        DrawRectangle(0, 0, (int)W, (int)H, Color{ 0, 0, 0, (unsigned char)(150 * a) });
+        DrawTexturePro(photo.texture, src, dst, { dst.width * 0.5f, dst.height * 0.5f }, -4.0f, Color{ 255, 255, 255, (unsigned char)(255 * a) });
+        TextCentered(F_MONO_LIGHT, "Z + mum.  sundays.", W * 0.5f + 6 * sc, H * 0.47f + 200 * sc, 20 * sc, Color{ 60, 56, 70, (unsigned char)(220 * a) });
+    }
     (void)g;
 }
 
@@ -352,6 +398,7 @@ void Story::Impl::DrawChoice() {
 // Always-on story systems
 // ---------------------------------------------------------------------------
 void Story::Impl::UpdateCommon(float dt) {
+    showPolaroid = fmaxf(0.0f, showPolaroid - dt);
     car.Update(dt);
     for (auto& c : customers) c.car.Update(dt);
     UpdateGrethnar(dt);

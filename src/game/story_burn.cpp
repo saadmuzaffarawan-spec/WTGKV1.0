@@ -459,6 +459,7 @@ void BuildEpilogue(Story::Impl& im, Script& s) {
 void StoryTestHook(Story::Impl& im, const std::string& what) {
     Game& g = im.g;
     Vector3 f = Vector3Add(g.player.feet, Vector3Scale(Flat(g.player.Forward()), 5.0f));
+    if (what == "polaroid") im.showPolaroid = 6.0f;
     if (what == "cow") {
         im.AddCreature("cow", 1, f);
         if (Creature* c = im.FindCreature("cow")) { c->yaw = g.player.yaw + PI; c->hitCd = 99; }
