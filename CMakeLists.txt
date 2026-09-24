@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(WhatTheGroundKeeps VERSION 1.0 LANGUAGES C CXX RC)
+project(WhatTheGroundKeeps VERSION 1.0 LANGUAGES C CXX)
+if(WIN32)
+    enable_language(RC)
+endif()
 
 include(FetchContent)
 

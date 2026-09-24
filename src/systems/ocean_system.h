@@ -486,7 +486,7 @@ static const float g_maxOxygen = 45.0f;
 static float g_wadeSplashTimer = 0.0f;
 static float g_screenDropletsTimer = 0.0f;
 static bool  g_wasSubmerged = false;
-static bool  g_salvageCrateOpened = false;
+extern bool g_salvageCrateOpened; // owned by hud_manager.cpp
 
 // Swimmer camera wave tilt bobbing
 static float g_waterSmoothBobY = 0.0f;
