@@ -53,7 +53,7 @@ public:
     void AddLight(const Light& l) { lights_.push_back(l); }
     void Draw(const Model3D* model, const Matrix& xf, Color tint = WHITE, bool castShadow = true);
     void DrawPart(const MeshAsset* mesh, int mat, const Matrix& xf, Color tint = WHITE, bool castShadow = true);
-    void DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<Matrix>& xfs, float maxDist = 1e9f);
+    void DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<Matrix>& xfs, float maxDist = 1e9f, float minDist = 0.0f);
     // Renders everything submitted this frame into the HDR buffer.
     void Render(const std::function<void()>& customOpaque = nullptr, const std::function<void()>& customTransparent = nullptr);
     // Composites to the backbuffer (call between BeginDrawing/EndDrawing).
@@ -91,10 +91,12 @@ private:
     std::vector<Inst> instanced_;
     Vector4 frustum_[6];
 
-    Shader lit_{}, litInst_{}, depth_{}, sky_{}, bright_{}, blur_{}, composite_{};
+    Shader lit_{}, litInst_{}, depth_{}, sky_{}, bright_{}, blur_{}, composite_{}, scatter_{}, add_{};
     Mesh skyBox_{};
     Material skyMat_{}, depthMat_{};
-    RenderTexture2D hdr_{}, bloomA_{}, bloomB_{}, bloomC_{}, bloomD_{};
+    RenderTexture2D hdr_{}, bloomA_{}, bloomB_{}, bloomC_{}, bloomD_{}, scatterRT_{};
+    Matrix sceneVP_ = MatrixIdentity();
+    void ScatterPass();
     RenderTexture2D moonShadow_{}, spotShadow_{};
     Matrix moonVP_{}, spotVP_{};
     bool spotShadowOn_ = false, moonShadowOn_ = false;

@@ -79,8 +79,19 @@ vec3 Scatter(vec3 ro, vec3 rd, float dist, vec2 fragXY) {
             float fall = exp(-max(length(lp - cp) - range * 0.5, 0.0) / range);
             acc += col * (a / h) * fall * dens * 0.12;
         } else {
-            // Spot light: short ray-march with the spot cone (and its shadow)
+            // Spot light: short ray-march with the spot cone (and its shadow).
+            // Every sample outside the light's range adds exactly zero (att = 0 there), so a
+            // ray that never enters the range sphere can skip the march without changing anything.
             float maxT = min(dist, range);
+            {
+                vec3 oc = ro - lp;
+                float b = dot(oc, rd);
+                float c = dot(oc, oc) - range * range;
+                float disc = b * b - c;
+                if (disc <= 0.0) continue;
+                float sq = sqrt(disc);
+                if (-b + sq < 0.0 || -b - sq > maxT) continue;
+            }
             const int STEPS = 12;
             float stepL = maxT / float(STEPS);
             vec3 sum = vec3(0.0);
@@ -544,6 +555,40 @@ void main() {
     c += texture(texture0, fragTexCoord - t * 3.2308).rgb * 0.070270;
     finalColor = vec4(c, 1.0);
 }
+)GLSL";
+
+// ---------------------------------------------------------------------------
+// Volumetric scattering, once per screen pixel. Surfaces used to evaluate Scatter() in their
+// own shaders, so every overdrawn fragment paid for it too; here it runs once per pixel with
+// the same inputs (camera ray, distance to the visible surface, pixel position) and is added
+// to the HDR image, so the result is the same at a fraction of the cost.
+// ---------------------------------------------------------------------------
+static const char* kScatterFS = R"GLSL(
+uniform sampler2D uDepth;     // scene depth
+uniform mat4 uInvVP;          // inverse view-projection the scene was drawn with
+uniform vec2 uSize;
+uniform float uHasSky;        // 0: nothing was drawn behind the scene (no sky, no scattering)
+out vec4 finalColor;
+void main() {
+    ivec2 px = ivec2(gl_FragCoord.xy);
+    float z = texelFetch(uDepth, px, 0).r;
+    if (z >= 1.0 && uHasSky < 0.5) { finalColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+    vec2 ndc = gl_FragCoord.xy / uSize * 2.0 - 1.0;
+    vec4 w = uInvVP * vec4(ndc, z * 2.0 - 1.0, 1.0);
+    vec3 wp = w.xyz / w.w;
+    vec3 d = wp - uCamPos;
+    float dist = length(d);
+    vec3 rd = d / max(dist, 1e-5);
+    if (z >= 1.0) dist = 70.0;   // sky: the sky shader integrated 70 m of the view ray
+    finalColor = vec4(Scatter(uCamPos, rd, dist, gl_FragCoord.xy), 1.0);
+}
+)GLSL";
+
+static const char* kAddFS = R"GLSL(
+#version 330
+uniform sampler2D uSrc;
+out vec4 finalColor;
+void main() { finalColor = vec4(texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0).rgb, 1.0); }
 )GLSL";
 
 static const char* kCompositeFS = R"GLSL(

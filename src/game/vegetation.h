@@ -11,7 +11,7 @@ public:
     float density = 1.0f;   // settings: grass density multiplier
     bool Excluded(float x, float z, float extraMargin = 0.0f, bool forTrees = false) const;
 private:
-    struct Group { const Model3D* model; std::vector<Matrix> xfs; };
+    struct Group { const Model3D* model; std::vector<Matrix> xfs; const Model3D* lod[2] = { nullptr, nullptr }; };
     std::vector<Group> groups_;
     std::vector<ExclusionZone> zones_;
     MeshAsset* grassMesh_ = nullptr;

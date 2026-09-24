@@ -22,7 +22,10 @@ static void BuildDeadTree(PrefabBuild& b, const Entity& e) {
         std::vector<Vector3> pts{ { 0, 0.35f, 0 }, { d.x * 0.5f, 0.1f, d.z * 0.5f }, { d.x * 1.1f, -0.15f, d.z * 1.1f } };
         b.M(MAT_BARK).Tube(pts, { rad * 0.7f, rad * 0.45f, rad * 0.15f }, 6, true);
     }
+    int lod = (int)e.Num("lod", 0);   // 1: no twigs, 2: no twigs or small branches (far away)
+    g_branchLodSkip = lod == 1 ? 3 : (lod == 2 ? 2 : 99);
     GrowBranch(b.mb, rng, { 0, -0.2f, 0 }, lean, height, rad, 0, rng.Chance(0.5f) ? 3 : 2, MAT_BARK);
+    g_branchLodSkip = 99;
     b.ColliderCyl({ 0, 0, 0 }, rad + 0.08f, 4.0f, SURF_WOOD);
 }
 
@@ -80,11 +83,13 @@ static void BuildPine(PrefabBuild& b, const Entity& e) {
 static void BuildBush(PrefabBuild& b, const Entity& e) {
     Rng rng(VariantSeed(e, 31) | 1);
     int stems = rng.RangeI(6, 10);
+    g_branchLodSkip = e.Num("lod", 0) > 0 ? 3 : 99;   // far away: no twigs
     for (int i = 0; i < stems; i++) {
         float a = rng.Range(0, 6.28f);
         Vector3 d{ cosf(a) * 0.5f, 1.0f, sinf(a) * 0.5f };
         GrowBranch(b.mb, rng, { rng.Signed() * 0.2f, 0, rng.Signed() * 0.2f }, d, rng.Range(0.7f, 1.5f), 0.02f, 2, 3, MAT_BARK_DARK);
     }
+    g_branchLodSkip = 99;
     b.castShadow = true;
 }
 
@@ -368,9 +373,9 @@ void RegisterEnvPrefabs() {
         PrefabInfo p; p.name = n; p.category = cat; p.build = fn; p.geometryKeys = keys;
         RegisterPrefab(p);
     };
-    reg("dead_tree", "nature", BuildDeadTree);
+    reg("dead_tree", "nature", BuildDeadTree, { "variant", "lod" });
     reg("pine_tree", "nature", BuildPine);
-    reg("bush", "nature", BuildBush);
+    reg("bush", "nature", BuildBush, { "variant", "lod" });
     reg("rock", "nature", BuildRock);
     reg("stump", "nature", BuildStump);
     reg("log", "nature", BuildLog, { "variant", "len" });
