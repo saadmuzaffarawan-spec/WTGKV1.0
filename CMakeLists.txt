@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(WhatTheGroundKeeps VERSION 1.0 LANGUAGES C CXX)
+project(WhatTheGroundKeeps VERSION 2.0 LANGUAGES C CXX)
 if(WIN32)
     enable_language(RC)
 endif()
@@ -24,32 +24,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib)
 
-set(WTGK_SOURCES
-    src/main.cpp
-    src/audio/audio_synthesis.cpp
-    src/systems/shop_atmosphere.cpp
-    src/systems/ui_helpers.cpp
-    src/systems/texture_factories.cpp
-    src/systems/receipt_printer.cpp
-    src/systems/footprint_decals.cpp
-    src/systems/gas_station_system.cpp
-    src/systems/crashed_sedan_site.cpp
-    src/systems/hound_npc.cpp
-    src/systems/skeleton_cow_npc.cpp
-    src/systems/shovel_system.cpp
-    src/systems/blackwood_college.cpp
-    src/systems/shop_lighting.cpp
-    src/systems/atmospheric_particles.cpp
-    src/systems/procedural_shop_assets.cpp
-    src/systems/cctv_surveillance.cpp
-    src/systems/hud_manager.cpp
-    src/systems/atm_system.cpp
-    src/systems/intro_cinematic.cpp
-    src/systems/main_menu_system.cpp
-    src/systems/phone_system.cpp
-    src/systems/grethnar_system.cpp
-    src/core/game_context.cpp
-)
+file(GLOB_RECURSE WTGK_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 if(WIN32)
     list(APPEND WTGK_SOURCES src/resources/WhatTheGroundKeeps.rc)
@@ -57,20 +33,17 @@ endif()
 
 add_executable(WhatTheGroundKeeps ${WTGK_SOURCES})
 
-target_include_directories(WhatTheGroundKeeps PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/systems"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
-)
-
+target_include_directories(WhatTheGroundKeeps PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(WhatTheGroundKeeps PRIVATE cxx_std_17)
 target_link_libraries(WhatTheGroundKeeps PRIVATE raylib)
 
+find_package(Threads REQUIRED)
+target_link_libraries(WhatTheGroundKeeps PRIVATE Threads::Threads)
+
 if(MSVC)
-    target_compile_options(WhatTheGroundKeeps PRIVATE /W4 /wd4576)
+    target_compile_options(WhatTheGroundKeeps PRIVATE /W4 /wd4576 /wd4244 /wd4305)
 else()
-    target_compile_options(WhatTheGroundKeeps PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(WhatTheGroundKeeps PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
 endif()
 
 add_custom_command(TARGET WhatTheGroundKeeps POST_BUILD
