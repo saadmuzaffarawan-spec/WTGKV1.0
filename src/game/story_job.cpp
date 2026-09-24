@@ -36,8 +36,17 @@ void Story::Impl::RegisterActions() {
                       if (kind == "door_glass") audio::Play3D(open ? "door_glass_open" : "door_latch", e.FocusPoint(), 0.9f);
                       else audio::Play3D((kind + (open ? "_open" : "_close")).c_str(), e.FocusPoint(), 0.9f);
                   } };
-    A["talk_grethnar"] = { [&gg](Entity&) -> std::string { return gg.Flag("can_talk") || gg.chapter == CH_AWAKENING ? "Talk" : ""; },
-                           [&gg](Entity&) { gg.SetFlag("talk_request"); } };
+    // Grethnar can always be spoken to. When he has something for you (the deal, the end of a
+    // shift) the story takes over; otherwise he tells you what is still left to do.
+    A["talk_grethnar"] = { [&gg](Entity&) -> std::string { return gg.story && gg.story->InCutscene() ? "" : "Talk to Mr. Grethnar"; },
+                           [this, &gg](Entity&) {
+                               if (gg.Flag("can_talk") || gg.chapter == CH_AWAKENING) { gg.SetFlag("talk_request"); return; }
+                               std::string left;
+                               for (auto& t : tasks) if (!t.done) { if (!left.empty()) left += ", "; left += t.label; }
+                               if (left.empty()) gg.hud.Say("GRETHNAR", "Not now. Go on.", 2.5f);
+                               else gg.hud.Say("GRETHNAR", "Work first. Still to do: " + left + ".", 5.0f);
+                               gg.hud.Hint("Hold Tab to see tonight's list.", 3.0f);
+                           } };
     A["wreck"] = { [](Entity&) -> std::string { return "Look inside"; },
                    [&gg](Entity&) {
                        if (!gg.Flag("saw_body")) { gg.SetFlag("saw_body"); gg.hud.Say("ADAM", "That's... me.", 2.5f); gg.player.fear = 0.6f; }

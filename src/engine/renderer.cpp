@@ -217,9 +217,11 @@ void Renderer::DrawPart(const MeshAsset* mesh, int mat, const Matrix& xf, Color 
     float r = mesh->radius * MaxScale(xf);
     const SurfaceMat& m = Mat(mat);
     Item it{ mesh, mat, xf, tint, castShadow && m.castShadow, Vector3DistanceSqr(c, cam.position) };
-    // Shadow casters must be kept even when off-screen; visibility is decided per pass.
+    // Only what is in view (and within the draw distance) is drawn. Off-screen objects are
+    // kept only as nearby shadow casters, and only when shadows are on.
+    if (it.d2 > (s.drawDistance + r) * (s.drawDistance + r)) return;
     bool vis = SphereVisible(c, r);
-    if (!vis && !it.shadow) return;
+    if (!vis && (!it.shadow || !s.shadowsEnabled || it.d2 > 60.0f * 60.0f)) return;
     if (!vis) it.tint.a = 0;   // marker: shadow-only
     if (m.transparent) { if (vis) transparent_.push_back(it); }
     else items_.push_back(it);
@@ -240,6 +242,7 @@ void Renderer::DrawInstanced(const MeshAsset* mesh, int mat, const std::vector<M
     if (!mesh || xfs.empty()) return;
     Inst inst{ mesh, mat, {} };
     inst.xfs.reserve(xfs.size());
+    maxDist = fminf(maxDist, s.drawDistance);
     float md2 = maxDist * maxDist, mn2 = minDist * minDist;
     for (const Matrix& m : xfs) {
         Vector3 c{ m.m12, m.m13, m.m14 };
@@ -279,7 +282,7 @@ void Renderer::ShadowPass() {
     rlDisableColorBlend();
     // --- Moon ---------------------------------------------------------------
     Vector3 md = Vector3Normalize(s.moonDir);
-    if (s.moonShadows && md.y > 0.05f) {
+    if (s.moonShadows && s.shadowsEnabled && md.y > 0.05f) {
         const float extent = 110.0f;
         Vector3 center = Vector3Add(cam.position, Vector3Scale(Vector3Normalize(Vector3Subtract(cam.target, cam.position)), 25.0f));
         center.y = cam.position.y - 1.0f;
@@ -311,7 +314,7 @@ void Renderer::ShadowPass() {
         moonShadowOn_ = true;
     }
     // --- Spot ---------------------------------------------------------------
-    if (spotShadowIndex_ >= 0) {
+    if (spotShadowIndex_ >= 0 && s.shadowsEnabled) {
         const Light& l = active_[spotShadowIndex_];
         Camera3D lc{};
         lc.position = l.pos;
@@ -469,7 +472,7 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
     // volumetric light over the opaque scene, once per pixel; transparent surfaces then blend
     // over it and add their own share (inline, as before), exactly like the single-pass order
     ScatterPass();
-    U1(lit_, "uScatter", s.scatter);
+    U1(lit_, "uScatter", s.volumetrics ? s.scatter : 0.0f);
     BeginTextureMode(hdr_);
     BeginMode3D(cam);
 
@@ -505,7 +508,7 @@ void Renderer::Render(const std::function<void()>& customOpaque, const std::func
 }
 
 void Renderer::ScatterPass() {
-    if (s.fogDensity * s.scatter <= 0.0f) return;
+    if (s.fogDensity * s.scatter <= 0.0f || !s.volumetrics) return;
     int w = hdr_.texture.width, h = hdr_.texture.height;
     // 1. evaluate the in-scattered light for every pixel from the depth buffer
     BeginTextureMode(scatterRT_);

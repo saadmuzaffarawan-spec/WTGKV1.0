@@ -31,6 +31,9 @@ void Settings::Load() {
         else if (k == "brightness") brightness = f; else if (k == "render_scale") renderScale = f; else if (k == "grass") grass = f;
         else if (k == "ascii") ascii = f; else if (k == "subtitle_size") subtitleSize = f;
         else if (k == "invert_y") invertY = f > 0.5f; else if (k == "subtitles") subtitles = f > 0.5f;
+        else if (k == "move_speed") moveSpeed = f; else if (k == "volumetrics") volumetrics = f > 0.5f;
+        else if (k == "shadows") shadows = f > 0.5f; else if (k == "quality") quality = (int)f;
+        else if (k == "fps_limit") fpsLimit = (int)f; else if (k == "draw_distance") drawDistance = f; else if (k == "show_fps") showFps = f > 0.5f;
         else if (k == "fullscreen") fullscreen = f > 0.5f; else if (k == "vsync") vsync = f > 0.5f; else if (k == "head_bob") headBob = f > 0.5f;
     }
 }
@@ -39,13 +42,22 @@ void Settings::Save() const {
     o << "master=" << master << "\nsensitivity=" << sensitivity << "\nfov=" << fov << "\nbrightness=" << brightness
       << "\nrender_scale=" << renderScale << "\ngrass=" << grass << "\nascii=" << ascii << "\nsubtitle_size=" << subtitleSize
       << "\ninvert_y=" << invertY << "\nsubtitles=" << subtitles << "\nfullscreen=" << fullscreen << "\nvsync=" << vsync
-      << "\nhead_bob=" << headBob << "\n";
+      << "\nhead_bob=" << headBob << "\nmove_speed=" << moveSpeed << "\nvolumetrics=" << volumetrics
+      << "\nshadows=" << shadows << "\nquality=" << quality << "\nfps_limit=" << fpsLimit
+      << "\ndraw_distance=" << drawDistance << "\nshow_fps=" << showFps << "\n";
 }
 
 void Game::ApplySettings() {
     audio::SetMasterVolume(settings.master);
     Rdr().s.renderScale = Clamp(settings.renderScale, 0.5f, 1.0f);
     Veg().density = settings.grass;
+    Rdr().s.volumetrics = settings.volumetrics;
+    Rdr().s.drawDistance = settings.drawDistance;
+    if (!shotFile) SetTargetFPS(settings.fpsLimit);
+    Rdr().s.shadowsEnabled = settings.shadows;
+    player.walkSpeed = 1.55f * settings.moveSpeed;
+    player.sprintSpeed = 3.7f * settings.moveSpeed;
+    player.crouchSpeed = 0.85f * settings.moveSpeed;
     hud.subtitleScale = settings.subtitleSize;
     hud.subtitlesOn = settings.subtitles;
 }
@@ -234,7 +246,7 @@ bool Game::Init(int argc, char** argv) {
         mode = Mode::Menu;
         MenuEnter();
     }
-    if (!shotFile) SetTargetFPS(0);
+    if (!shotFile) SetTargetFPS(settings.fpsLimit);
     return true;
 }
 
@@ -396,8 +408,8 @@ void Game::UpdateInteraction(const PlayerInput& in, float dt) {
         float dist = Vector3Length(d);
         if (dist > kv.second.radius) continue;
         float ang = acosf(Clamp(Vector3DotProduct(Vector3Scale(d, 1.0f / fmaxf(dist, 0.001f)), fwd), -1.0f, 1.0f));
-        if (ang > 0.45f) continue;
-        float score = ang * 2.0f + dist * 0.15f;
+        if (ang > 0.5f) continue;
+        float score = ang * 2.0f + dist * 0.15f - 0.35f;   // people win over props next to them (the register)
         if (score < bestScore) { bestScore = score; best = nullptr; bestActor = kv.first; }
     }
     // resolve prompt
@@ -553,6 +565,7 @@ void Game::RenderWorld() {
 }
 
 void Game::DrawOverlay() {
+    if (settings.showFps) DrawText(TextFormat("%d fps", GetFPS()), GetScreenWidth() - 90, 10, 20, Color{ 200, 200, 200, 200 });
     if (mode == Mode::Menu) { MenuDraw(); return; }
     if (mode == Mode::Credits) { CreditsDraw(); return; }
     if (story) story->DrawOverlay();

@@ -17,6 +17,8 @@ struct MenuState {
     float enterT = 0;
     float startT = -1;      // new game transition
     bool startContinue = false;
+    bool guideOpen = false;
+    float guideScroll = 0;
     float creditsT = 0;
 };
 MenuState M;
@@ -64,8 +66,26 @@ std::vector<SettingRow> Rows() {
         { "field of view", [&] { return std::string(TextFormat("%d", (int)st.fov)); }, [&](int d) { st.fov = Clamp(st.fov + d * 2.0f, 55, 100); } },
         { "brightness", [&] { return pct(st.brightness); }, [&](int d) { st.brightness = Clamp(st.brightness + d * 0.05f, 0.5f, 2.0f); } },
         { "spirit sight (ascii)", [&] { return pct(st.ascii); }, [&](int d) { st.ascii = Clamp(st.ascii + d * 0.1f, 0.0f, 1.5f); } },
+        { "graphics quality", [&] { static const char* q[] = { "low", "medium", "high" }; return std::string(q[st.quality < 0 ? 0 : st.quality > 2 ? 2 : st.quality]); },
+          [&](int d) {
+              st.quality = (st.quality + (d < 0 ? 2 : 1)) % 3;
+              // presets: low favours speed on weak / integrated GPUs
+              if (st.quality == 0) { st.renderScale = 0.6f; st.grass = 0.2f; st.volumetrics = false; st.shadows = false; st.drawDistance = 100; }
+              if (st.quality == 1) { st.renderScale = 0.8f; st.grass = 0.5f; st.volumetrics = false; st.shadows = true; st.drawDistance = 180; }
+              if (st.quality == 2) { st.renderScale = 1.0f; st.grass = 1.0f; st.volumetrics = true; st.shadows = true; st.drawDistance = 320; }
+              G().ApplySettings();
+          } },
+        { "volumetric fog", [&] { return onoff(st.volumetrics); }, [&](int) { st.volumetrics = !st.volumetrics; G().ApplySettings(); } },
+        { "shadows", [&] { return onoff(st.shadows); }, [&](int) { st.shadows = !st.shadows; G().ApplySettings(); } },
+        { "fps limit", [&] { return st.fpsLimit ? std::to_string(st.fpsLimit) : std::string("unlimited"); },
+          [&](int d) { static const int v[] = { 30, 60, 90, 120, 144, 165, 240, 0 }; int i = 0; while (i < 7 && v[i] != st.fpsLimit) i++;
+                       i = (i + (d < 0 ? 7 : 1)) % 8; st.fpsLimit = v[i]; G().ApplySettings(); } },
+        { "show fps", [&] { return onoff(st.showFps); }, [&](int) { st.showFps = !st.showFps; } },
+        { "draw distance", [&] { return std::string(TextFormat("%d m", (int)st.drawDistance)); }, [&](int d) { st.drawDistance = Clamp(st.drawDistance + d * 20.0f, 60.0f, 320.0f); G().ApplySettings(); } },
+        { "movement speed", [&] { return pct(st.moveSpeed); }, [&](int d) { st.moveSpeed = Clamp(st.moveSpeed + d * 0.1f, 0.6f, 2.0f); G().ApplySettings(); } },
+        { "vsync", [&] { return onoff(st.vsync); }, [&](int) { st.vsync = !st.vsync; if (st.vsync) SetWindowState(FLAG_VSYNC_HINT); else ClearWindowState(FLAG_VSYNC_HINT); } },
         { "render scale", [&] { return pct(st.renderScale); }, [&](int d) { st.renderScale = Clamp(st.renderScale + d * 0.05f, 0.5f, 1.0f); } },
-        { "grass density", [&] { return pct(st.grass); }, [&](int d) { st.grass = Clamp(st.grass + d * 0.1f, 0.0f, 1.0f); } },
+        { "grass density", [&] { return pct(st.grass); }, [&](int d) { st.grass = Clamp(st.grass + d * 0.1f, 0.0f, 1.0f); G().ApplySettings(); } },
         { "head bob", [&] { return onoff(st.headBob); }, [&](int) { st.headBob = !st.headBob; } },
         { "subtitles", [&] { return onoff(st.subtitles); }, [&](int) { st.subtitles = !st.subtitles; } },
         { "subtitle size", [&] { return pct(st.subtitleSize); }, [&](int d) { st.subtitleSize = Clamp(st.subtitleSize + d * 0.1f, 0.7f, 1.8f); } },
@@ -85,10 +105,11 @@ void SettingsUpdate() {
     if (Accept() && M.settingsSel < n - 1) { rows[M.settingsSel].change(1); audio::Play("ui_select", 0.6f); }
     // mouse
     float s = UiScale();
-    float x = GetScreenWidth() * 0.1f, y = GetScreenHeight() * 0.28f;
+    float x = GetScreenWidth() * 0.1f, y = GetScreenHeight() * 0.2f;
+    float rh = fminf(30 * s, (GetScreenHeight() * 0.68f) / n);
     Vector2 mp = GetMousePosition();
     for (int i = 0; i < n; i++) {
-        Rectangle r{ x, y + i * 30 * s - 4 * s, 560 * s, 26 * s };
+        Rectangle r{ x, y + i * rh - 4 * s, 560 * s, rh };
         if (CheckCollisionPointRec(mp, r)) {
             if (Vector2Length(GetMouseDelta()) > 0.5f) M.settingsSel = i;
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { if (i == n - 1) back = true; else rows[i].change(1); audio::Play("ui_select", 0.6f); }
@@ -105,20 +126,23 @@ void SettingsDraw() {
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
     DrawRectangleGradientH(0, 0, (int)(W * 0.7f), (int)H, Alpha(BLACK, 0.85f), Alpha(BLACK, 0.0f));
     float x = W * 0.1f, y = H * 0.28f;
-    Text(F_MONO_THIN, "settings", x, y - 70 * s, 34 * s, kInk, 6 * s);
+    Text(F_MONO_THIN, "settings", x, H * 0.2f - 60 * s, 34 * s, kInk, 6 * s);
     auto rows = Rows();
+    y = H * 0.2f;
+    float rh = fminf(30 * s, (H * 0.68f) / rows.size());
+    float fs = fminf(16 * s, rh * 0.62f);
     for (int i = 0; i < (int)rows.size(); i++) {
         bool on = i == M.settingsSel;
         Color c = on ? kInk : kFaint;
-        Text(F_MONO, rows[i].label, x + (on ? 18 * s : 0), y + i * 30 * s, 16 * s, c);
+        Text(F_MONO, rows[i].label, x + (on ? 18 * s : 0), y + i * rh, fs, c);
         std::string v = rows[i].value();
-        if (!v.empty()) Text(F_MONO, (on ? "< " + v + " >" : v).c_str(), x + 330 * s, y + i * 30 * s, 16 * s, on ? kInk : kDim);
-        if (on) Hairline(x, y + i * 30 * s + 9 * s, x + 12 * s, y + i * 30 * s + 9 * s, kBlood);
+        if (!v.empty()) Text(F_MONO, (on ? "< " + v + " >" : v).c_str(), x + 330 * s, y + i * rh, fs, on ? kInk : kDim);
+        if (on) Hairline(x, y + i * rh + fs * 0.55f, x + 12 * s, y + i * rh + fs * 0.55f, kBlood);
     }
     Text(F_MONO_LIGHT, "left/right to change   esc to go back", x, H - 60 * s, 13 * s, kFaint, 1 * s);
     if (rows[M.settingsSel].label == std::string("brightness")) {
         // calibration: the left mark should be barely visible
-        float bx = x + 560 * s, by = y + 4 * 30 * s;
+        float bx = x + 560 * s, by = H * 0.3f;
         DrawRectangle((int)bx, (int)by, (int)(40 * s), (int)(40 * s), Color{ (unsigned char)(8 * G().settings.brightness), (unsigned char)(8 * G().settings.brightness), (unsigned char)(8 * G().settings.brightness), 255 });
         DrawRectangle((int)(bx + 50 * s), (int)by, (int)(40 * s), (int)(40 * s), Color{ 30, 30, 30, 255 });
         Text(F_MONO_LIGHT, "left square: barely visible", bx, by + 48 * s, 12 * s, kFaint);
@@ -160,6 +184,63 @@ void MenuCamera() {
     g.camera.projection = CAMERA_PERSPECTIVE;
 }
 
+// ---------------------------------------------------------------------------
+// How to play (same text as GUIDE.md)
+// ---------------------------------------------------------------------------
+static const char* kGuide[] = {
+    "HOW TO PLAY",
+    "",
+    "CONTROLS",
+    "  WASD move    mouse look    Shift run    Ctrl/C crouch    Space jump",
+    "  E  interact (look at something until a prompt appears; some prompts say HOLD - keep E down)",
+    "  F  flashlight    left mouse  pour fuel (last chapter)    Tab  hold for tonight's task list",
+    "  Esc  pause (settings, save, quit)",
+    "",
+    "HOW THE GAME PROGRESSES",
+    "  The top-left objective always says what to do next. The game saves at the start of every chapter.",
+    "  Prologue  - a cutscene. Just watch (Esc skips where allowed).",
+    "  Awakening - follow the blood trail down the road to the gas station hatch, then walk into the",
+    "              store and talk to Mr. Grethnar behind the counter (look at him, press E). Accept the deal.",
+    "  Nights 1-3 - it is always night: each chapter is one night shift. Hold Tab to see the tasks.",
+    "              Do every task, then go back to Grethnar and press E to report. He gives you a clue,",
+    "              and the next night begins. Talking to him early just reminds you what is left.",
+    "              Night 1: pump fuel for the customer, restock shelves (boxes in the storage room),",
+    "                       mop the stains (take the mop, hold E on a stain), trash to the dumpster.",
+    "              Night 2: pump + ring up the customer at the register, dip the tank at the hatch,",
+    "                       fetch the ledger from the office of Blackwood College (across the road).",
+    "              Night 3: mop, reset the breakers in the storage room when the power dies, then",
+    "                       relight the boiler in the college basement (stairs at the back of the building).",
+    "  The Key   - find the barn past the cow skeletons (south-east field) and take the shovel.",
+    "              Count the cows from the fence by the road; hold E beside the third one to dig. Then RUN",
+    "              back over the fence. Use the key on the iron door in the college basement.",
+    "  Below     - go down the stairs, follow the torches to the far end, find Zain. Don't touch the",
+    "              bodies. Then run back to the stairs. Shine your flashlight at creatures to scare them.",
+    "  Burn      - take the red fuel can next to the store, fill it at a pump (hold E), pour (hold",
+    "              left mouse) near the hatch, the pumps and the store, stand on the trail and press E.",
+    "",
+    "TIPS",
+    "  If a game runs slowly: settings > graphics quality > low (or lower render scale).",
+    "  Movement speed, field of view, shadows and volumetric fog are in settings too.",
+    "  Getting hit three times sends you back to a checkpoint. The flashlight battery refills",
+    "  at the register (buy batteries).",
+    "",
+    "Esc / Enter to close",
+};
+static void GuideUpdate() {
+    if (Back() || Accept() || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { M.guideOpen = false; audio::Play("ui_back", 0.6f); }
+}
+static void GuideDraw() {
+    float W = (float)GetScreenWidth(), H = (float)GetScreenHeight(), s = UiScale();
+    DrawRectangle(0, 0, (int)W, (int)H, Alpha(BLACK, 0.9f));
+    int n = (int)(sizeof(kGuide) / sizeof(kGuide[0]));
+    float lh = fminf(22 * s, (H * 0.9f) / n), fs = lh * 0.68f;
+    float x = W * 0.06f, y = H * 0.05f;
+    for (int i = 0; i < n; i++) {
+        bool head = kGuide[i][0] != ' ' && kGuide[i][0] != 0 && i < n - 1;
+        Text(head ? F_MONO_BOLD : F_MONO_LIGHT, kGuide[i], x, y + i * lh, head ? fs * 1.1f : fs, head ? kInk : kDim);
+    }
+}
+
 void MenuEnter() {
     M = MenuState();
     M.sel = G().HasSave() ? 0 : 1;
@@ -188,9 +269,10 @@ void MenuUpdate(float dt) {
         return;
     }
     if (M.settingsOpen) { SettingsUpdate(); return; }
+    if (M.guideOpen) { GuideUpdate(); return; }
     std::vector<std::string> items;
     bool hasSave = g.HasSave();
-    int n = 4;
+    int n = 5;
     if (Up()) { M.sel = (M.sel + n - 1) % n; if (!hasSave && M.sel == 0) M.sel = n - 1; }
     if (Down()) { M.sel = (M.sel + 1) % n; if (!hasSave && M.sel == 0) M.sel = 1; }
     if (M.sel != M.prevSel) { if (M.prevSel >= 0) audio::Play("ui_hover", 0.5f); M.prevSel = M.sel; }
@@ -200,7 +282,8 @@ void MenuUpdate(float dt) {
         if (M.sel == 0 && hasSave) { M.startT = 0; M.startContinue = true; g.hud.FadeTo(1.0f, 0.6f); }
         else if (M.sel == 1) { M.startT = 0; M.startContinue = false; g.hud.FadeTo(1.0f, 0.6f); }
         else if (M.sel == 2) { M.settingsOpen = true; M.settingsSel = 0; }
-        else if (M.sel == 3) g.quit = true;
+        else if (M.sel == 3) M.guideOpen = true;
+        else if (M.sel == 4) g.quit = true;
     }
 }
 
@@ -209,13 +292,14 @@ void MenuDraw() {
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight(), s = UiScale();
     DrawRectangleGradientH(0, 0, (int)(W * 0.55f), (int)H, Alpha(BLACK, 0.7f), Alpha(BLACK, 0.0f));
     if (M.settingsOpen) { SettingsDraw(); g.hud.Draw(false); return; }
+    if (M.guideOpen) { GuideDraw(); return; }
     float x = W * 0.1f, y = H * 0.3f;
     float glitch = (fmodf(M.t, 7.3f) < 0.18f) ? 0.5f : 0.0f;
     TextDecay(F_MONO_THIN, "WHAT THE", x, y, 30 * s, kInk, 10 * s, Saturate(1.2f - M.t * 0.6f) + glitch * 0.3f, M.t);
     TextDecay(F_MONO_THIN, "GROUND KEEPS", x, y + 38 * s, 48 * s, kInk, 10 * s, Saturate(1.4f - M.t * 0.6f) + glitch, M.t);
     Text(F_MONO_LIGHT, "a night on route 9", x + 2 * s, y + 100 * s, 14 * s, Alpha(kDim, Saturate(M.t - 1.0f)), 3 * s);
     bool hasSave = g.HasSave();
-    std::vector<std::string> items{ hasSave ? "continue" : "continue", "new game", "settings", "quit" };
+    std::vector<std::string> items{ "continue", "new game", "settings", "how to play", "quit" };
     float ly = y + 170 * s;
     bool clicked;
     int sel = M.sel;
@@ -231,7 +315,7 @@ void MenuDraw() {
 // Pause
 // ---------------------------------------------------------------------------
 void PauseEnter() {
-    M.sel = 0; M.settingsOpen = false; M.prevSel = 0;
+    M.sel = 0; M.settingsOpen = false; M.guideOpen = false; M.prevSel = 0;
     EnableCursor();
     audio::Amb().muffle = 0.6f;
 }
@@ -240,7 +324,8 @@ void PauseUpdate(float dt) {
     Game& g = G();
     M.t += dt;
     if (M.settingsOpen) { SettingsUpdate(); return; }
-    int n = 4;
+    if (M.guideOpen) { GuideUpdate(); return; }
+    int n = 5;
     if (Up()) M.sel = (M.sel + n - 1) % n;
     if (Down()) M.sel = (M.sel + 1) % n;
     if (M.sel != M.prevSel) { audio::Play("ui_hover", 0.5f); M.prevSel = M.sel; }
@@ -251,8 +336,9 @@ void PauseUpdate(float dt) {
         audio::Play("ui_select", 0.7f);
         if (M.sel == 0) resume();
         else if (M.sel == 1) { M.settingsOpen = true; M.settingsSel = 0; }
-        else if (M.sel == 2) { audio::Amb().muffle = 0.0f; g.ReturnToMenu(); }
-        else if (M.sel == 3) { g.SaveGame(); g.quit = true; }
+        else if (M.sel == 2) M.guideOpen = true;
+        else if (M.sel == 3) { audio::Amb().muffle = 0.0f; g.ReturnToMenu(); }
+        else if (M.sel == 4) { g.SaveGame(); g.quit = true; }
     }
 }
 
@@ -261,11 +347,12 @@ void PauseDraw() {
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight(), s = UiScale();
     DrawRectangle(0, 0, (int)W, (int)H, Alpha(BLACK, 0.55f));
     if (M.settingsOpen) { SettingsDraw(); return; }
+    if (M.guideOpen) { GuideDraw(); return; }
     float x = W * 0.1f, y = H * 0.32f;
     Text(F_MONO_THIN, "paused", x, y, 36 * s, kInk, 8 * s);
     if (g.story) Text(F_MONO_LIGHT, ChapterTitle(g.story->chapter), x + 2 * s, y + 50 * s, 13 * s, kDim, 3 * s);
     if (!g.hud.objective.empty()) Text(F_MONO_LIGHT, g.hud.objective.c_str(), x + 2 * s, y + 70 * s, 13 * s, kFaint);
-    std::vector<std::string> items{ "resume", "settings", "save and return to menu", "save and quit" };
+    std::vector<std::string> items{ "resume", "settings", "how to play", "save and return to menu", "save and quit" };
     bool clicked;
     DrawList(items, M.sel, x, y + 120 * s, 20 * s, M.hover, true, clicked);
     if (clicked) {}
